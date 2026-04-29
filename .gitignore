@@ -1,0 +1,6 @@
+.venv/
+src/bitmap_designer.egg-info/
+__pycache__/
+*.pyc
+*.py.backup
+.DS_Store
