@@ -81,6 +81,8 @@
                     - The rectangle corner selection can move into any quadrant around the cursor.
                     - The selection movement must be restricted within the bounds.
             - [P]review - open/refresh the preview in a browser window
+            - [U]ndo - undo last action (dimmed when nothing to undo)
+            - [^R]edo - redo last undone action (dimmed when nothing to redo)
             - [Escape] - exit Design mode (return Main UI)
     - Bitmap index UI (modal window) // select a unique dataspace for a bitmap with its own data
         - Prompt: Enter any positive integer number.
@@ -238,7 +240,7 @@
 - Status line: at bottom of screen (when present)
 
 ### Colors
-- 0 = transparent (to reset pixel(s) in the UI)
+- 0 = transparent (resets pixel(s) to space in the UI and bitmap data)
     - Note: never actually paint transparent colors in the generated code.
 - 16-color palette accessible by keyboard (0-F)
 - Up to 9 palettes can be defined in ~/.bitmapsrc
@@ -345,12 +347,12 @@
     - each bitmap should contain pixel data
     - each bitmap should have configurations alongside it
 - the bitmap should be saved as ASCII art
-    - each character represents a canvas pixel (0-F, single character)
+    - each character represents a canvas pixel: color codes 1-F are single characters, transparent (color code 0) is stored as a space character
     - In text UI: 2 characters = 1 pixel (for square appearance)
     - pixelSize config only affects preview/output, not text UI
     - colors
         - 16-color palette (0-F) for keyboard accessibility
-        - 0 = transparent (space in UI)
+        - 0 = transparent (space in UI and bitmap pixel data)
 
 ### Example Output Snippet
    // Fill a 10x10 design area with blue pixels.

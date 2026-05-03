@@ -192,16 +192,19 @@ class DesignScreen(Screen):
         self.cursor_y = 0
         self.current_color = "1"
         self.pixels = bitmap_data.get("bitmap", {}).get("pixels", [])
+        self.undo_stack = []
+        self.redo_stack = []
 
     def compose(self) -> ComposeResult:
         yield Static("Design Mode", id="title")
         with Vertical():
             yield Static("", id="grid")
-            yield Static("[arrows/hjkl] move  [space] paint  [C]olor  [F]ill  [R]ect  [P]review  [Escape] back", id="hints", markup=False)
+            yield Static("", id="hints", markup=False)
         yield Static("", id="status")  # Status line for messages
 
     def on_mount(self) -> None:
         self.refresh_grid()
+        self._update_hints()
 
     def refresh_grid(self):
         lines = []
@@ -234,6 +237,12 @@ class DesignScreen(Screen):
         key = event.key.lower()
         if key == "q":
             self.app.action_quit()
+            return
+        if key == "u":
+            self._undo()
+            return
+        elif key == "ctrl+r":
+            self._redo()
             return
         step = 1
 
@@ -268,18 +277,20 @@ class DesignScreen(Screen):
         self.refresh_grid()
 
     def paint_pixel(self):
+        self._save_state()
         if len(self.pixels) <= self.cursor_y:
             self.pixels.extend([" " * self.width for _ in range(self.cursor_y - len(self.pixels) + 1)])
         row = list(self.pixels[self.cursor_y])
         if len(row) <= self.cursor_x:
             row.extend([" "] * (self.cursor_x - len(row) + 1))
-        row[self.cursor_x] = self.app.current_color
+        row[self.cursor_x] = " " if self.app.current_color == "0" else self.app.current_color
         self.pixels[self.cursor_y] = "".join(row)
         self.app.dirty = True
         self._sync_pixels()
         self.app._save_preview_html()
 
     def flood_fill(self):
+        self._save_state()
         target = self._get_pixel(self.cursor_x, self.cursor_y)
         fill_color = self.app.current_color
         if target == fill_color:
@@ -300,7 +311,7 @@ class DesignScreen(Screen):
         row = list(self.pixels[y])
         while len(row) <= x:
             row.append(" ")
-        row[x] = color
+        row[x] = " " if color == "0" else color
         self.pixels[y] = "".join(row)
 
     def _flood_fill(self, x: int, y: int, target: str, fill: str):
@@ -325,6 +336,53 @@ class DesignScreen(Screen):
         idx = str(self.app.current_index)
         if idx in self.app.bitmaps:
             self.app.bitmaps[idx]["bitmap"] = {"pixels": self.pixels}
+
+    def _save_state(self):
+        self.undo_stack.append([row for row in self.pixels])
+        self.redo_stack.clear()
+        self._update_hints()
+
+    def _undo(self):
+        if not self.undo_stack:
+            return
+        self.redo_stack.append([row for row in self.pixels])
+        self.pixels = self.undo_stack.pop()
+        self._sync_pixels()
+        self.app.dirty = True
+        self._update_hints()
+        self.refresh_grid()
+
+    def _redo(self):
+        if not self.redo_stack:
+            return
+        self.undo_stack.append([row for row in self.pixels])
+        self.pixels = self.redo_stack.pop()
+        self._sync_pixels()
+        self.app.dirty = True
+        self._update_hints()
+        self.refresh_grid()
+
+    def _update_hints(self):
+        from rich.text import Text
+        hints = Text()
+        hints.append("[arrows/hjkl] move  ")
+        hints.append("[space] paint  ")
+        hints.append("[C]olor  ")
+        hints.append("[F]ill  ")
+        hints.append("[R]ect  ")
+        hints.append("[P]review  ")
+        if not self.undo_stack:
+            hints.append("[U]ndo", style="dim")
+        else:
+            hints.append("[U]ndo")
+        hints.append("  ")
+        if not self.redo_stack:
+            hints.append("[^R]edo", style="dim")
+        else:
+            hints.append("[^R]edo")
+        hints.append("  ")
+        hints.append("[Escape] back")
+        self.query_one("#hints", Static).update(hints)
 
 
 class ColorScreen(Screen):
