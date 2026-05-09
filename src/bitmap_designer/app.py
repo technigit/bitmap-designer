@@ -1,7 +1,10 @@
+# pylint: disable=missing-docstring
+from pathlib import Path
 import os
 import json
 import webbrowser
-from pathlib import Path
+import pyperclip
+from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.screen import Screen
 from textual.widgets import Static, Footer, Button, Input
@@ -83,7 +86,9 @@ class OpenScreen(Screen):
 
     def refresh_files(self):
         if not os.path.exists(DEFAULT_BITMAP_DIR):
-            self.query_one("#file_list").update("No .json files found.\nCreate ~/bitmaps directory first.")
+            self.query_one("#file_list").update(
+                "No .json files found.\nCreate ~/bitmaps directory first."
+            )
             return
 
         self.files = sorted([f for f in os.listdir(DEFAULT_BITMAP_DIR) if f.endswith(".json")])
@@ -159,7 +164,11 @@ class MainScreen(Screen):
             return
         key_lower = key.lower()
         if key_lower == "d":
-            self.app.push_screen(DesignScreen(self.app.bitmaps.get(str(self.app.current_index), self.app._create_default_bitmap())))
+            bitmap = self.app.bitmaps.get(
+                str(self.app.current_index),
+                self.app.create_default_bitmap()
+            )
+            self.app.push_screen(DesignScreen(bitmap))
         elif key_lower == "b":
             self.app.push_screen(ConfigIndexScreen())
         elif key_lower == "p":
@@ -215,13 +224,13 @@ class DesignScreen(Screen):
             for x in range(self.width):
                 if x == self.cursor_x and y == self.cursor_y:
                     # Cursor: show color char with reverse video
-                    pixel = self.pixels[y][x] if y < len(self.pixels) and x < len(self.pixels[y]) else " "
+                    pixel = self._get_pixel(x, y)
                     if pixel == " ":
                         row += "[reverse]  [/]"  # Two spaces, reversed
                     else:
                         row += f"[reverse]{pixel}{pixel}[/]"  # Color char twice, reversed
                 else:
-                    pixel = self.pixels[y][x] if y < len(self.pixels) and x < len(self.pixels[y]) else " "
+                    pixel = self._get_pixel(x, y)
                     row += pixel * 2  # Always 2 chars per pixel in UI
             row += "|"
             lines.append(row)
@@ -241,7 +250,7 @@ class DesignScreen(Screen):
         if key == "u":
             self._undo()
             return
-        elif key == "ctrl+r":
+        if key == "ctrl+r":
             self._redo()
             return
         step = 1
@@ -279,15 +288,17 @@ class DesignScreen(Screen):
     def paint_pixel(self):
         self._save_state()
         if len(self.pixels) <= self.cursor_y:
-            self.pixels.extend([" " * self.width for _ in range(self.cursor_y - len(self.pixels) + 1)])
+            self.pixels.extend(
+                [" " * self.width for _ in range(self.cursor_y - len(self.pixels) + 1)]
+            )
         row = list(self.pixels[self.cursor_y])
         if len(row) <= self.cursor_x:
             row.extend([" "] * (self.cursor_x - len(row) + 1))
         row[self.cursor_x] = " " if self.app.current_color == "0" else self.app.current_color
         self.pixels[self.cursor_y] = "".join(row)
-        self.app.dirty = True
+        self.app.mark_dirty()
         self._sync_pixels()
-        self.app._save_preview_html()
+        self.app.save_preview_html()
 
     def flood_fill(self):
         self._save_state()
@@ -296,9 +307,9 @@ class DesignScreen(Screen):
         if target == fill_color:
             return
         self._flood_fill(self.cursor_x, self.cursor_y, target, fill_color)
-        self.app.dirty = True
+        self.app.mark_dirty()
         self._sync_pixels()
-        self.app._save_preview_html()
+        self.app.save_preview_html()
 
     def _get_pixel(self, x: int, y: int) -> str:
         if y < len(self.pixels) and x < len(self.pixels[y]):
@@ -338,32 +349,31 @@ class DesignScreen(Screen):
             self.app.bitmaps[idx]["bitmap"] = {"pixels": self.pixels}
 
     def _save_state(self):
-        self.undo_stack.append([row for row in self.pixels])
+        self.undo_stack.append(list(self.pixels))
         self.redo_stack.clear()
         self._update_hints()
 
     def _undo(self):
         if not self.undo_stack:
             return
-        self.redo_stack.append([row for row in self.pixels])
+        self.redo_stack.append(list(self.pixels))
         self.pixels = self.undo_stack.pop()
         self._sync_pixels()
-        self.app.dirty = True
+        self.app.mark_dirty()
         self._update_hints()
         self.refresh_grid()
 
     def _redo(self):
         if not self.redo_stack:
             return
-        self.undo_stack.append([row for row in self.pixels])
+        self.undo_stack.append(list(self.pixels))
         self.pixels = self.redo_stack.pop()
         self._sync_pixels()
-        self.app.dirty = True
+        self.app.mark_dirty()
         self._update_hints()
         self.refresh_grid()
 
     def _update_hints(self):
-        from rich.text import Text
         hints = Text()
         hints.append("[arrows/hjkl] move  ")
         hints.append("[space] paint  ")
@@ -425,6 +435,7 @@ class SaveScreen(Screen):
     def __init__(self):
         super().__init__()
         self.filename = "Untitled"
+        self.filename_input = None
 
     def compose(self) -> ComposeResult:
         yield Static("Save File", id="title")
@@ -459,12 +470,12 @@ class SaveScreen(Screen):
         }
 
         try:
-            with open(filepath, "w") as f:
+            with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
-            self.app.current_file = filepath
+            self.app.set_current_file(filepath)
             self.app.show_status("File saved.")
             self.app.pop_screen()
-        except Exception as e:
+        except (OSError, json.JSONDecodeError) as e:
             self.app.show_status(f"Error: {e}")
 
 
@@ -506,11 +517,20 @@ class RenameScreen(Screen):
     #status { dock: bottom; }
     """
 
+    def __init__(self):
+        super().__init__()
+        self.input = None
+        self.current_file = None
+
     def compose(self) -> ComposeResult:
         current = os.path.basename(self.app.current_file or "Untitled.json")
         yield Static("Rename File", id="title")
         with Vertical():
-            self.input = Input(value=current.replace(".json", ""), placeholder="New filename", id="filename")
+            self.input = Input(
+                value=current.replace(".json", ""),
+                placeholder="New filename",
+                id="filename"
+            )
             yield self.input
             yield Static("[Enter] rename  [Escape] cancel", id="hints")
 
@@ -544,7 +564,7 @@ class RenameScreen(Screen):
             self.app.current_file = new_path
             self.app.show_status("File renamed.")
             self.app.pop_screen()
-        except Exception as e:
+        except (OSError, json.JSONDecodeError) as e:
             self.app.show_status(f"Error: {e}")
 
 
@@ -629,13 +649,13 @@ class DeleteScreen(Screen):
             return
         try:
             os.remove(self.app.current_file)
-            self.app.current_file = None
-            self.app.bitmaps = {}
-            self.app.dirty = False
+            self.app.set_current_file(None)
+            self.app.set_bitmaps({})
+            self.app.mark_dirty(False)
             self.app.show_status("File deleted.")
             self.app.pop_screen()
             self.app.push_screen(StartupScreen())
-        except Exception as e:
+        except (OSError, json.JSONDecodeError) as e:
             self.app.show_status(f"Error: {e}")
 
 
@@ -646,6 +666,10 @@ class ConfigIndexScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
+    def __init__(self):
+        super().__init__()
+        self.input = None
 
     def compose(self) -> ComposeResult:
         yield Static("Bitmap Index", id="title")
@@ -668,9 +692,9 @@ class ConfigIndexScreen(Screen):
             try:
                 val = int(self.input.value or "1")
                 if val >= 1:
-                    self.app.current_index = val
+                    self.app.set_current_index(val)
                     if str(val) not in self.app.bitmaps:
-                        self.app.bitmaps[str(val)] = self.app._create_default_bitmap()
+                        self.app.bitmaps[str(val)] = self.app.create_default_bitmap()
                     self.app.pop_screen()
                     self.app.show_status(f"Switched to bitmap {val}.")
             except ValueError:
@@ -683,6 +707,10 @@ class ConfigBoundsScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
+    def __init__(self):
+        super().__init__()
+        self.input = None
 
     def compose(self) -> ComposeResult:
         b = self.app.bitmaps.get(str(self.app.current_index), {}).get("bounds", {})
@@ -713,7 +741,7 @@ class ConfigBoundsScreen(Screen):
                     if w >= 2 and h >= 2:
                         idx = str(self.app.current_index)
                         if idx not in self.app.bitmaps:
-                            self.app.bitmaps[idx] = self.app._create_default_bitmap()
+                            self.app.bitmaps[idx] = self.app.create_default_bitmap()
                         self.app.bitmaps[idx]["bounds"] = {"width": w, "height": h}
                         self.app.pop_screen()
             except ValueError:
@@ -726,6 +754,10 @@ class ConfigContextScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
+    def __init__(self):
+        super().__init__()
+        self.input = None
 
     def compose(self) -> ComposeResult:
         yield Static("Context variable", id="title")
@@ -749,7 +781,7 @@ class ConfigContextScreen(Screen):
         elif event.key in ("enter", "\n"):
             idx = str(self.app.current_index)
             if idx not in self.app.bitmaps:
-                self.app.bitmaps[idx] = self.app._create_default_bitmap()
+                self.app.bitmaps[idx] = self.app.create_default_bitmap()
             self.app.bitmaps[idx]["context"] = self.input.value or "ctx"
             self.app.pop_screen()
             self.app.show_status("Context saved.")
@@ -761,6 +793,10 @@ class ConfigXScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
+    def __init__(self):
+        super().__init__()
+        self.input = None
 
     def compose(self) -> ComposeResult:
         yield Static("X variable", id="title")
@@ -784,7 +820,7 @@ class ConfigXScreen(Screen):
         elif event.key in ("enter", "\n"):
             idx = str(self.app.current_index)
             if idx not in self.app.bitmaps:
-                self.app.bitmaps[idx] = self.app._create_default_bitmap()
+                self.app.bitmaps[idx] = self.app.create_default_bitmap()
             self.app.bitmaps[idx]["x"] = self.input.value or "x"
             self.app.pop_screen()
             self.app.show_status("X variable saved.")
@@ -796,6 +832,10 @@ class ConfigYScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
+    def __init__(self):
+        super().__init__()
+        self.input = None
 
     def compose(self) -> ComposeResult:
         yield Static("Y variable", id="title")
@@ -819,7 +859,7 @@ class ConfigYScreen(Screen):
         elif event.key in ("enter", "\n"):
             idx = str(self.app.current_index)
             if idx not in self.app.bitmaps:
-                self.app.bitmaps[idx] = self.app._create_default_bitmap()
+                self.app.bitmaps[idx] = self.app.create_default_bitmap()
             self.app.bitmaps[idx]["y"] = self.input.value or "y"
             self.app.pop_screen()
             self.app.show_status("Y variable saved.")
@@ -831,6 +871,10 @@ class ConfigLocationScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
+    def __init__(self):
+        super().__init__()
+        self.input = None
 
     def compose(self) -> ComposeResult:
         yield Static("Location (x y)", id="title")
@@ -859,7 +903,7 @@ class ConfigLocationScreen(Screen):
                     y = int(parts[1])
                     idx = str(self.app.current_index)
                     if idx not in self.app.bitmaps:
-                        self.app.bitmaps[idx] = self.app._create_default_bitmap()
+                        self.app.bitmaps[idx] = self.app.create_default_bitmap()
                     self.app.bitmaps[idx]["location"] = {"x": x, "y": y}
                     self.app.pop_screen()
                     self.app.show_status("Location saved.")
@@ -873,6 +917,10 @@ class ConfigPixelScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
+    def __init__(self):
+        super().__init__()
+        self.input = None
 
     def compose(self) -> ComposeResult:
         yield Static("Pixel Size", id="title")
@@ -899,7 +947,7 @@ class ConfigPixelScreen(Screen):
                 if val >= 1:
                     idx = str(self.app.current_index)
                     if idx not in self.app.bitmaps:
-                        self.app.bitmaps[idx] = self.app._create_default_bitmap()
+                        self.app.bitmaps[idx] = self.app.create_default_bitmap()
                     self.app.bitmaps[idx]["pixelSize"] = val
                     self.app.pop_screen()
                     self.app.show_status("Pixel size saved.")
@@ -953,6 +1001,7 @@ class QuitSaveScreen(Screen):
     def __init__(self):
         super().__init__()
         self.filename = "Untitled"
+        self.filename_input = None
 
     def compose(self) -> ComposeResult:
         yield Static("Save File", id="title")
@@ -984,12 +1033,12 @@ class QuitSaveScreen(Screen):
         }
 
         try:
-            with open(filepath, "w") as f:
+            with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
-            self.app.current_file = filepath
-            self.app.dirty = False
+            self.app.set_current_file(filepath)
+            self.app.mark_dirty(False)
             self.app.exit()
-        except Exception as e:
+        except (OSError, json.JSONDecodeError) as e:
             self.app.show_status(f"Error: {e}")
 
 
@@ -1041,6 +1090,7 @@ class SaveScreenForClose(Screen):
     def __init__(self):
         super().__init__()
         self.filename = "Untitled"
+        self.filename_input = None
 
     def compose(self) -> ComposeResult:
         yield Static("Save File", id="title")
@@ -1075,13 +1125,13 @@ class SaveScreenForClose(Screen):
         }
 
         try:
-            with open(filepath, "w") as f:
+            with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
-            self.app.current_file = filepath
-            self.app.dirty = False
+            self.app.set_current_file(filepath)
+            self.app.mark_dirty(False)
             self.app.pop_screen()
             self.app.push_screen(StartupScreen())
-        except Exception as e:
+        except (OSError, json.JSONDecodeError) as e:
             self.app.show_status(f"Error: {e}")
 
 
@@ -1173,13 +1223,22 @@ class BitmapDesignerApp(App):
         self.current_color = "1"
         self.dirty = False
 
+    def mark_dirty(self, value: bool = True) -> None:
+        self.dirty = value
+    def set_current_file(self, path: str | None) -> None:
+        self.current_file = path
+    def set_bitmaps(self, bitmaps: dict) -> None:
+        self.bitmaps = bitmaps
+    def set_current_index(self, index: int) -> None:
+        self.current_index = index
+
     def compose(self) -> ComposeResult:
         yield Footer()
 
     def on_mount(self) -> None:
         self.push_screen(StartupScreen())
 
-    def action_quit(self) -> None:
+    async def action_quit(self) -> None:
         self.push_screen(QuitScreen())
 
     def show_status(self, message: str) -> None:
@@ -1188,19 +1247,19 @@ class BitmapDesignerApp(App):
             screen = self.screen
             if hasattr(screen, 'show_status'):
                 screen.show_status(message)
-        except Exception:
+        except Exception:  # pylint: disable=W0718
             pass
 
     def new_bitmap(self):
         self.bitmaps = {}
         self.current_index = 1
-        self.bitmaps["1"] = self._create_default_bitmap()
+        self.bitmaps["1"] = self.create_default_bitmap()
         self.dirty = False
         self.push_screen(MainScreen())
 
     def load_file(self, filepath: str):
         try:
-            with open(filepath, "r") as f:
+            with open(filepath, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 self.bitmaps = data.get("bitmaps", {})
                 self.current_file = filepath
@@ -1208,29 +1267,27 @@ class BitmapDesignerApp(App):
                     self.current_index = int(next(iter(self.bitmaps.keys())))
                 self.dirty = False
                 self.push_screen(MainScreen())
-        except Exception as e:
+        except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error loading file: {e}")
 
     def set_current_color(self, color: str):
         self.current_color = color
 
     def preview(self):
-        self._save_preview_html()
+        self.save_preview_html()
         try:
             self._open_browser("/tmp/bitmap-preview.html")
             self.show_status("Preview opened.")
-        except Exception as e:
+        except (OSError, FileNotFoundError) as e:
             self.show_status(f"Error: {e}")
 
-    def _save_preview_html(self):
+    def save_preview_html(self):
         html = self.generate_preview_html()
         preview_path = "/tmp/bitmap-preview.html"
-        with open(preview_path, "w") as f:
+        with open(preview_path, "w", encoding="utf-8") as f:
             f.write(html)
 
     def _open_browser(self, path: str):
-        import platform
-        import webbrowser
         webbrowser.open(f"file://{path}")
 
     def generate_preview_html(self) -> str:
@@ -1258,7 +1315,9 @@ class BitmapDesignerApp(App):
                     if char != " ":
                         color = color_map.get(char.lower(), char)
                         js_code.append(f"ctx.fillStyle = '{color}';")
-                        js_code.append(f"ctx.fillRect({x_var} + {x} * {pixel_size}, {y_var} + {y} * {pixel_size}, {pixel_size}, {pixel_size});")
+                        rect = f"{x_var} + {x} * {pixel_size},"
+                        rect += f"{y_var} + {y} * {pixel_size}, {pixel_size}, {pixel_size}"
+                        js_code.append(f"ctx.fillRect({rect});")
 
         canvas_js = "\n    ".join(js_code)
 
@@ -1303,7 +1362,7 @@ class BitmapDesignerApp(App):
 
         return "\n".join(lines)
 
-    def _create_default_bitmap(self) -> dict:
+    def create_default_bitmap(self) -> dict:
         return {
             "bounds": {"width": 10, "height": 10},
             "context": "ctx",

@@ -5,6 +5,7 @@ description = "A text-based utility to design bitmaps and convert them into JS c
 requires-python = ">=3.11"
 dependencies = [
     "textual>=0.60.0",
+    "pyperclip",
 ]
 
 [project.scripts]
