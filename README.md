@@ -26,26 +26,15 @@ A text-based utility to design bitmap graphics for JavaScript projects.
    This installs the `bitmap-designer` CLI command and the required `textual` dependency.
 
 ## Running the Application
-Once installed, launch the application with:
-```bash
-bitmap-designer
-```
-
 To run without installing (using the source directly):
 ```bash
 python -m bitmap_designer
 ```
 
-Or using the project's venv directly:
-
-**macOS/Linux:**
+Or, install the project and run the CLI command:
 ```bash
-.venv/bin/python -m bitmap_designer
-```
-
-**Windows:**
-```bash
-.venv\Scripts\python.exe -m bitmap_designer
+pip install -e .
+bitmap-designer
 ```
 
 ## Notes
