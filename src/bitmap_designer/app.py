@@ -40,6 +40,13 @@ ASCII_HEADER = "Bitmap Designer"
 HOME_DIR = str(Path.home())
 DEFAULT_BITMAP_DIR = os.path.join(HOME_DIR, "bitmaps")
 
+COLOR_MAP = {
+    "1": "#000000", "2": "#FFFFFF", "3": "#FF4A00", "4": "#FFD24A",
+    "5": "#5CFF4A", "6": "#4AA8A8", "7": "#C24AFF", "8": "#FF9A00", "9": "#8A4A00",
+    "a": "#0f2a66", "b": "#d2d2d2", "c": "#909090", "d": "#ff7a9a",
+    "e": "#ffd24a", "f": "#ffffff",
+}
+
 
 class StartupScreen(Screen):
     CSS = """
@@ -193,13 +200,10 @@ class DesignScreen(Screen):
 
     def __init__(self, bitmap_data: dict):
         super().__init__()
-        self.bitmap_data = bitmap_data
         self.width = bitmap_data.get("bounds", {}).get("width", 10)
         self.height = bitmap_data.get("bounds", {}).get("height", 10)
-        self.pixel_size = bitmap_data.get("pixelSize", 2)
         self.cursor_x = 0
         self.cursor_y = 0
-        self.current_color = "1"
         self.pixels = bitmap_data.get("bitmap", {}).get("pixels", [])
         self.undo_stack = []
         self.redo_stack = []
@@ -242,20 +246,8 @@ class DesignScreen(Screen):
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
-    def on_key(self, event) -> None:
-        key = event.key.lower()
-        if key == "q":
-            self.app.action_quit()
-            return
-        if key == "u":
-            self._undo()
-            return
-        if key == "ctrl+r":
-            self._redo()
-            return
+    def _handle_movement(self, key: str) -> bool:
         step = 1
-
-        # Check for modifiers in key name (e.g., "shift+left", "ctrl+h")
         if key.startswith("shift"):
             step = 5
         elif key.startswith("ctrl"):
@@ -271,7 +263,25 @@ class DesignScreen(Screen):
             self.cursor_y = max(0, self.cursor_y - step)
         elif key in ("down", "j", "s"):
             self.cursor_y = min(self.height - 1, self.cursor_y + step)
-        elif key == "space":
+        else:
+            return False
+        return True
+
+    def on_key(self, event) -> None:
+        key = event.key.lower()
+        if key == "q":
+            self.app.action_quit()
+            return
+        if key == "u":
+            self._undo()
+            return
+        if key == "ctrl+r":
+            self._redo()
+            return
+        if self._handle_movement(key):
+            self.refresh_grid()
+            return
+        if key == "space":
             self.paint_pixel()
         elif key == "f":
             self.flood_fill()
@@ -1290,34 +1300,32 @@ class BitmapDesignerApp(App):
     def _open_browser(self, path: str):
         webbrowser.open(f"file://{path}")
 
-    def generate_preview_html(self) -> str:
-        color_map = {
-            "1": "#000000", "2": "#FFFFFF", "3": "#FF4A00", "4": "#FFD24A",
-            "5": "#5CFF4A", "6": "#4AA8A8", "7": "#C24AFF", "8": "#FF9A00", "9": "#8A4A00",
-            "a": "#0f2a66", "b": "#d2d2d2", "c": "#909090", "d": "#ff7a9a",
-            "e": "#ffd24a", "f": "#ffffff",
-        }
+    def _bitmap_to_js(self, idx: str, bm: dict) -> list[str]:
+        lines = []
+        x_var = bm.get("x", f"x{idx}")
+        y_var = bm.get("y", f"y{idx}")
+        location = bm.get("location", {"x": 0, "y": 0})
+        pixel_size = bm.get("pixelSize", 2)
+        pixels = bm.get("bitmap", {}).get("pixels", [])
 
+        lines.append(f"// Bitmap {idx}")
+        lines.append(f"const {x_var} = {location['x']};")
+        lines.append(f"const {y_var} = {location['y']};")
+
+        for y, row in enumerate(pixels):
+            for x, char in enumerate(row):
+                if char != " ":
+                    color = COLOR_MAP.get(char.lower(), char)
+                    lines.append(f"ctx.fillStyle = '{color}';")
+                    rect = f"{x_var} + {x} * {pixel_size},"
+                    rect += f"{y_var} + {y} * {pixel_size}, {pixel_size}, {pixel_size}"
+                    lines.append(f"ctx.fillRect({rect});")
+        return lines
+
+    def generate_preview_html(self) -> str:
         js_code = []
         for idx, bm in self.bitmaps.items():
-            x_var = bm.get("x", f"x{idx}")
-            y_var = bm.get("y", f"y{idx}")
-            location = bm.get("location", {"x": 0, "y": 0})
-            pixel_size = bm.get("pixelSize", 2)
-            pixels = bm.get("bitmap", {}).get("pixels", [])
-
-            js_code.append(f"// Bitmap {idx}")
-            js_code.append(f"const {x_var} = {location['x']};")
-            js_code.append(f"const {y_var} = {location['y']};")
-
-            for y, row in enumerate(pixels):
-                for x, char in enumerate(row):
-                    if char != " ":
-                        color = color_map.get(char.lower(), char)
-                        js_code.append(f"ctx.fillStyle = '{color}';")
-                        rect = f"{x_var} + {x} * {pixel_size},"
-                        rect += f"{y_var} + {y} * {pixel_size}, {pixel_size}, {pixel_size}"
-                        js_code.append(f"ctx.fillRect({rect});")
+            js_code.extend(self._bitmap_to_js(idx, bm))
 
         canvas_js = "\n    ".join(js_code)
 
