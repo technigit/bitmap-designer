@@ -5,9 +5,10 @@
 1. startup
     - Startup UI
         - Startup UI
-            - display "bitmap designer" in ASCII art
+            - display "Bitmap Designer" in ASCII art
+            - current color reset to default (1)
             - menu commands:
-                - [N]ew Bitmap // use index 1 by default
+                - [N]ew Bitmap // use index 1 by default, current_file set to Untitled.json
                 - [O]pen Bitmap
                 - [Q]uit // global command, works from anywhere
                     - Shows "Really quit? (y/N)"
@@ -28,7 +29,7 @@
                             - proceed to list .json files in current directory
                         - if no
                             - return to Startup UI
-        - list .json files in ~/bitmaps (or the last visited directory)
+        - list .json files in ~/bitmaps (or the last visited directory), sorted by last modified (newest first)
         - if none
             - Response: No .json files were found. [OK]
             - return to Startup UI
@@ -44,6 +45,7 @@
                 - return to Startup UI
 2. editor
     - Main UI
+        - page title shows current filename: "Main Menu - filename.json"
         - menu commands below content:
             - [D]esign mode // Design UI
             - [B]itmap index // Bitmap index UI
@@ -59,6 +61,7 @@
         - two text characters = 1 bitmap pixel in UI (for square appearance)
         - Note: pixelSize config only affects preview/output, not the text UI
         - all transparent by default
+        - page title shows current filename: "Design Mode - filename.json"
         - menu commands below content:
             - [arrow keys / hjkl] - move cursor // in two dimensions
             - [shift arrow keys / hjkl] - move cursor (5px)
@@ -69,7 +72,7 @@
             - [ctrl yuio] - scroll grid (10px)
             - [option yuio] - scroll grid (20px)
             - [wasd] - ad = -/+ bitmap index number, ws = -10/+10 bitmap index number
-            - [C]olor - select current color // Color UI
+            - [C]olor=N - select current color (N shows current color value) // Color UI
             - [space] - paint one bitmap pixel at the cursor position with the current color
             - [F]ill - flood fill (paint bucket style) with current color
             - [R]ectangle - paint rectangle from cursor with current color
@@ -82,7 +85,10 @@
                     - The selection movement must be restricted within the bounds.
             - [P]review - open/refresh the preview in a browser window
             - [U]ndo - undo last action (dimmed when nothing to undo)
+                - cursor position saved and restored with each undo/redo
+                - status shows: "Before change #N of M" or "Already at oldest change"
             - [^R]edo - redo last undone action (dimmed when nothing to redo)
+                - status shows: "After change #N of M" or "Already at newest change"
             - [Escape] - exit Design mode (return Main UI)
     - Bitmap index UI (modal window) // select a unique dataspace for a bitmap with its own data
         - Prompt: Enter any positive integer number.
@@ -117,7 +123,7 @@
     - Manage file UI (modal window)
         - provide file management options
             - [R]ename - rename file
-                - enter/edit file name // use current name, or default to Untitled)
+        - enter/edit file name // pre-filled with current filename (or Untitled.json for new files), name part selected/highlighted, cursor before .json
                     - if file name already exists
                         - Prompt: Overwrite file? (y/N)
                             - if yes
@@ -142,7 +148,9 @@
         - Error handling messages:
             - (show system error message)
     - Configuration UI (modal window)
-        - read/write ~/.bitmapsrc
+        - page title shows current filename: "Configuration - filename.json"
+        - shows current values in a right-aligned column, 2-character margin from longest label
+        - values refresh on return from any sub-screen
         - [I]ndex - bitmap index
             - enter any positive integer number
             - [Enter] - save configuration
@@ -196,18 +204,15 @@
         - if changes were made (file is dirty)
             - Prompt: Really close? (y/N)
                 - if yes
-                    - if file saved
-                        - return to the Startup UI
-                    - if file not saved
-                        - Prompt: Save file first? (Y/n)
-                            - if yes
-                                - Save UI → Startup UI
-                            - if no
-                                - Prompt: Are you sure? (y/N)
-                                    - if yes
-                                        - return to the Startup UI
-                                    - if no
-                                        - go back to Main UI, do not close
+                    - Prompt: Save file first? (Y/n)
+                        - if yes
+                            - Save UI → Startup UI (dirty bit cleared)
+                        - if no
+                            - Prompt: Are you sure? (y/N)
+                                - if yes
+                                    - return to the Startup UI (dirty bit cleared)
+                                - if no
+                                    - go back to Main UI, do not close
                 - if no
                     - go back to Main UI, do not close
     - Quit UI (q from anywhere)

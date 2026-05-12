@@ -19,6 +19,7 @@ class StartupScreen(Screen):
     CSS = """
     #menu { margin-top: 1; }
     """
+
     def compose(self) -> ComposeResult:
         yield Static(ASCII_HEADER, markup=False, id="title")
         with Vertical():
@@ -26,6 +27,7 @@ class StartupScreen(Screen):
 
     def on_mount(self) -> None:
         self.app.title = "Bitmap Designer"
+        self.app.set_current_color("1")
 
     def on_key(self, event) -> None:
         key = event.key.lower()
@@ -43,6 +45,7 @@ class OpenScreen(Screen):
     #file_list { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
     """
+
     def __init__(self):
         super().__init__()
         self.files = []
@@ -58,7 +61,6 @@ class OpenScreen(Screen):
         self.refresh_files()
 
     # Scan the bitmap directory and update the file list.
-
     def refresh_files(self):
         if not os.path.exists(DEFAULT_BITMAP_DIR):
             self.query_one("#file_list").update(
@@ -66,7 +68,11 @@ class OpenScreen(Screen):
             )
             return
 
-        self.files = sorted([f for f in os.listdir(DEFAULT_BITMAP_DIR) if f.endswith(".json")])
+        self.files = sorted(
+            [f for f in os.listdir(DEFAULT_BITMAP_DIR) if f.endswith(".json")],
+            key=lambda f: os.path.getmtime(os.path.join(DEFAULT_BITMAP_DIR, f)),
+            reverse=True,
+        )
 
         if self.files:
             self.selected_idx = 0
@@ -98,7 +104,6 @@ class OpenScreen(Screen):
             self._update_list()
 
     # Load the selected file from the list.
-
     def open_file(self):
         filename = self.files[self.selected_idx]
         filepath = os.path.join(DEFAULT_BITMAP_DIR, filename)

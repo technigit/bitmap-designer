@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 class QuitScreen(Screen):
     """Initial quit confirmation screen."""
+
     def on_mount(self) -> None:
         if not self.app.dirty:
             self.app.exit()
@@ -34,6 +35,7 @@ class QuitScreen(Screen):
 
 class QuitSaveFileFirstScreen(Screen):
     """Screen asking whether to save before quitting."""
+
     def compose(self) -> ComposeResult:
         yield Static("Quit - Save", id="title")
         with Vertical():

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Static, Input
+from textual.widgets._input import Selection
 from textual.containers import Vertical
 
 from ..constants import DEFAULT_BITMAP_DIR
@@ -23,8 +24,11 @@ class ManageScreen(Screen):
     #menu { margin-top: 1; }
     #status { dock: bottom; }
     """
+
+    TITLE = "Manage File"
+
     def compose(self) -> ComposeResult:
-        yield Static("Manage File", id="title")
+        yield Static(self.app.title_with_file(self.TITLE), id="title")
         with Vertical():
             yield Static(
                 "[R]ename file\n"
@@ -36,6 +40,9 @@ class ManageScreen(Screen):
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
+
+    def on_screen_resume(self, _event) -> None:
+        self.query_one("#title", Static).update(self.app.title_with_file(self.TITLE))
 
     def on_key(self, event) -> None:
         if event.key.lower() == "q":
@@ -55,6 +62,7 @@ class RenameScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
     def __init__(self):
         super().__init__()
         self.input = None
@@ -65,12 +73,16 @@ class RenameScreen(Screen):
         yield Static("Rename File", id="title")
         with Vertical():
             self.input = Input(
-                value=current.replace(".json", ""),
+                value=current,
                 placeholder="New filename",
                 id="filename"
             )
             yield self.input
             yield Static("[Enter] rename  [Escape] cancel", id="hints")
+
+    def on_mount(self) -> None:
+        if self.input.value.endswith(".json"):
+            self.input.selection = Selection(0, len(self.input.value) - 5)
 
     def on_key(self, event) -> None:
         if event.key.lower() == "q":
@@ -82,7 +94,6 @@ class RenameScreen(Screen):
             self.rename_file()
 
     # Rename the current file on disk.
-
     def rename_file(self):
         if not self.app.current_file:
             self.app.show_status("No file to rename.")
@@ -110,11 +121,11 @@ class RenameScreen(Screen):
 
 class DeleteScreen(Screen):
     """Screen to confirm and delete the current file."""
-
     CSS = """
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
     def compose(self) -> ComposeResult:
         yield Static("Delete File", id="title")
         with Vertical():
@@ -135,7 +146,6 @@ class DeleteScreen(Screen):
             self.app.pop_screen()
 
     # Delete the current file and reset application state.
-
     def delete_file(self):
         if not self.app.current_file or not os.path.exists(self.app.current_file):
             self.app.show_status("No file to delete.")

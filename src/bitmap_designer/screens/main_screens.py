@@ -24,8 +24,11 @@ class MainScreen(Screen):
     #menu { margin-top: 1; }
     #status { dock: bottom; }
     """
+
+    TITLE = "Main Menu"
+
     def compose(self) -> ComposeResult:
-        yield Static("Main Menu", id="title")
+        yield Static(self.app.title_with_file(self.TITLE), id="title")
         with Vertical():
             yield Static(
                 "[D]esign mode\n"
@@ -43,6 +46,9 @@ class MainScreen(Screen):
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
+
+    def on_screen_resume(self, _event) -> None:
+        self.query_one("#title", Static).update(self.app.title_with_file(self.TITLE))
 
     def on_key(self, event) -> None:
         key = event.key
@@ -75,8 +81,8 @@ class MainScreen(Screen):
 
 
 class CloseScreen(Screen):
-
     """Close confirmation screen from the main menu."""
+
     def on_mount(self) -> None:
         if not self.app.dirty:
             self.app.pop_screen()
@@ -97,6 +103,7 @@ class CloseScreen(Screen):
 
 class SaveFileFirstScreen(Screen):
     """Screen asking whether to save before closing."""
+
     def compose(self) -> ComposeResult:
         yield Static("Close - Save", id="title")
         with Vertical():
@@ -115,6 +122,7 @@ class SaveFileFirstScreen(Screen):
 
 class AreYouSureScreen(Screen):
     """Final confirmation screen when discarding changes."""
+
     def compose(self) -> ComposeResult:
         yield Static("Close - Confirm", id="title")
         with Vertical():
@@ -122,6 +130,7 @@ class AreYouSureScreen(Screen):
 
     def on_key(self, event) -> None:
         if event.key.lower() == "y":
+            self.app.mark_dirty(False)
             self.app.pop_screen()
             self.app.push_screen(StartupScreen())
         elif event.key in ("enter", "\n") or event.key.lower() in ("n", "escape"):

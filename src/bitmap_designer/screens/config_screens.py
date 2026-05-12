@@ -18,21 +18,44 @@ class ConfigScreen(Screen):
     #hints { opacity: 0.5; }
     #status { dock: bottom; }
     """
+
     def compose(self) -> ComposeResult:
-        yield Static("Configuration", id="title")
+        yield Static(self.app.title_with_file("Configuration"), id="title")
         with Vertical():
-            yield Static(
-                "[I]ndex\n"
-                "[B]ounds\n"
-                "[C]ontext\n"
-                "Variable [X]\n"
-                "Variable [Y]\n"
-                "[L]ocation\n"
-                "Pixel [S]ize",
-                id="menu",
-                markup=False,
-            )
+            yield Static("", id="menu", markup=False)
         yield Static("", id="status")  # Status line for messages
+
+    def on_mount(self) -> None:
+        self._refresh_values()
+
+    def on_screen_resume(self, _event) -> None:
+        self._refresh_values()
+
+    def _refresh_values(self):
+        idx = str(self.app.current_index)
+        bm = self.app.bitmaps.get(idx, {})
+        bounds = bm.get("bounds", {"width": 10, "height": 10})
+        loc = bm.get("location", {"x": 0, "y": 0})
+        labels = [
+            "[I]ndex", "[B]ounds", "[C]ontext",
+            "Variable [X]", "Variable [Y]",
+            "[L]ocation", "Pixel [S]ize",
+        ]
+        values = [
+            idx,
+            f"{bounds['width']} {bounds['height']}",
+            bm.get("context", "ctx"),
+            bm.get("x", f"x{idx}"),
+            bm.get("y", f"y{idx}"),
+            f"{loc['x']} {loc['y']}",
+            str(bm.get("pixelSize", 2)),
+        ]
+        max_label = max(len(l) for l in labels)
+        lines = "\n".join(
+            f"{label}{' ' * (max_label - len(label) + 2)}{value}"
+            for label, value in zip(labels, values)
+        )
+        self.query_one("#menu", Static).update(lines)
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
@@ -62,18 +85,18 @@ class ConfigScreen(Screen):
 
 class ConfigIndexScreen(Screen):
     """Screen to change the current bitmap index."""
-
     CSS = """
     Input { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
     def __init__(self):
         super().__init__()
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static("Bitmap Index", id="title")
+        yield Static(self.app.title_with_file("Bitmap Index"), id="title")
         with Vertical():
             self.input = Input(value=str(self.app.current_index), placeholder="Index", id="index")
             yield self.input
@@ -109,6 +132,7 @@ class ConfigBoundsScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
     def __init__(self):
         super().__init__()
         self.input = None
@@ -117,7 +141,7 @@ class ConfigBoundsScreen(Screen):
         b = self.app.bitmaps.get(str(self.app.current_index), {}).get("bounds", {})
         bw = b.get("width", 10)
         bh = b.get("height", 10)
-        yield Static("Bitmap Bounds", id="title")
+        yield Static(self.app.title_with_file("Bitmap Bounds"), id="title")
         with Vertical():
             self.input = Input(value=f"{bw} {bh}", placeholder="width height", id="bounds")
             yield self.input
@@ -156,12 +180,13 @@ class ConfigContextScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
     def __init__(self):
         super().__init__()
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static("Context variable", id="title")
+        yield Static(self.app.title_with_file("Context variable"), id="title")
         with Vertical():
             bm = self.app.bitmaps.get(str(self.app.current_index), {})
             current = bm.get("context", "ctx")
@@ -195,12 +220,13 @@ class ConfigXScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
     def __init__(self):
         super().__init__()
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static("X variable", id="title")
+        yield Static(self.app.title_with_file("X variable"), id="title")
         with Vertical():
             bm = self.app.bitmaps.get(str(self.app.current_index), {})
             current = bm.get("x", f"x{self.app.current_index}")
@@ -234,12 +260,13 @@ class ConfigYScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
     def __init__(self):
         super().__init__()
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static("Y variable", id="title")
+        yield Static(self.app.title_with_file("Y variable"), id="title")
         with Vertical():
             bm = self.app.bitmaps.get(str(self.app.current_index), {})
             current = bm.get("y", f"y{self.app.current_index}")
@@ -273,12 +300,13 @@ class ConfigLocationScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
     def __init__(self):
         super().__init__()
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static("Location (x y)", id="title")
+        yield Static(self.app.title_with_file("Location (x y)"), id="title")
         with Vertical():
             bm = self.app.bitmaps.get(str(self.app.current_index), {})
             loc = bm.get("location", {"x": 0, "y": 0})
@@ -319,12 +347,13 @@ class ConfigPixelScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
     def __init__(self):
         super().__init__()
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static("Pixel Size", id="title")
+        yield Static(self.app.title_with_file("Pixel Size"), id="title")
         with Vertical():
             bm = self.app.bitmaps.get(str(self.app.current_index), {})
             current = bm.get("pixelSize", 2)

@@ -19,8 +19,9 @@ class CodegenScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
     def compose(self) -> ComposeResult:
-        yield Static("Code Generation", id="title")
+        yield Static(self.app.title_with_file("Code Generation"), id="title")
         with Vertical():
             yield Static("", id="code")
             yield Static("[Enter] copy  [Escape] close", id="hints")
@@ -43,6 +44,7 @@ class CodegenScreen(Screen):
 
 class ResponseScreen(Screen):
     """Generic message screen with an OK button."""
+
     def __init__(self, message: str):
         super().__init__()
         self.message = message

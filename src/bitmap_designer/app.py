@@ -1,23 +1,22 @@
 """Main application class and entry point."""
 import json
+import os
 import webbrowser
 from textual.app import App, ComposeResult
 from textual.widgets import Footer
 from textual.binding import Binding
 
-from .constants import COLOR_MAP
+from .constants import COLOR_MAP, DEFAULT_BITMAP_DIR
 from .screens import StartupScreen, MainScreen, QuitScreen
 
 
 class BitmapDesignerApp(App):
     """Textual App subclass orchestrating all screens and application state."""
-
     CSS = """
     #title { text-align: center; text-style: bold; margin-top: 1; margin-bottom: 2; }
     #hints { margin-top: 1; opacity: 0.5; }
     Vertical { margin-left: 3; }
     """
-
     BINDINGS = [
         Binding("q", "quit", "Quit", show=False),
     ]
@@ -35,6 +34,11 @@ class BitmapDesignerApp(App):
 
     def set_current_file(self, path: str | None) -> None:
         self.current_file = path
+
+    def title_with_file(self, base_title: str) -> str:
+        if self.current_file:
+            return f"{base_title} - {os.path.basename(self.current_file)}"
+        return base_title
 
     def set_bitmaps(self, bitmaps: dict) -> None:
         self.bitmaps = bitmaps
@@ -67,7 +71,9 @@ class BitmapDesignerApp(App):
         self.bitmaps = {}
         self.current_index = 1
         self.bitmaps["1"] = self.create_default_bitmap()
+        self.current_file = os.path.join(DEFAULT_BITMAP_DIR, "Untitled.json")
         self.dirty = False
+        self.set_current_color("1")
         self.push_screen(MainScreen())
 
     # Load bitmaps from a JSON file and open the main menu.

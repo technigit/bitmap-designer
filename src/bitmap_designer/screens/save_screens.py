@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Static, Input
+from textual.widgets._input import Selection
 from textual.containers import Vertical
 
 from ..constants import DEFAULT_BITMAP_DIR
@@ -24,6 +25,7 @@ class SaveScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
     def __init__(self):
         super().__init__()
         self.filename = "Untitled"
@@ -37,6 +39,13 @@ class SaveScreen(Screen):
             yield self.filename_input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
 
+    def on_mount(self) -> None:
+        if self.app.current_file:
+            basename = os.path.basename(self.app.current_file)
+            self.filename_input.value = basename
+            if basename.endswith(".json"):
+                self.filename_input.selection = Selection(0, len(basename) - 5)
+
     def on_key(self, event) -> None:
         if event.key.lower() == "q":
             self.app.action_quit()
@@ -47,7 +56,6 @@ class SaveScreen(Screen):
             self.save_file()
 
     # Save all bitmaps to a JSON file.
-
     def save_file(self):
         filename = self.filename_input.value or "Untitled"
         if not filename.endswith(".json"):
@@ -67,6 +75,7 @@ class SaveScreen(Screen):
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
             self.app.set_current_file(filepath)
+            self.app.mark_dirty(False)
             self.app.show_status("File saved.")
             self.app.pop_screen()
         except (OSError, json.JSONDecodeError) as e:
@@ -79,6 +88,7 @@ class QuitSaveScreen(Screen):
     Input { margin: 1 0; }
     #hints { opacity: 0.5; }
     """
+
     def __init__(self):
         super().__init__()
         self.filename = "Untitled"
@@ -92,6 +102,13 @@ class QuitSaveScreen(Screen):
             yield self.filename_input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
 
+    def on_mount(self) -> None:
+        if self.app.current_file:
+            basename = os.path.basename(self.app.current_file)
+            self.filename_input.value = basename
+            if basename.endswith(".json"):
+                self.filename_input.selection = Selection(0, len(basename) - 5)
+
     def on_key(self, event) -> None:
         if event.key == "escape":
             self.app.pop_screen()
@@ -99,7 +116,6 @@ class QuitSaveScreen(Screen):
             self.save_file()
 
     # Save all bitmaps to a JSON file and exit.
-
     def save_file(self):
         filename = self.filename_input.value or "Untitled"
         if not filename.endswith(".json"):
@@ -131,6 +147,7 @@ class SaveScreenForClose(Screen):
     Input { margin: 1 0; }
     #hints { opacity: 0.5; }
     """
+
     def __init__(self):
         super().__init__()
         self.filename = "Untitled"
@@ -144,6 +161,13 @@ class SaveScreenForClose(Screen):
             yield self.filename_input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
 
+    def on_mount(self) -> None:
+        if self.app.current_file:
+            basename = os.path.basename(self.app.current_file)
+            self.filename_input.value = basename
+            if basename.endswith(".json"):
+                self.filename_input.selection = Selection(0, len(basename) - 5)
+
     def on_key(self, event) -> None:
         if event.key.lower() == "q":
             self.app.action_quit()
@@ -154,7 +178,6 @@ class SaveScreenForClose(Screen):
             self.save_file()
 
     # Save all bitmaps to a JSON file and return to startup.
-
     def save_file(self):
         filename = self.filename_input.value or "Untitled"
         if not filename.endswith(".json"):

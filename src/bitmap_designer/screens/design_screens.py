@@ -19,6 +19,7 @@ class DesignScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
     def __init__(self, bitmap_data: dict):
         super().__init__()
         self.width = bitmap_data.get("bounds", {}).get("width", 10)
@@ -30,7 +31,7 @@ class DesignScreen(Screen):
         self.redo_stack = []
 
     def compose(self) -> ComposeResult:
-        yield Static("Design Mode", id="title")
+        yield Static(self.app.title_with_file("Design Mode"), id="title")
         with Vertical():
             yield Static("", id="grid")
             yield Static("", id="hints", markup=False)
@@ -40,8 +41,10 @@ class DesignScreen(Screen):
         self.refresh_grid()
         self._update_hints()
 
-    # Rebuild the grid display from pixel data.
+    def on_screen_resume(self, _event) -> None:
+        self._update_hints()
 
+    # Rebuild the grid display from pixel data.
     def refresh_grid(self):
         lines = []
         border = "+" + "-" * (self.width * 2) + "+"  # 2 chars per pixel in UI
@@ -70,7 +73,6 @@ class DesignScreen(Screen):
         self.query_one("#status", Static).update(message)
 
     # Move cursor by arrow keys, with modifier keys for larger steps.
-
     def _handle_movement(self, key: str) -> bool:
         step = 1
         if key.startswith("shift"):
@@ -121,7 +123,6 @@ class DesignScreen(Screen):
         self.refresh_grid()
 
     # Paint the current color at the cursor position.
-
     def paint_pixel(self):
         self._save_state()
         if len(self.pixels) <= self.cursor_y:
@@ -138,7 +139,6 @@ class DesignScreen(Screen):
         self.app.save_preview_html()
 
     # Fill a connected region from the cursor with the current color.
-
     def flood_fill(self):
         self._save_state()
         target = self._get_pixel(self.cursor_x, self.cursor_y)
@@ -165,7 +165,6 @@ class DesignScreen(Screen):
         self.pixels[y] = "".join(row)
 
     # Iterative stack-based flood fill within bounds.
-
     def _flood_fill(self, x: int, y: int, target: str, fill: str):
         stack = [(x, y)]
         visited = set()
@@ -185,44 +184,50 @@ class DesignScreen(Screen):
             stack.append((cx, cy - 1))
 
     # Write local pixel data back to the app's bitmap store.
-
     def _sync_pixels(self):
         idx = str(self.app.current_index)
         if idx in self.app.bitmaps:
             self.app.bitmaps[idx]["bitmap"] = {"pixels": self.pixels}
 
     def _save_state(self):
-        self.undo_stack.append(list(self.pixels))
+        self.undo_stack.append((list(self.pixels), self.cursor_x, self.cursor_y))
         self.redo_stack.clear()
         self._update_hints()
 
     def _undo(self):
         if not self.undo_stack:
+            self.show_status("Already at oldest change")
             return
-        self.redo_stack.append(list(self.pixels))
-        self.pixels = self.undo_stack.pop()
+        _, saved_cx, saved_cy = self.undo_stack[-1]
+        self.redo_stack.append((list(self.pixels), saved_cx, saved_cy))
+        self.pixels, self.cursor_x, self.cursor_y = self.undo_stack.pop()
         self._sync_pixels()
         self.app.mark_dirty()
         self._update_hints()
         self.refresh_grid()
+        total = len(self.undo_stack) + len(self.redo_stack)
+        self.show_status(f"Before change #{len(self.undo_stack) + 1} of {total}")
 
     def _redo(self):
         if not self.redo_stack:
+            self.show_status("Already at newest change")
             return
-        self.undo_stack.append(list(self.pixels))
-        self.pixels = self.redo_stack.pop()
+        _, saved_cx, saved_cy = self.redo_stack[-1]
+        self.undo_stack.append((list(self.pixels), saved_cx, saved_cy))
+        self.pixels, self.cursor_x, self.cursor_y = self.redo_stack.pop()
         self._sync_pixels()
         self.app.mark_dirty()
         self._update_hints()
         self.refresh_grid()
+        total = len(self.undo_stack) + len(self.redo_stack)
+        self.show_status(f"After change #{len(self.undo_stack)} of {total}")
 
     # Refresh the hints bar with current undo/redo availability.
-
     def _update_hints(self):
         hints = Text()
         hints.append("[arrows/hjkl] move  ")
         hints.append("[space] paint  ")
-        hints.append("[C]olor  ")
+        hints.append(f"[C]olor={self.app.current_color}  ")
         hints.append("[F]ill  ")
         hints.append("[R]ect  ")
         hints.append("[P]review  ")
@@ -247,8 +252,9 @@ class ColorScreen(Screen):
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
+
     def compose(self) -> ComposeResult:
-        yield Static("Select Color", id="title")
+        yield Static(self.app.title_with_file("Select Color"), id="title")
         with Vertical():
             yield Static(
                 "0: transparent  1: black  2: white  3: red  4: yellow\n"
