@@ -78,7 +78,11 @@ class RenameScreen(Screen):
                 id="filename"
             )
             yield self.input
-            yield Static("[Enter] rename  [Escape] cancel", id="hints")
+            yield Static("[Enter] rename  [Escape] cancel", id="hints", markup=False)
+        yield Static("", id="status")
+
+    def show_status(self, message: str) -> None:
+        self.query_one("#status", Static).update(message)
 
     def on_mount(self) -> None:
         if self.input.value.endswith(".json"):
@@ -99,20 +103,27 @@ class RenameScreen(Screen):
             self.app.show_status("No file to rename.")
             return
 
-        new_name = self.input.value or "Untitled"
+        new_name = (self.input.value or "").strip()
+        if not new_name:
+            self.app.show_status("Please enter a valid filename.")
+            return
         if not new_name.endswith(".json"):
             new_name += ".json"
 
         dir_path = DEFAULT_BITMAP_DIR
         new_path = os.path.join(dir_path, new_name)
 
+        if new_path == self.app.current_file:
+            self.app.pop_screen()
+            return
+
         if os.path.exists(new_path):
-            self.app.show_status("File already exists.")
+            self.app.show_status(f"File '{new_name}' already exists.")
             return
 
         try:
             os.rename(self.app.current_file, new_path)
-            self.app.current_file = new_path
+            self.app.set_current_file(new_path)
             self.app.show_status("File renamed.")
             self.app.pop_screen()
         except (OSError, json.JSONDecodeError) as e:

@@ -38,6 +38,10 @@ class SaveScreen(Screen):
             self.filename_input = Input(value=self.filename, placeholder="Filename", id="filename")
             yield self.filename_input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
+        yield Static("", id="status")
+
+    def show_status(self, message: str) -> None:
+        self.query_one("#status", Static).update(message)
 
     def on_mount(self) -> None:
         if self.app.current_file:
@@ -57,7 +61,14 @@ class SaveScreen(Screen):
 
     # Save all bitmaps to a JSON file.
     def save_file(self):
-        filename = self.filename_input.value or "Untitled"
+        filename = (self.filename_input.value or "").strip()
+        if not filename:
+            default_name = os.path.basename(self.app.current_file) if self.app.current_file else "Untitled"
+            self.filename_input.value = default_name
+            if default_name.endswith(".json"):
+                self.filename_input.selection = Selection(0, len(default_name) - 5)
+            return
+
         if not filename.endswith(".json"):
             filename += ".json"
 
@@ -65,6 +76,10 @@ class SaveScreen(Screen):
 
         if not os.path.exists(DEFAULT_BITMAP_DIR):
             os.makedirs(DEFAULT_BITMAP_DIR, exist_ok=True)
+
+        if os.path.exists(filepath) and filepath != self.app.current_file:
+            self.show_status(f"File '{filename}' already exists.")
+            return
 
         data = {
             "version": "1.0",
@@ -79,7 +94,7 @@ class SaveScreen(Screen):
             self.app.show_status("File saved.")
             self.app.pop_screen()
         except (OSError, json.JSONDecodeError) as e:
-            self.app.show_status(f"Error: {e}")
+            self.show_status(f"Error: {e}")
 
 
 class QuitSaveScreen(Screen):
@@ -87,6 +102,7 @@ class QuitSaveScreen(Screen):
     CSS = """
     Input { margin: 1 0; }
     #hints { opacity: 0.5; }
+    #status { dock: bottom; }
     """
 
     def __init__(self):
@@ -101,6 +117,10 @@ class QuitSaveScreen(Screen):
             self.filename_input = Input(value=self.filename, placeholder="Filename", id="filename")
             yield self.filename_input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
+        yield Static("", id="status")
+
+    def show_status(self, message: str) -> None:
+        self.query_one("#status", Static).update(message)
 
     def on_mount(self) -> None:
         if self.app.current_file:
@@ -117,7 +137,14 @@ class QuitSaveScreen(Screen):
 
     # Save all bitmaps to a JSON file and exit.
     def save_file(self):
-        filename = self.filename_input.value or "Untitled"
+        filename = (self.filename_input.value or "").strip()
+        if not filename:
+            default_name = os.path.basename(self.app.current_file) if self.app.current_file else "Untitled"
+            self.filename_input.value = default_name
+            if default_name.endswith(".json"):
+                self.filename_input.selection = Selection(0, len(default_name) - 5)
+            return
+
         if not filename.endswith(".json"):
             filename += ".json"
 
@@ -125,6 +152,10 @@ class QuitSaveScreen(Screen):
 
         if not os.path.exists(DEFAULT_BITMAP_DIR):
             os.makedirs(DEFAULT_BITMAP_DIR, exist_ok=True)
+
+        if os.path.exists(filepath) and filepath != self.app.current_file:
+            self.show_status(f"File '{filename}' already exists.")
+            return
 
         data = {
             "version": "1.0",
@@ -138,7 +169,7 @@ class QuitSaveScreen(Screen):
             self.app.mark_dirty(False)
             self.app.exit()
         except (OSError, json.JSONDecodeError) as e:
-            self.app.show_status(f"Error: {e}")
+            self.show_status(f"Error: {e}")
 
 
 class SaveScreenForClose(Screen):
@@ -146,6 +177,7 @@ class SaveScreenForClose(Screen):
     CSS = """
     Input { margin: 1 0; }
     #hints { opacity: 0.5; }
+    #status { dock: bottom; }
     """
 
     def __init__(self):
@@ -160,6 +192,10 @@ class SaveScreenForClose(Screen):
             self.filename_input = Input(value=self.filename, placeholder="Filename", id="filename")
             yield self.filename_input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
+        yield Static("", id="status")
+
+    def show_status(self, message: str) -> None:
+        self.query_one("#status", Static).update(message)
 
     def on_mount(self) -> None:
         if self.app.current_file:
@@ -179,7 +215,14 @@ class SaveScreenForClose(Screen):
 
     # Save all bitmaps to a JSON file and return to startup.
     def save_file(self):
-        filename = self.filename_input.value or "Untitled"
+        filename = (self.filename_input.value or "").strip()
+        if not filename:
+            default_name = os.path.basename(self.app.current_file) if self.app.current_file else "Untitled"
+            self.filename_input.value = default_name
+            if default_name.endswith(".json"):
+                self.filename_input.selection = Selection(0, len(default_name) - 5)
+            return
+
         if not filename.endswith(".json"):
             filename += ".json"
 
@@ -187,6 +230,10 @@ class SaveScreenForClose(Screen):
 
         if not os.path.exists(DEFAULT_BITMAP_DIR):
             os.makedirs(DEFAULT_BITMAP_DIR, exist_ok=True)
+
+        if os.path.exists(filepath) and filepath != self.app.current_file:
+            self.show_status(f"File '{filename}' already exists.")
+            return
 
         data = {
             "version": "1.0",
@@ -201,4 +248,4 @@ class SaveScreenForClose(Screen):
             self.app.pop_screen()
             self.app.push_screen(StartupScreen())
         except (OSError, json.JSONDecodeError) as e:
-            self.app.show_status(f"Error: {e}")
+            self.show_status(f"Error: {e}")

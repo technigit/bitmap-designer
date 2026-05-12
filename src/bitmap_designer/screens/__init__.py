@@ -4,7 +4,7 @@ from .design_screens import DesignScreen, ColorScreen
 from .save_screens import SaveScreen, QuitSaveScreen, SaveScreenForClose
 from .manage_screens import ManageScreen, RenameScreen, DeleteScreen
 from .config_screens import (
-    ConfigScreen, ConfigIndexScreen, ConfigBoundsScreen,
+    ConfigScreen, ConfigKeyScreen, ConfigBoundsScreen,
     ConfigContextScreen, ConfigXScreen, ConfigYScreen,
     ConfigLocationScreen, ConfigPixelScreen,
 )

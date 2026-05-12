@@ -1,5 +1,6 @@
 """Main menu and close flow screens."""
 from __future__ import annotations
+import os
 from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
@@ -11,7 +12,7 @@ from .startup_screens import StartupScreen
 from .design_screens import DesignScreen
 from .save_screens import SaveScreen, SaveScreenForClose
 from .manage_screens import ManageScreen
-from .config_screens import ConfigScreen, ConfigIndexScreen
+from .config_screens import ConfigScreen, ConfigKeyScreen
 from .codegen_screens import CodegenScreen
 
 if TYPE_CHECKING:
@@ -32,7 +33,7 @@ class MainScreen(Screen):
         with Vertical():
             yield Static(
                 "[D]esign mode\n"
-                "[B]itmap index\n"
+                "[K]ey\n"
                 "[P]review\n"
                 "[S]ave file\n"
                 "[G]enerate code\n"
@@ -49,6 +50,8 @@ class MainScreen(Screen):
 
     def on_screen_resume(self, _event) -> None:
         self.query_one("#title", Static).update(self.app.title_with_file(self.TITLE))
+        if self.app.check_external_change() and self.app.current_file:
+            self.app.push_screen(FileChangedScreen(self.app.current_file))
 
     def on_key(self, event) -> None:
         key = event.key
@@ -61,12 +64,12 @@ class MainScreen(Screen):
         key_lower = key.lower()
         if key_lower == "d":
             bitmap = self.app.bitmaps.get(
-                str(self.app.current_index),
-                self.app.create_default_bitmap()
+                self.app.current_key,
+                self.app.create_default_bitmap(key=self.app.current_key)
             )
             self.app.push_screen(DesignScreen(bitmap))
-        elif key_lower == "b":
-            self.app.push_screen(ConfigIndexScreen())
+        elif key_lower == "k":
+            self.app.push_screen(ConfigKeyScreen())
         elif key_lower == "p":
             self.app.preview()
             self.show_status("Preview opened.")
@@ -136,3 +139,45 @@ class AreYouSureScreen(Screen):
         elif event.key in ("enter", "\n") or event.key.lower() in ("n", "escape"):
             self.app.pop_screen()
             self.app.push_screen(MainScreen())
+
+
+class FileChangedScreen(Screen):
+    """Warning screen when the file has been externally edited."""
+    CSS = """
+    #hints { margin-top: 1; opacity: 0.5; }
+    #status { dock: bottom; }
+    """
+
+    def __init__(self, filepath: str):
+        super().__init__()
+        self.filepath = filepath
+
+    def compose(self) -> ComposeResult:
+        yield Static("Warning", id="title")
+        with Vertical():
+            yield Static(
+                f"File '{os.path.basename(self.filepath)}' has been externally edited.",
+                id="warning"
+            )
+            yield Static("[O]K (ignore), [R]eload", id="hints", markup=False)
+        yield Static("", id="status")
+
+    def show_status(self, message: str) -> None:
+        self.query_one("#status", Static).update(message)
+
+    def on_key(self, event) -> None:
+        key = event.key.lower()
+        if key == "q":
+            self.app.action_quit()
+            return
+        if key in ("o", "enter", "\n"):
+            self.app.refresh_mtime()
+            self.app.pop_screen()
+        elif key == "r":
+            if self.app.dirty:
+                self.show_status("Cannot reload: save your changes first.")
+                return
+            self.app.reload_file()
+            self.app.pop_screen()
+        elif key == "escape":
+            self.app.pop_screen()

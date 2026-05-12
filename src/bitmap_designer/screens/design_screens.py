@@ -185,7 +185,7 @@ class DesignScreen(Screen):
 
     # Write local pixel data back to the app's bitmap store.
     def _sync_pixels(self):
-        idx = str(self.app.current_index)
+        idx = self.app.current_key
         if idx in self.app.bitmaps:
             self.app.bitmaps[idx]["bitmap"] = {"pixels": self.pixels}
 

@@ -44,6 +44,7 @@ class OpenScreen(Screen):
     CSS = """
     #file_list { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
+    #status { dock: bottom; }
     """
 
     def __init__(self):
@@ -51,11 +52,15 @@ class OpenScreen(Screen):
         self.files = []
         self.selected_idx = 0
 
+    def show_status(self, message: str) -> None:
+        self.query_one("#status", Static).update(message)
+
     def compose(self) -> ComposeResult:
         yield Static("Open Bitmap", id="title")
         with Vertical():
             yield Static("", id="file_list")
             yield Static("[Enter] Open  [Escape] Back", id="hints", markup=False)
+        yield Static("", id="status")
 
     def on_mount(self) -> None:
         self.refresh_files()

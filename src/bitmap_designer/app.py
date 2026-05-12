@@ -24,8 +24,9 @@ class BitmapDesignerApp(App):
     def __init__(self):
         super().__init__()
         self.current_file = None
+        self.current_file_mtime = None
         self.bitmaps = {}
-        self.current_index = 1
+        self.current_key = "1"
         self.current_color = "1"
         self.dirty = False
 
@@ -34,6 +35,7 @@ class BitmapDesignerApp(App):
 
     def set_current_file(self, path: str | None) -> None:
         self.current_file = path
+        self.refresh_mtime()
 
     def title_with_file(self, base_title: str) -> str:
         if self.current_file:
@@ -43,8 +45,36 @@ class BitmapDesignerApp(App):
     def set_bitmaps(self, bitmaps: dict) -> None:
         self.bitmaps = bitmaps
 
-    def set_current_index(self, index: int) -> None:
-        self.current_index = index
+    def set_current_key(self, key: str) -> None:
+        self.current_key = key
+
+    def refresh_mtime(self) -> None:
+        try:
+            self.current_file_mtime = os.path.getmtime(self.current_file) if self.current_file and os.path.exists(self.current_file) else None
+        except OSError:
+            self.current_file_mtime = None
+
+    def check_external_change(self) -> bool:
+        if not self.current_file or not os.path.exists(self.current_file):
+            return False
+        try:
+            return os.path.getmtime(self.current_file) != self.current_file_mtime
+        except OSError:
+            return False
+
+    def reload_file(self) -> None:
+        if not self.current_file or not os.path.exists(self.current_file):
+            return
+        try:
+            with open(self.current_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                self.bitmaps = data.get("bitmaps", {})
+                if self.bitmaps:
+                    self.current_key = next(iter(self.bitmaps.keys()))
+                self.dirty = False
+                self.refresh_mtime()
+        except (OSError, json.JSONDecodeError) as e:
+            self.show_status(f"Error reloading file: {e}")
 
     def compose(self) -> ComposeResult:
         yield Footer()
@@ -69,9 +99,9 @@ class BitmapDesignerApp(App):
 
     def new_bitmap(self):
         self.bitmaps = {}
-        self.current_index = 1
+        self.current_key = "1"
         self.bitmaps["1"] = self.create_default_bitmap()
-        self.current_file = os.path.join(DEFAULT_BITMAP_DIR, "Untitled.json")
+        self.set_current_file(os.path.join(DEFAULT_BITMAP_DIR, "Untitled.json"))
         self.dirty = False
         self.set_current_color("1")
         self.push_screen(MainScreen())
@@ -83,9 +113,9 @@ class BitmapDesignerApp(App):
             with open(filepath, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 self.bitmaps = data.get("bitmaps", {})
-                self.current_file = filepath
+                self.set_current_file(filepath)
                 if self.bitmaps:
-                    self.current_index = int(next(iter(self.bitmaps.keys())))
+                    self.current_key = next(iter(self.bitmaps.keys()))
                 self.dirty = False
                 self.push_screen(MainScreen())
         except (OSError, json.JSONDecodeError) as e:
@@ -128,8 +158,8 @@ class BitmapDesignerApp(App):
         pixels = bm.get("bitmap", {}).get("pixels", [])
 
         lines.append(f"// Bitmap {idx}")
-        lines.append(f"const {x_var} = {location['x']};")
-        lines.append(f"const {y_var} = {location['y']};")
+        lines.append(f"var {x_var} = {location['x']};")
+        lines.append(f"var {y_var} = {location['y']};")
 
         for y, row in enumerate(pixels):
             for x, char in enumerate(row):
@@ -182,8 +212,8 @@ class BitmapDesignerApp(App):
             pixels = bm.get("bitmap", {}).get("pixels", [])
 
             lines.append(f"// Bitmap {idx}")
-            lines.append(f"const {x_var} = {location['x']};")
-            lines.append(f"const {y_var} = {location['y']};")
+            lines.append(f"var {x_var} = {location['x']};")
+            lines.append(f"var {y_var} = {location['y']};")
 
             for y, row in enumerate(pixels):
                 for x, char in enumerate(row):
@@ -195,12 +225,12 @@ class BitmapDesignerApp(App):
 
     # Return a default bitmap configuration dict.
 
-    def create_default_bitmap(self) -> dict:
+    def create_default_bitmap(self, key: str = "1") -> dict:
         return {
             "bounds": {"width": 10, "height": 10},
             "context": "ctx",
-            "x": "x1",
-            "y": "y1",
+            "x": "x",
+            "y": "y",
             "location": {"x": 0, "y": 0},
             "pixelSize": 2,
             "bitmap": {"pixels": []},

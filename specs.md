@@ -8,7 +8,7 @@
             - display "Bitmap Designer" in ASCII art
             - current color reset to default (1)
             - menu commands:
-                - [N]ew Bitmap // use index 1 by default, current_file set to Untitled.json
+                - [N]ew Bitmap // use key "1" by default, current_file set to Untitled.json
                 - [O]pen Bitmap
                 - [Q]uit // global command, works from anywhere
                     - Shows "Really quit? (y/N)"
@@ -48,7 +48,7 @@
         - page title shows current filename: "Main Menu - filename.json"
         - menu commands below content:
             - [D]esign mode // Design UI
-            - [B]itmap index // Bitmap index UI
+            - [K]ey // Bitmap key UI
             - [P]review // open/refresh the preview in a browser window
             - [S]ave file // Save UI
             - [G]enerate code // Code generation UI
@@ -90,12 +90,12 @@
             - [^R]edo - redo last undone action (dimmed when nothing to redo)
                 - status shows: "After change #N of M" or "Already at newest change"
             - [Escape] - exit Design mode (return Main UI)
-    - Bitmap index UI (modal window) // select a unique dataspace for a bitmap with its own data
-        - Prompt: Enter any positive integer number.
+    - Bitmap key UI (modal window) // select a unique dataspace for a bitmap with its own data
+        - Prompt: Enter a key (short string, no spaces).
             - [Enter] - save configuration
             - [Escape] - cancel/revert
         - Error handling message for invalid input:
-            - Response: Please only enter a positive integer number. [OK]
+            - Response: Please enter a valid key (no spaces). [OK]
     - Color UI (modal window)
         - select color from list (see Colors section)
             - [0-9A-F] - color by # // 0 = transparent
@@ -105,17 +105,21 @@
         - use ~/bitmaps by default (or the last visited directory)
         - enter/edit file name // use current name, or default to Untitled)
             - [Enter] - save configuration
-                - if file name already exists
-                    - Prompt: Overwrite file? (y/N)
-                        - if yes
-                            - save file
-                            - Response: File saved. [OK]
-                            - return to Main UI
-                        - if no
-                            - do nothing (stay in Save UI)
+                - if blank input
+                    - restore current filename (or "Untitled" if new file) in input, with name selection
+                    - do not save
+                - if file already exists and is the current file
+                    - save (overwrite)
+                - if file already exists and is a different file
+                    - Response: File already exists. [OK]
+                    - stay in Save UI
+                - if file does not exist
+                    - save file
+                    - Response: File saved. [OK]
+                    - return to Main UI
             - [Escape] - cancel/revert
         - Error handling messages:
-            - (show system error message)
+            - displayed on status bar
     - Code generation UI (modal window)
         - display configuration in modal/scrollable window
         - [Enter] - copy to clipboard
@@ -123,15 +127,19 @@
     - Manage file UI (modal window)
         - provide file management options
             - [R]ename - rename file
-        - enter/edit file name // pre-filled with current filename (or Untitled.json for new files), name part selected/highlighted, cursor before .json
-                    - if file name already exists
-                        - Prompt: Overwrite file? (y/N)
-                            - if yes
-                                - rename file
-                                - Response: File renamed. [OK]
-                                - return to Main UI
-                            - if no
-                                - do nothing (stay in Manage file UI)
+        - enter/edit file name // pre-filled with current filename, name part selected/highlighted, cursor before .json
+                - if blank/whitespace input
+                    - Response: Please enter a valid filename. [OK]
+                    - stay in rename UI
+                - if new name is same as current name
+                    - close (no-op)
+                - if new name already exists
+                    - Response: File already exists. [OK]
+                    - stay in rename UI
+                - if valid new name
+                    - rename file
+                    - Response: File renamed. [OK]
+                    - return to Manage file UI
             - [D]elete - delete file
                 - if file name already exists
                     - if yes
@@ -151,8 +159,8 @@
         - page title shows current filename: "Configuration - filename.json"
         - shows current values in a right-aligned column, 2-character margin from longest label
         - values refresh on return from any sub-screen
-        - [I]ndex - bitmap index
-            - enter any positive integer number
+        - [K]ey - bitmap key
+            - enter a key (short string, no spaces)
             - [Enter] - save configuration
             - [Escape] - cancel/revert
         - [B]ounds
@@ -347,8 +355,8 @@
             },
         }
     }
-- group data by bitmap index
-    - one bitmap per bitmap index
+- group data by bitmap key
+    - one bitmap per bitmap key
     - each bitmap should contain pixel data
     - each bitmap should have configurations alongside it
 - the bitmap should be saved as ASCII art
@@ -412,7 +420,7 @@
 - I want the bitmap data to be stored with .json extension.
 - I want the bitmap data to be human-readable.
 - I want to store multiple bitmap sets in the same file.
-- I want each bitmap set to contain configuration metadata, such as bitmap index, bounds, context variable name, location, and pixel size).
+- I want each bitmap set to contain configuration metadata, such as bitmap key, bounds, context variable name, location, and pixel size).
 - I want to be able to open a .json file and work with it.
 - I want to save global configurations in ~/.bitmapsrc.
 - I want to specify/define color palette(s) in ~/.bitmapsrc.
