@@ -31,9 +31,7 @@ class StartupScreen(Screen):
 
     def on_key(self, event) -> None:
         key = event.key.lower()
-        if key == "q":
-            self.app.action_quit()
-        elif key == "n":
+        if key == "n":
             self.app.new_bitmap()
         elif key == "o":
             self.app.push_screen(OpenScreen())
@@ -93,9 +91,6 @@ class OpenScreen(Screen):
         self.query_one("#file_list").update("\n".join(lines))
 
     def on_key(self, event) -> None:
-        if event.key.lower() == "q":
-            self.app.action_quit()
-            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):

@@ -7,6 +7,8 @@ from textual.screen import Screen
 from textual.widgets import Static
 from textual.containers import Vertical
 
+from ..constants import HINT_ESCAPE
+
 from .save_screens import QuitSaveScreen
 
 if TYPE_CHECKING:
@@ -24,6 +26,7 @@ class QuitScreen(Screen):
         yield Static("Quit", id="title")
         with Vertical():
             yield Static("Really quit? (y/N)", id="prompt")
+            yield Static(HINT_ESCAPE, id="hints", markup=False)
 
     def on_key(self, event) -> None:
         if event.key.lower() == "y":
@@ -40,6 +43,7 @@ class QuitSaveFileFirstScreen(Screen):
         yield Static("Quit - Save", id="title")
         with Vertical():
             yield Static("Save file first? (Y/n)", id="prompt")
+            yield Static(HINT_ESCAPE, id="hints", markup=False)
 
     def on_key(self, event) -> None:
         if event.key in ("enter", "\n") or event.key.lower() == "y":

@@ -51,9 +51,6 @@ class SaveScreen(Screen):
                 self.filename_input.selection = Selection(0, len(basename) - 5)
 
     def on_key(self, event) -> None:
-        if event.key.lower() == "q":
-            self.app.action_quit()
-            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
@@ -63,7 +60,9 @@ class SaveScreen(Screen):
     def save_file(self):
         filename = (self.filename_input.value or "").strip()
         if not filename:
-            default_name = os.path.basename(self.app.current_file) if self.app.current_file else "Untitled"
+            default_name = "Untitled"
+            if self.app.current_file:
+                default_name = os.path.basename(self.app.current_file)
             self.filename_input.value = default_name
             if default_name.endswith(".json"):
                 self.filename_input.selection = Selection(0, len(default_name) - 5)
@@ -139,7 +138,9 @@ class QuitSaveScreen(Screen):
     def save_file(self):
         filename = (self.filename_input.value or "").strip()
         if not filename:
-            default_name = os.path.basename(self.app.current_file) if self.app.current_file else "Untitled"
+            default_name = "Untitled"
+            if self.app.current_file:
+                default_name = os.path.basename(self.app.current_file)
             self.filename_input.value = default_name
             if default_name.endswith(".json"):
                 self.filename_input.selection = Selection(0, len(default_name) - 5)
@@ -205,9 +206,6 @@ class SaveScreenForClose(Screen):
                 self.filename_input.selection = Selection(0, len(basename) - 5)
 
     def on_key(self, event) -> None:
-        if event.key.lower() == "q":
-            self.app.action_quit()
-            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
@@ -217,7 +215,9 @@ class SaveScreenForClose(Screen):
     def save_file(self):
         filename = (self.filename_input.value or "").strip()
         if not filename:
-            default_name = os.path.basename(self.app.current_file) if self.app.current_file else "Untitled"
+            default_name = "Untitled"
+            if self.app.current_file:
+                default_name = os.path.basename(self.app.current_file)
             self.filename_input.value = default_name
             if default_name.endswith(".json"):
                 self.filename_input.selection = Selection(0, len(default_name) - 5)

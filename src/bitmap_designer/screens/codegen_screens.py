@@ -31,9 +31,6 @@ class CodegenScreen(Screen):
         self.query_one("#code").update(code or "No bitmap data.")
 
     def on_key(self, event) -> None:
-        if event.key.lower() == "q":
-            self.app.action_quit()
-            return
         if event.key in ("enter", "\n"):
             code = self.app.generate_code()
             pyperclip.copy(code)
@@ -60,9 +57,6 @@ class ResponseScreen(Screen):
             self.app.pop_screen()
 
     def on_key(self, event) -> None:
-        if event.key.lower() == "q":
-            self.app.action_quit()
-            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):

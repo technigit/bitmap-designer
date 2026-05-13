@@ -1,9 +1,10 @@
 """Main application class and entry point."""
+import copy
 import json
 import os
 import webbrowser
 from textual.app import App, ComposeResult
-from textual.widgets import Footer
+from textual.widgets import Footer, Static
 from textual.binding import Binding
 
 from .constants import COLOR_MAP, DEFAULT_BITMAP_DIR
@@ -29,9 +30,43 @@ class BitmapDesignerApp(App):
         self.current_key = "1"
         self.current_color = "1"
         self.dirty = False
+        self._clean_snapshot = None
+        self._undo_stacks: dict[str, list] = {}
+        self._redo_stacks: dict[str, list] = {}
+
+    def _take_clean_snapshot(self) -> None:
+        self._clean_snapshot = copy.deepcopy(self.bitmaps)
+
+    def _is_modified(self) -> bool:
+        if any(len(s) > 0 for s in self._undo_stacks.values()):
+            return True
+        if self._clean_snapshot is not None and self.bitmaps != self._clean_snapshot:
+            return True
+        return False
 
     def mark_dirty(self, value: bool = True) -> None:
-        self.dirty = value
+        if value is True:
+            self.dirty = self._is_modified()
+        else:
+            self.dirty = False
+            self._take_clean_snapshot()
+        self._refresh_current_title()
+
+    def _refresh_current_title(self):
+        screen = self.screen
+        title = screen.query_one("#title", Static)
+        if hasattr(screen, '_base_title'):
+            title.update(self.title_with_file(screen._base_title))
+
+    def get_undo_stack(self, key: str) -> list:
+        return self._undo_stacks.setdefault(key, [])
+
+    def get_redo_stack(self, key: str) -> list:
+        return self._redo_stacks.setdefault(key, [])
+
+    def _clear_undo_stacks(self) -> None:
+        self._undo_stacks.clear()
+        self._redo_stacks.clear()
 
     def set_current_file(self, path: str | None) -> None:
         self.current_file = path
@@ -39,7 +74,10 @@ class BitmapDesignerApp(App):
 
     def title_with_file(self, base_title: str) -> str:
         if self.current_file:
-            return f"{base_title} - {os.path.basename(self.current_file)}"
+            result = f"{base_title} - {os.path.basename(self.current_file)}"
+            if self.dirty:
+                result += " (modified)"
+            return result
         return base_title
 
     def set_bitmaps(self, bitmaps: dict) -> None:
@@ -50,7 +88,11 @@ class BitmapDesignerApp(App):
 
     def refresh_mtime(self) -> None:
         try:
-            self.current_file_mtime = os.path.getmtime(self.current_file) if self.current_file and os.path.exists(self.current_file) else None
+            self.current_file_mtime = (
+                os.path.getmtime(self.current_file)
+                if self.current_file and os.path.exists(self.current_file)
+                else None
+            )
         except OSError:
             self.current_file_mtime = None
 
@@ -72,6 +114,8 @@ class BitmapDesignerApp(App):
                 if self.bitmaps:
                     self.current_key = next(iter(self.bitmaps.keys()))
                 self.dirty = False
+                self._take_clean_snapshot()
+                self._clear_undo_stacks()
                 self.refresh_mtime()
         except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error reloading file: {e}")
@@ -103,7 +147,9 @@ class BitmapDesignerApp(App):
         self.bitmaps["1"] = self.create_default_bitmap()
         self.set_current_file(os.path.join(DEFAULT_BITMAP_DIR, "Untitled.json"))
         self.dirty = False
+        self._take_clean_snapshot()
         self.set_current_color("1")
+        self._clear_undo_stacks()
         self.push_screen(MainScreen())
 
     # Load bitmaps from a JSON file and open the main menu.
@@ -117,6 +163,8 @@ class BitmapDesignerApp(App):
                 if self.bitmaps:
                     self.current_key = next(iter(self.bitmaps.keys()))
                 self.dirty = False
+                self._take_clean_snapshot()
+                self._clear_undo_stacks()
                 self.push_screen(MainScreen())
         except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error loading file: {e}")
@@ -225,7 +273,7 @@ class BitmapDesignerApp(App):
 
     # Return a default bitmap configuration dict.
 
-    def create_default_bitmap(self, key: str = "1") -> dict:
+    def create_default_bitmap(self) -> dict:
         return {
             "bounds": {"width": 10, "height": 10},
             "context": "ctx",

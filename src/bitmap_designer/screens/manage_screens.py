@@ -10,7 +10,7 @@ from textual.widgets import Static, Input
 from textual.widgets._input import Selection
 from textual.containers import Vertical
 
-from ..constants import DEFAULT_BITMAP_DIR
+from ..constants import DEFAULT_BITMAP_DIR, HINT_ESCAPE
 
 from .startup_screens import StartupScreen
 
@@ -20,11 +20,7 @@ if TYPE_CHECKING:
 
 class ManageScreen(Screen):
     """Menu screen for file management operations."""
-    CSS = """
-    #menu { margin-top: 1; }
-    #status { dock: bottom; }
-    """
-
+    _base_title = "Manage File"
     TITLE = "Manage File"
 
     def compose(self) -> ComposeResult:
@@ -45,9 +41,6 @@ class ManageScreen(Screen):
         self.query_one("#title", Static).update(self.app.title_with_file(self.TITLE))
 
     def on_key(self, event) -> None:
-        if event.key.lower() == "q":
-            self.app.action_quit()
-            return
         if event.key.lower() == "r":
             self.app.push_screen(RenameScreen())
         elif event.key.lower() == "d":
@@ -89,9 +82,6 @@ class RenameScreen(Screen):
             self.input.selection = Selection(0, len(self.input.value) - 5)
 
     def on_key(self, event) -> None:
-        if event.key.lower() == "q":
-            self.app.action_quit()
-            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
@@ -141,16 +131,13 @@ class DeleteScreen(Screen):
         yield Static("Delete File", id="title")
         with Vertical():
             yield Static("Are you sure you want to delete this file?", id="prompt")
-            yield Static("[Y]es  [N]o", id="hints", markup=False)
+            yield Static("[Y]es  [N]o" + HINT_ESCAPE, id="hints", markup=False)
         yield Static("", id="status")
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
     def on_key(self, event) -> None:
-        if event.key.lower() == "q":
-            self.app.action_quit()
-            return
         if event.key.lower() == "y":
             self.delete_file()
         elif event.key.lower() in ("n", "escape"):

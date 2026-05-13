@@ -8,6 +8,8 @@ from textual.screen import Screen
 from textual.widgets import Static
 from textual.containers import Vertical
 
+from .config_screens import ConfigKeyScreen
+
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
 
@@ -27,11 +29,13 @@ class DesignScreen(Screen):
         self.cursor_x = 0
         self.cursor_y = 0
         self.pixels = bitmap_data.get("bitmap", {}).get("pixels", [])
-        self.undo_stack = []
-        self.redo_stack = []
+        self.undo_stack = self.app.get_undo_stack(self.app.current_key)
+        self.redo_stack = self.app.get_redo_stack(self.app.current_key)
+        self._key_on_enter = self.app.current_key
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file("Design Mode"), id="title")
+        self._base_title = "Design Mode"
+        yield Static(self.app.title_with_file(self._base_title), id="title")
         with Vertical():
             yield Static("", id="grid")
             yield Static("", id="hints", markup=False)
@@ -42,6 +46,18 @@ class DesignScreen(Screen):
         self._update_hints()
 
     def on_screen_resume(self, _event) -> None:
+        self.query_one("#title", Static).update(self.app.title_with_file(self._base_title))
+        if self.app.current_key != self._key_on_enter:
+            self._key_on_enter = self.app.current_key
+            bm = self.app.bitmaps.get(self.app.current_key, {})
+            self.width = bm.get("bounds", {}).get("width", 10)
+            self.height = bm.get("bounds", {}).get("height", 10)
+            self.pixels = bm.get("bitmap", {}).get("pixels", [])
+            self.cursor_x = 0
+            self.cursor_y = 0
+            self.undo_stack = self.app.get_undo_stack(self.app.current_key)
+            self.redo_stack = self.app.get_redo_stack(self.app.current_key)
+            self.refresh_grid()
         self._update_hints()
 
     # Rebuild the grid display from pixel data.
@@ -96,14 +112,14 @@ class DesignScreen(Screen):
 
     def on_key(self, event) -> None:
         key = event.key.lower()
-        if key == "q":
-            self.app.action_quit()
-            return
         if key == "u":
             self._undo()
             return
         if key == "ctrl+r":
             self._redo()
+            return
+        if key == "ctrl+k":
+            self.app.push_screen(ConfigKeyScreen())
             return
         if self._handle_movement(key):
             self.refresh_grid()
@@ -226,11 +242,12 @@ class DesignScreen(Screen):
     def _update_hints(self):
         hints = Text()
         hints.append("[arrows/hjkl] move  ")
-        hints.append("[space] paint  ")
-        hints.append(f"[C]olor={self.app.current_color}  ")
+        hints.append("[space] paint\n")
         hints.append("[F]ill  ")
         hints.append("[R]ect  ")
-        hints.append("[P]review  ")
+        hints.append("[P]review\n")
+        hints.append(f"[C]olor={self.app.current_color}  ")
+        hints.append(f"[^K]ey={self.app.current_key}\n")
         if not self.undo_stack:
             hints.append("[U]ndo", style="dim")
         else:
@@ -240,7 +257,7 @@ class DesignScreen(Screen):
             hints.append("[^R]edo", style="dim")
         else:
             hints.append("[^R]edo")
-        hints.append("  ")
+        hints.append("\n")
         hints.append("[Escape] back")
         self.query_one("#hints", Static).update(hints)
 
@@ -266,9 +283,6 @@ class ColorScreen(Screen):
 
     def on_key(self, event) -> None:
         key = event.key.lower()
-        if key == "q":
-            self.app.action_quit()
-            return
         if key in "0123456789abcdef":
             self.app.set_current_color(key)
             self.app.pop_screen()

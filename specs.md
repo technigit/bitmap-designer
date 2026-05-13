@@ -46,9 +46,9 @@
 2. editor
     - Main UI
         - page title shows current filename: "Main Menu - filename.json"
+            - when dirty, appends " (modified)"
         - menu commands below content:
             - [D]esign mode // Design UI
-            - [K]ey // Bitmap key UI
             - [P]review // open/refresh the preview in a browser window
             - [S]ave file // Save UI
             - [G]enerate code // Code generation UI
@@ -62,6 +62,7 @@
         - Note: pixelSize config only affects preview/output, not the text UI
         - all transparent by default
         - page title shows current filename: "Design Mode - filename.json"
+            - when dirty, appends " (modified)"
         - menu commands below content:
             - [arrow keys / hjkl] - move cursor // in two dimensions
             - [shift arrow keys / hjkl] - move cursor (5px)
@@ -72,6 +73,7 @@
             - [ctrl yuio] - scroll grid (10px)
             - [option yuio] - scroll grid (20px)
             - [wasd] - ad = -/+ bitmap index number, ws = -10/+10 bitmap index number
+            - [^K]ey=N - switch bitmap key (N shows current key value) // Bitmap key UI
             - [C]olor=N - select current color (N shows current color value) // Color UI
             - [space] - paint one bitmap pixel at the cursor position with the current color
             - [F]ill - flood fill (paint bucket style) with current color
@@ -87,6 +89,8 @@
             - [U]ndo - undo last action (dimmed when nothing to undo)
                 - cursor position saved and restored with each undo/redo
                 - status shows: "Before change #N of M" or "Already at oldest change"
+                - undo history persists per bitmap key across design-mode entries
+                - cleared at file session boundaries (new, open, reload)
             - [^R]edo - redo last undone action (dimmed when nothing to redo)
                 - status shows: "After change #N of M" or "Already at newest change"
             - [Escape] - exit Design mode (return Main UI)
@@ -141,6 +145,7 @@
                     - Response: File renamed. [OK]
                     - return to Manage file UI
             - [D]elete - delete file
+                - hint: [Y]es [N]o [Escape] cancel
                 - if file name already exists
                     - if yes
                         - Prompt: Are you sure? (y/N)
@@ -154,10 +159,15 @@
                         - display error
             - [Escape] - cancel/revert
         - Error handling messages:
-            - (show system error message)
+            - displayed on status bar
     - Configuration UI (modal window)
         - page title shows current filename: "Configuration - filename.json"
+            - when dirty, appends " (modified)"
+            - refreshes on return from any sub-screen
         - shows current values in a right-aligned column, 2-character margin from longest label
+        - values displayed in two groups separated by a blank line:
+            - Design settings: Key, Bounds, Location
+            - Code settings: Context, Pixel Size, X, Y
         - values refresh on return from any sub-screen
         - [K]ey - bitmap key
             - enter a key (short string, no spaces)
@@ -210,13 +220,13 @@
         - if no changes were made (file not dirty)
             - return to the Startup UI (no prompts)
         - if changes were made (file is dirty)
-            - Prompt: Really close? (y/N)
+            - Prompt: Really close? (y/N)  // hint: [Escape] cancel
                 - if yes
-                    - Prompt: Save file first? (Y/n)
+                    - Prompt: Save file first? (Y/n)  // hint: [Escape] cancel
                         - if yes
                             - Save UI → Startup UI (dirty bit cleared)
                         - if no
-                            - Prompt: Are you sure? (y/N)
+                            - Prompt: Are you sure? (y/N)  // hint: [Escape] cancel
                                 - if yes
                                     - return to the Startup UI (dirty bit cleared)
                                 - if no
@@ -227,9 +237,9 @@
         - global command, works from any screen
         - if not dirty: quit immediately
         - if dirty:
-            - Prompt: Really quit? (y/N)
+            - Prompt: Really quit? (y/N)  // hint: [Escape] cancel
                 - if yes
-                    - Prompt: Save file first? (Y/n)
+                    - Prompt: Save file first? (Y/n)  // hint: [Escape] cancel
                         - if yes: Save UI → quit
                         - if no: quit without saving
                 - if no: cancel quit (back to previous screen)
@@ -306,6 +316,7 @@
 - iterate with smaller rectangular blocks, etc., down to the configured pixel size until the entire area is covered
 
 ### JSON File Format
+// Example values — illustrative, not prescriptive
     {
         "version": "1.0",
         "bitmaps": {
@@ -368,6 +379,7 @@
         - 0 = transparent (space in UI and bitmap pixel data)
 
 ### Example Output Snippet
+// Illustrative example — actual output depends on bitmap configuration
    // Fill a 10x10 design area with blue pixels.
    x1 = 0;
    y1 = 0;
