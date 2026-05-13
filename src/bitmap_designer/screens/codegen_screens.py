@@ -8,6 +8,8 @@ from textual.screen import Screen
 from textual.widgets import Static, Button
 from textual.containers import Vertical
 
+from ..codegen_service import CodegenService
+
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
 
@@ -27,12 +29,12 @@ class CodegenScreen(Screen):
             yield Static("[Enter] copy  [Escape] close", id="hints")
 
     def on_mount(self) -> None:
-        code = self.app.generate_code()
+        code = CodegenService(self.app.bitmaps).generate_code()
         self.query_one("#code").update(code or "No bitmap data.")
 
     def on_key(self, event) -> None:
         if event.key in ("enter", "\n"):
-            code = self.app.generate_code()
+            code = CodegenService(self.app.bitmaps).generate_code()
             pyperclip.copy(code)
             self.app.show_status("Code copied to clipboard.")
         elif event.key == "escape":

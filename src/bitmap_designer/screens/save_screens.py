@@ -44,8 +44,8 @@ class SaveScreen(Screen):
         self.query_one("#status", Static).update(message)
 
     def on_mount(self) -> None:
-        if self.app.current_file:
-            basename = os.path.basename(self.app.current_file)
+        if self.app.file.current_file:
+            basename = os.path.basename(self.app.file.current_file)
             self.filename_input.value = basename
             if basename.endswith(".json"):
                 self.filename_input.selection = Selection(0, len(basename) - 5)
@@ -61,8 +61,8 @@ class SaveScreen(Screen):
         filename = (self.filename_input.value or "").strip()
         if not filename:
             default_name = "Untitled"
-            if self.app.current_file:
-                default_name = os.path.basename(self.app.current_file)
+            if self.app.file.current_file:
+                default_name = os.path.basename(self.app.file.current_file)
             self.filename_input.value = default_name
             if default_name.endswith(".json"):
                 self.filename_input.selection = Selection(0, len(default_name) - 5)
@@ -76,7 +76,7 @@ class SaveScreen(Screen):
         if not os.path.exists(DEFAULT_BITMAP_DIR):
             os.makedirs(DEFAULT_BITMAP_DIR, exist_ok=True)
 
-        if os.path.exists(filepath) and filepath != self.app.current_file:
+        if os.path.exists(filepath) and filepath != self.app.file.current_file:
             self.show_status(f"File '{filename}' already exists.")
             return
 
@@ -88,7 +88,7 @@ class SaveScreen(Screen):
         try:
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
-            self.app.set_current_file(filepath)
+            self.app.file.set_current_file(filepath)
             self.app.mark_dirty(False)
             self.app.show_status("File saved.")
             self.app.pop_screen()
@@ -122,8 +122,8 @@ class QuitSaveScreen(Screen):
         self.query_one("#status", Static).update(message)
 
     def on_mount(self) -> None:
-        if self.app.current_file:
-            basename = os.path.basename(self.app.current_file)
+        if self.app.file.current_file:
+            basename = os.path.basename(self.app.file.current_file)
             self.filename_input.value = basename
             if basename.endswith(".json"):
                 self.filename_input.selection = Selection(0, len(basename) - 5)
@@ -139,8 +139,8 @@ class QuitSaveScreen(Screen):
         filename = (self.filename_input.value or "").strip()
         if not filename:
             default_name = "Untitled"
-            if self.app.current_file:
-                default_name = os.path.basename(self.app.current_file)
+            if self.app.file.current_file:
+                default_name = os.path.basename(self.app.file.current_file)
             self.filename_input.value = default_name
             if default_name.endswith(".json"):
                 self.filename_input.selection = Selection(0, len(default_name) - 5)
@@ -154,7 +154,7 @@ class QuitSaveScreen(Screen):
         if not os.path.exists(DEFAULT_BITMAP_DIR):
             os.makedirs(DEFAULT_BITMAP_DIR, exist_ok=True)
 
-        if os.path.exists(filepath) and filepath != self.app.current_file:
+        if os.path.exists(filepath) and filepath != self.app.file.current_file:
             self.show_status(f"File '{filename}' already exists.")
             return
 
@@ -166,7 +166,7 @@ class QuitSaveScreen(Screen):
         try:
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
-            self.app.set_current_file(filepath)
+            self.app.file.set_current_file(filepath)
             self.app.mark_dirty(False)
             self.app.exit()
         except (OSError, json.JSONDecodeError) as e:
@@ -199,8 +199,8 @@ class SaveScreenForClose(Screen):
         self.query_one("#status", Static).update(message)
 
     def on_mount(self) -> None:
-        if self.app.current_file:
-            basename = os.path.basename(self.app.current_file)
+        if self.app.file.current_file:
+            basename = os.path.basename(self.app.file.current_file)
             self.filename_input.value = basename
             if basename.endswith(".json"):
                 self.filename_input.selection = Selection(0, len(basename) - 5)
@@ -216,8 +216,8 @@ class SaveScreenForClose(Screen):
         filename = (self.filename_input.value or "").strip()
         if not filename:
             default_name = "Untitled"
-            if self.app.current_file:
-                default_name = os.path.basename(self.app.current_file)
+            if self.app.file.current_file:
+                default_name = os.path.basename(self.app.file.current_file)
             self.filename_input.value = default_name
             if default_name.endswith(".json"):
                 self.filename_input.selection = Selection(0, len(default_name) - 5)
@@ -231,7 +231,7 @@ class SaveScreenForClose(Screen):
         if not os.path.exists(DEFAULT_BITMAP_DIR):
             os.makedirs(DEFAULT_BITMAP_DIR, exist_ok=True)
 
-        if os.path.exists(filepath) and filepath != self.app.current_file:
+        if os.path.exists(filepath) and filepath != self.app.file.current_file:
             self.show_status(f"File '{filename}' already exists.")
             return
 
@@ -243,7 +243,7 @@ class SaveScreenForClose(Screen):
         try:
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=2)
-            self.app.set_current_file(filepath)
+            self.app.file.set_current_file(filepath)
             self.app.mark_dirty(False)
             self.app.pop_screen()
             self.app.push_screen(StartupScreen())

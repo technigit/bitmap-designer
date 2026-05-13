@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 class ConfigScreen(Screen):
     """Configuration menu screen."""
-    _base_title = "Configuration"
+    base_title = "Configuration"
     CSS = """
     #menu { margin-top: 1; }
     #hints { opacity: 0.5; }
@@ -23,7 +23,7 @@ class ConfigScreen(Screen):
     """
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self._base_title), id="title")
+        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
             yield Static("", id="menu", markup=False)
             yield Static("", id="hints", markup=False)
@@ -33,7 +33,7 @@ class ConfigScreen(Screen):
         self._refresh_values()
 
     def on_screen_resume(self, _event) -> None:
-        self.query_one("#title", Static).update(self.app.title_with_file(self._base_title))
+        self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
         self._refresh_values()
 
     def _refresh_values(self):
@@ -99,7 +99,7 @@ class ConfigScreen(Screen):
 
 class ConfigKeyScreen(Screen):
     """Screen to change the current bitmap key."""
-    _base_title = "Bitmap Key"
+    base_title = "Bitmap Key"
     CSS = """
     Input { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
@@ -111,7 +111,7 @@ class ConfigKeyScreen(Screen):
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self._base_title), id="title")
+        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
             self.input = Input(value=self.app.current_key, placeholder="Key", id="key")
             yield self.input
@@ -128,7 +128,7 @@ class ConfigKeyScreen(Screen):
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
-            val = (self.input.value or "1").strip()
+            val = (self.input.value or str(self.app.current_key)).strip()
             if val and " " not in val:
                 self.app.set_current_key(val)
                 if val not in self.app.bitmaps:
@@ -141,7 +141,7 @@ class ConfigKeyScreen(Screen):
 
 class ConfigKeyManageScreen(Screen):
     """Screen for bitmap key management operations."""
-    _base_title = "Manage Key"
+    base_title = "Manage Key"
     CSS = """
     #menu { margin-top: 1; }
     #info { margin-top: 1; }
@@ -150,7 +150,7 @@ class ConfigKeyManageScreen(Screen):
     """
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self._base_title), id="title")
+        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
             yield Static("[R]ename key\n[D]elete key\n\n[Escape] back", id="menu", markup=False)
             yield Static("", id="info")
@@ -192,7 +192,7 @@ class ConfigKeyManageScreen(Screen):
 
 class ConfigKeyRenameScreen(Screen):
     """Screen to rename the current bitmap key."""
-    _base_title = "Rename Key"
+    base_title = "Rename Key"
     CSS = """
     Input { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
@@ -204,7 +204,7 @@ class ConfigKeyRenameScreen(Screen):
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self._base_title), id="title")
+        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
             self.input = Input(value=self.app.current_key, placeholder="New key", id="key")
             yield self.input
@@ -233,10 +233,7 @@ class ConfigKeyRenameScreen(Screen):
             self.show_status(f"Key '{new_key}' already exists.")
             return
         self.app.bitmaps[new_key] = self.app.bitmaps.pop(old_key)
-        if old_key in self.app._undo_stacks:
-            self.app._undo_stacks[new_key] = self.app._undo_stacks.pop(old_key)
-        if old_key in self.app._redo_stacks:
-            self.app._redo_stacks[new_key] = self.app._redo_stacks.pop(old_key)
+        self.app.history.migrate(old_key, new_key)
         self.app.set_current_key(new_key)
         self.app.mark_dirty()
         self.app.show_status(f"Key '{old_key}' renamed to '{new_key}'.")
@@ -245,14 +242,14 @@ class ConfigKeyRenameScreen(Screen):
 
 class ConfigKeyDeleteScreen(Screen):
     """Screen to confirm and delete the current bitmap key."""
-    _base_title = "Delete Key"
+    base_title = "Delete Key"
     CSS = """
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self._base_title), id="title")
+        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
             yield Static(
                 f"Delete key '{self.app.current_key}' and all its data?",
@@ -279,8 +276,7 @@ class ConfigKeyDeleteScreen(Screen):
             self.show_status("Cannot delete the last key.")
             return
         del self.app.bitmaps[key]
-        self.app._undo_stacks.pop(key, None)
-        self.app._redo_stacks.pop(key, None)
+        self.app.history.delete(key)
         if self.app.bitmaps:
             self.app.set_current_key(next(iter(self.app.bitmaps)))
         self.app.mark_dirty()
@@ -291,7 +287,7 @@ class ConfigKeyDeleteScreen(Screen):
 
 class ConfigBoundsScreen(Screen):
     """Screen to set bitmap width and height."""
-    _base_title = "Bitmap Bounds"
+    base_title = "Bitmap Bounds"
     CSS = """
     Input { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
@@ -306,7 +302,7 @@ class ConfigBoundsScreen(Screen):
         b = self.app.bitmaps.get(str(self.app.current_key), {}).get("bounds", {})
         bw = b.get("width", 10)
         bh = b.get("height", 10)
-        yield Static(self.app.title_with_file(self._base_title), id="title")
+        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
             self.input = Input(value=f"{bw} {bh}", placeholder="width height", id="bounds")
             yield self.input
@@ -338,7 +334,7 @@ class ConfigBoundsScreen(Screen):
 
 class ConfigContextScreen(Screen):
     """Screen to set the canvas context variable name."""
-    _base_title = "Context variable"
+    base_title = "Context variable"
     CSS = """
     Input { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
@@ -350,7 +346,7 @@ class ConfigContextScreen(Screen):
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self._base_title), id="title")
+        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
             bm = self.app.bitmaps.get(str(self.app.current_key), {})
             current = bm.get("context", "ctx")
@@ -377,7 +373,7 @@ class ConfigContextScreen(Screen):
 
 class ConfigXScreen(Screen):
     """Screen to set the X variable name."""
-    _base_title = "X variable"
+    base_title = "X variable"
     CSS = """
     Input { margin:0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
@@ -389,7 +385,7 @@ class ConfigXScreen(Screen):
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self._base_title), id="title")
+        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
             bm = self.app.bitmaps.get(str(self.app.current_key), {})
             current = bm.get("x", f"x{self.app.current_key}")
@@ -416,7 +412,7 @@ class ConfigXScreen(Screen):
 
 class ConfigYScreen(Screen):
     """Screen to set the Y variable name."""
-    _base_title = "Y variable"
+    base_title = "Y variable"
     CSS = """
     Input { margin:0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
@@ -428,7 +424,7 @@ class ConfigYScreen(Screen):
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self._base_title), id="title")
+        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
             bm = self.app.bitmaps.get(str(self.app.current_key), {})
             current = bm.get("y", f"y{self.app.current_key}")
@@ -455,7 +451,7 @@ class ConfigYScreen(Screen):
 
 class ConfigLocationScreen(Screen):
     """Screen to set the bitmap origin coordinates."""
-    _base_title = "Location (x y)"
+    base_title = "Location (x y)"
     CSS = """
     Input { margin:0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
@@ -467,7 +463,7 @@ class ConfigLocationScreen(Screen):
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self._base_title), id="title")
+        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
             bm = self.app.bitmaps.get(str(self.app.current_key), {})
             loc = bm.get("location", {"x": 0, "y": 0})
@@ -501,7 +497,7 @@ class ConfigLocationScreen(Screen):
 
 class ConfigPixelScreen(Screen):
     """Screen to set the pixel size for rendering."""
-    _base_title = "Pixel Size"
+    base_title = "Pixel Size"
     CSS = """
     Input { margin:0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
@@ -513,7 +509,7 @@ class ConfigPixelScreen(Screen):
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self._base_title), id="title")
+        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
             bm = self.app.bitmaps.get(str(self.app.current_key), {})
             current = bm.get("pixelSize", 2)

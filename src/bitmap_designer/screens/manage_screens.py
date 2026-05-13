@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 class ManageScreen(Screen):
     """Menu screen for file management operations."""
-    _base_title = "Manage File"
+    base_title = "Manage File"
     TITLE = "Manage File"
 
     def compose(self) -> ComposeResult:
@@ -62,7 +62,7 @@ class RenameScreen(Screen):
         self.current_file = None
 
     def compose(self) -> ComposeResult:
-        current = os.path.basename(self.app.current_file or "Untitled.json")
+        current = os.path.basename(self.app.file.current_file or "Untitled.json")
         yield Static("Rename File", id="title")
         with Vertical():
             self.input = Input(
@@ -89,7 +89,7 @@ class RenameScreen(Screen):
 
     # Rename the current file on disk.
     def rename_file(self):
-        if not self.app.current_file:
+        if not self.app.file.current_file:
             self.app.show_status("No file to rename.")
             return
 
@@ -103,7 +103,7 @@ class RenameScreen(Screen):
         dir_path = DEFAULT_BITMAP_DIR
         new_path = os.path.join(dir_path, new_name)
 
-        if new_path == self.app.current_file:
+        if new_path == self.app.file.current_file:
             self.app.pop_screen()
             return
 
@@ -112,8 +112,8 @@ class RenameScreen(Screen):
             return
 
         try:
-            os.rename(self.app.current_file, new_path)
-            self.app.set_current_file(new_path)
+            os.rename(self.app.file.current_file, new_path)
+            self.app.file.set_current_file(new_path)
             self.app.show_status("File renamed.")
             self.app.pop_screen()
         except (OSError, json.JSONDecodeError) as e:
@@ -145,12 +145,12 @@ class DeleteScreen(Screen):
 
     # Delete the current file and reset application state.
     def delete_file(self):
-        if not self.app.current_file or not os.path.exists(self.app.current_file):
+        if not self.app.file.current_file or not os.path.exists(self.app.file.current_file):
             self.app.show_status("No file to delete.")
             return
         try:
-            os.remove(self.app.current_file)
-            self.app.set_current_file(None)
+            os.remove(self.app.file.current_file)
+            self.app.file.set_current_file(None)
             self.app.set_bitmaps({})
             self.app.mark_dirty(False)
             self.app.show_status("File deleted.")

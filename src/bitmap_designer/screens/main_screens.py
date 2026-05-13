@@ -15,6 +15,8 @@ from .manage_screens import ManageScreen
 from .config_screens import ConfigScreen
 from .codegen_screens import CodegenScreen
 
+from ..codegen_service import CodegenService
+
 from ..constants import HINT_ESCAPE
 
 if TYPE_CHECKING:
@@ -23,7 +25,7 @@ if TYPE_CHECKING:
 
 class MainScreen(Screen):
     """Main menu screen hub linking to design, preview, save, codegen, and config."""
-    _base_title = "Main Menu"
+    base_title = "Main Menu"
     TITLE = "Main Menu"
 
     def _menu_text(self) -> str:
@@ -52,8 +54,8 @@ class MainScreen(Screen):
         title.update(self.app.title_with_file(self.TITLE))
         menu = self.query_one("#menu", Static)
         menu.update(self._menu_text())
-        if self.app.check_external_change() and self.app.current_file:
-            self.app.push_screen(FileChangedScreen(self.app.current_file))
+        if self.app.file.check_external_change() and self.app.file.current_file:
+            self.app.push_screen(FileChangedScreen(self.app.file.current_file))
 
     def on_key(self, event) -> None:
         key = event.key
@@ -68,8 +70,7 @@ class MainScreen(Screen):
             )
             self.app.push_screen(DesignScreen(bitmap))
         elif key_lower == "p":
-            self.app.preview()
-            self.show_status("Preview opened.")
+            CodegenService(self.app.bitmaps, self.app.show_status).preview()
         elif key_lower == "s":
             self.app.push_screen(SaveScreen())
         elif key_lower == "g":

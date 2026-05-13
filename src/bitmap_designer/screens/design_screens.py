@@ -8,6 +8,8 @@ from textual.screen import Screen
 from textual.widgets import Static
 from textual.containers import Vertical
 
+from ..codegen_service import CodegenService
+
 from .config_screens import ConfigKeyScreen
 
 if TYPE_CHECKING:
@@ -16,6 +18,7 @@ if TYPE_CHECKING:
 
 class DesignScreen(Screen):
     """Grid-based bitmap editor with cursor movement, paint, fill, undo/redo."""
+    base_title = "Design Mode"
     CSS = """
     #grid { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
@@ -29,13 +32,18 @@ class DesignScreen(Screen):
         self.cursor_x = 0
         self.cursor_y = 0
         self.pixels = bitmap_data.get("bitmap", {}).get("pixels", [])
-        self.undo_stack = self.app.get_undo_stack(self.app.current_key)
-        self.redo_stack = self.app.get_redo_stack(self.app.current_key)
         self._key_on_enter = self.app.current_key
 
+    @property
+    def undo_stack(self):
+        return self.app.history.get_undo(self.app.current_key)
+
+    @property
+    def redo_stack(self):
+        return self.app.history.get_redo(self.app.current_key)
+
     def compose(self) -> ComposeResult:
-        self._base_title = "Design Mode"
-        yield Static(self.app.title_with_file(self._base_title), id="title")
+        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
             yield Static("", id="grid")
             yield Static("", id="hints", markup=False)
@@ -46,7 +54,7 @@ class DesignScreen(Screen):
         self._update_hints()
 
     def on_screen_resume(self, _event) -> None:
-        self.query_one("#title", Static).update(self.app.title_with_file(self._base_title))
+        self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
         if self.app.current_key != self._key_on_enter:
             self._key_on_enter = self.app.current_key
             bm = self.app.bitmaps.get(self.app.current_key, {})
@@ -55,8 +63,6 @@ class DesignScreen(Screen):
             self.pixels = bm.get("bitmap", {}).get("pixels", [])
             self.cursor_x = 0
             self.cursor_y = 0
-            self.undo_stack = self.app.get_undo_stack(self.app.current_key)
-            self.redo_stack = self.app.get_redo_stack(self.app.current_key)
             self.refresh_grid()
         self._update_hints()
 
@@ -120,6 +126,7 @@ class DesignScreen(Screen):
             return
         if key == "ctrl+k":
             self.app.push_screen(ConfigKeyScreen())
+            event.stop()
             return
         if self._handle_movement(key):
             self.refresh_grid()
@@ -133,8 +140,7 @@ class DesignScreen(Screen):
         elif key == "escape":
             self.app.pop_screen()
         elif key == "p":
-            self.app.preview()
-            self.show_status("Preview opened.")
+            CodegenService(self.app.bitmaps, self.app.show_status).preview()
 
         self.refresh_grid()
 
@@ -152,7 +158,7 @@ class DesignScreen(Screen):
         self.pixels[self.cursor_y] = "".join(row)
         self.app.mark_dirty()
         self._sync_pixels()
-        self.app.save_preview_html()
+        CodegenService(self.app.bitmaps).save_preview_html()
 
     # Fill a connected region from the cursor with the current color.
     def flood_fill(self):
@@ -164,7 +170,7 @@ class DesignScreen(Screen):
         self._flood_fill(self.cursor_x, self.cursor_y, target, fill_color)
         self.app.mark_dirty()
         self._sync_pixels()
-        self.app.save_preview_html()
+        CodegenService(self.app.bitmaps).save_preview_html()
 
     def _get_pixel(self, x: int, y: int) -> str:
         if y < len(self.pixels) and x < len(self.pixels[y]):
