@@ -17,7 +17,7 @@ from .codegen_screens import CodegenScreen
 
 from ..codegen_service import CodegenService
 
-from ..constants import HINT_ESCAPE
+from ..constants import HINT_ESCAPE, create_default_bitmap
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
@@ -66,7 +66,7 @@ class MainScreen(Screen):
         if key_lower == "d":
             bitmap = self.app.bitmaps.get(
                 self.app.current_key,
-                self.app.create_default_bitmap()
+                create_default_bitmap()
             )
             self.app.push_screen(DesignScreen(bitmap))
         elif key_lower == "p":

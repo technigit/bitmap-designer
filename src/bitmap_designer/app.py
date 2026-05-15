@@ -6,7 +6,7 @@ from textual.app import App, ComposeResult
 from textual.widgets import Footer, Static
 from textual.binding import Binding
 
-from .constants import DEFAULT_BITMAP_DIR
+from .constants import DEFAULT_BITMAP_DIR, create_default_bitmap
 from .file_service import FileService
 from .history_service import HistoryService
 from .screens import StartupScreen, MainScreen, QuitScreen
@@ -111,11 +111,11 @@ class BitmapDesignerApp(App):
     def new_bitmap(self):
         self.bitmaps = {}
         self.current_key = "1"
-        self.bitmaps["1"] = self.create_default_bitmap()
+        self.bitmaps["1"] = create_default_bitmap()
         self.file.set_current_file(os.path.join(DEFAULT_BITMAP_DIR, "Untitled.json"))
         self.dirty = False
         self._take_clean_snapshot()
-        self.set_current_color("1")
+        self.current_color = "1"
         self.history.clear_all()
         self.push_screen(MainScreen())
 
@@ -138,20 +138,6 @@ class BitmapDesignerApp(App):
 
     def set_current_color(self, color: str):
         self.current_color = color
-
-    # Return a default bitmap configuration dict.
-
-    def create_default_bitmap(self) -> dict:
-        return {
-            "bounds": {"width": 10, "height": 10},
-            "context": "ctx",
-            "x": "x",
-            "y": "y",
-            "location": {"x": 0, "y": 0},
-            "pixelSize": 2,
-            "bitmap": {"pixels": []},
-        }
-
 
 def run():
     """Run the bitmap designer application."""

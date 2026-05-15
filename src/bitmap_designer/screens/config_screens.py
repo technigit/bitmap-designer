@@ -7,7 +7,7 @@ from textual.screen import Screen
 from textual.widgets import Static, Input
 from textual.containers import Vertical
 
-from ..constants import HINT_ESCAPE
+from ..constants import HINT_ESCAPE, create_default_bitmap
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
@@ -132,7 +132,7 @@ class ConfigKeyScreen(Screen):
             if val and " " not in val:
                 self.app.set_current_key(val)
                 if val not in self.app.bitmaps:
-                    self.app.bitmaps[val] = self.app.create_default_bitmap()
+                    self.app.bitmaps[val] = create_default_bitmap()
                     self.app.mark_dirty()
                 self.app.pop_screen()
                 self.app.show_status(f"Switched to key {val}.")
@@ -324,7 +324,7 @@ class ConfigBoundsScreen(Screen):
                     if w >= 2 and h >= 2:
                         idx = str(self.app.current_key)
                         if idx not in self.app.bitmaps:
-                            self.app.bitmaps[idx] = self.app.create_default_bitmap()
+                            self.app.bitmaps[idx] = create_default_bitmap()
                         self.app.bitmaps[idx]["bounds"] = {"width": w, "height": h}
                         self.app.mark_dirty()
                         self.app.pop_screen()
@@ -364,7 +364,7 @@ class ConfigContextScreen(Screen):
         elif event.key in ("enter", "\n"):
             idx = str(self.app.current_key)
             if idx not in self.app.bitmaps:
-                self.app.bitmaps[idx] = self.app.create_default_bitmap()
+                self.app.bitmaps[idx] = create_default_bitmap()
             self.app.bitmaps[idx]["context"] = self.input.value or "ctx"
             self.app.mark_dirty()
             self.app.pop_screen()
@@ -403,7 +403,7 @@ class ConfigXScreen(Screen):
         elif event.key in ("enter", "\n"):
             idx = str(self.app.current_key)
             if idx not in self.app.bitmaps:
-                self.app.bitmaps[idx] = self.app.create_default_bitmap()
+                self.app.bitmaps[idx] = create_default_bitmap()
             self.app.bitmaps[idx]["x"] = self.input.value or "x"
             self.app.mark_dirty()
             self.app.pop_screen()
@@ -442,7 +442,7 @@ class ConfigYScreen(Screen):
         elif event.key in ("enter", "\n"):
             idx = str(self.app.current_key)
             if idx not in self.app.bitmaps:
-                self.app.bitmaps[idx] = self.app.create_default_bitmap()
+                self.app.bitmaps[idx] = create_default_bitmap()
             self.app.bitmaps[idx]["y"] = self.input.value or "y"
             self.app.mark_dirty()
             self.app.pop_screen()
@@ -486,7 +486,7 @@ class ConfigLocationScreen(Screen):
                     y = int(parts[1])
                     idx = str(self.app.current_key)
                     if idx not in self.app.bitmaps:
-                        self.app.bitmaps[idx] = self.app.create_default_bitmap()
+                        self.app.bitmaps[idx] = create_default_bitmap()
                     self.app.bitmaps[idx]["location"] = {"x": x, "y": y}
                     self.app.mark_dirty()
                     self.app.pop_screen()
@@ -530,7 +530,7 @@ class ConfigPixelScreen(Screen):
                 if val >= 1:
                     idx = str(self.app.current_key)
                     if idx not in self.app.bitmaps:
-                        self.app.bitmaps[idx] = self.app.create_default_bitmap()
+                        self.app.bitmaps[idx] = create_default_bitmap()
                     self.app.bitmaps[idx]["pixelSize"] = val
                     self.app.mark_dirty()
                     self.app.pop_screen()

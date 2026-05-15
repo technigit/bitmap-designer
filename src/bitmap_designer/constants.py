@@ -9,6 +9,17 @@ HINT_ESCAPE = "  [Escape] cancel"
 HOME_DIR = str(Path.home())
 DEFAULT_BITMAP_DIR = os.path.join(HOME_DIR, "bitmaps")
 
+def create_default_bitmap() -> dict:
+    return {
+        "bounds": {"width": 10, "height": 10},
+        "context": "ctx",
+        "x": "x",
+        "y": "y",
+        "location": {"x": 0, "y": 0},
+        "pixelSize": 2,
+        "bitmap": {"pixels": []},
+    }
+
 COLOR_MAP = {
     "1": "#000000", "2": "#FFFFFF", "3": "#FF4A00", "4": "#FFD24A",
     "5": "#5CFF4A", "6": "#4AA8A8", "7": "#C24AFF", "8": "#FF9A00", "9": "#8A4A00",
