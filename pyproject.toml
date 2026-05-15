@@ -21,9 +21,12 @@ where = ["src"]
 [tool.pylint.'MESSAGES CONTROL']
 disable = ["missing-function-docstring"]
 
+[tool.pylint.DESIGN]
+max-attributes = 10
+
 [tool.pylint.MASTER]
 ignore = "tests"
-good-names = "_"
+good-names = "bx,by,dx,dy,ox,oy,cx,cy,_"
 
 [tool.pylint.REPORTS]
 output-format = "colorized"

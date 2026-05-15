@@ -72,7 +72,11 @@
             - [shift yuio] - scroll grid (5px)
             - [ctrl yuio] - scroll grid (10px)
             - [option yuio] - scroll grid (20px)
-            - [wasd] - ad = -/+ bitmap index number, ws = -10/+10 bitmap index number
+            - [wasd] - switch bitmap key in that direction (up/left/down/right)
+                - based on bitmap location coordinates
+                - horizontal tie-break (a/d): favor topmost (smallest y)
+                - vertical tie-break (w/s): favor leftmost (smallest x)
+                - if no key in that direction, show a status message
             - [^K]ey=N - switch bitmap key (N shows current key value) // Bitmap key UI
             - [C]olor=N - select current color (N shows current color value) // Color UI
             - [space] - paint one bitmap pixel at the cursor position with the current color

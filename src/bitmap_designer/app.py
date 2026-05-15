@@ -32,6 +32,52 @@ class BitmapDesignerApp(App):
         self.current_color = "1"
         self.dirty = False
         self._clean_snapshot = None
+        self._key_adjacency: dict[str, dict[str, str | None]] = {}
+        self.cursor_positions: dict[str, tuple[int, int]] = {}
+
+    @staticmethod
+    def _get_location(bitmap_data: dict) -> tuple[int, int]:
+        loc = bitmap_data.get("location", {})
+        return loc.get("x", 0), loc.get("y", 0)
+
+    def build_key_adjacency(self) -> None:
+        adj = {}
+        locs = {k: self._get_location(self.bitmaps[k]) for k in self.bitmaps}
+        for key, (bx, by) in locs.items():
+            best = {"left": None, "right": None, "up": None, "down": None}
+            best_dist = {"left": None, "right": None, "up": None, "down": None}
+            best_tie = {"left": None, "right": None, "up": None, "down": None}
+            for ok, (ox, oy) in locs.items():
+                if ok == key:
+                    continue
+                dx = ox - bx
+                dy = oy - by
+                dsq = dx * dx + dy * dy
+                if dx > 0 and (best_dist["right"] is None or dsq < best_dist["right"]
+                               or (dsq == best_dist["right"] and oy < best_tie["right"])):
+                    best["right"] = ok
+                    best_dist["right"] = dsq
+                    best_tie["right"] = oy
+                if dx < 0 and (best_dist["left"] is None or dsq < best_dist["left"]
+                               or (dsq == best_dist["left"] and oy < best_tie["left"])):
+                    best["left"] = ok
+                    best_dist["left"] = dsq
+                    best_tie["left"] = oy
+                if dy > 0 and (best_dist["down"] is None or dsq < best_dist["down"]
+                               or (dsq == best_dist["down"] and ox < best_tie["down"])):
+                    best["down"] = ok
+                    best_dist["down"] = dsq
+                    best_tie["down"] = ox
+                if dy < 0 and (best_dist["up"] is None or dsq < best_dist["up"]
+                               or (dsq == best_dist["up"] and ox < best_tie["up"])):
+                    best["up"] = ok
+                    best_dist["up"] = dsq
+                    best_tie["up"] = ox
+            adj[key] = best
+        self._key_adjacency = adj
+
+    def navigate_key(self, direction: str) -> str | None:
+        return self._key_adjacency.get(self.current_key, {}).get(direction)
 
     def _take_clean_snapshot(self) -> None:
         self._clean_snapshot = copy.deepcopy(self.bitmaps)
@@ -67,6 +113,7 @@ class BitmapDesignerApp(App):
 
     def set_bitmaps(self, bitmaps: dict) -> None:
         self.bitmaps = bitmaps
+        self.build_key_adjacency()
 
     def set_current_key(self, key: str) -> None:
         self.current_key = key
@@ -78,11 +125,13 @@ class BitmapDesignerApp(App):
             with open(self.file.current_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 self.bitmaps = data.get("bitmaps", {})
+                self.build_key_adjacency()
                 if self.bitmaps:
                     self.current_key = next(iter(self.bitmaps.keys()))
                 self.dirty = False
                 self._take_clean_snapshot()
                 self.history.clear_all()
+                self.cursor_positions = {}
                 self.file.refresh_mtime()
         except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error reloading file: {e}")
@@ -112,11 +161,13 @@ class BitmapDesignerApp(App):
         self.bitmaps = {}
         self.current_key = "1"
         self.bitmaps["1"] = create_default_bitmap()
+        self.build_key_adjacency()
         self.file.set_current_file(os.path.join(DEFAULT_BITMAP_DIR, "Untitled.json"))
         self.dirty = False
         self._take_clean_snapshot()
         self.current_color = "1"
         self.history.clear_all()
+        self.cursor_positions = {}
         self.push_screen(MainScreen())
 
     # Load bitmaps from a JSON file and open the main menu.
@@ -126,12 +177,14 @@ class BitmapDesignerApp(App):
             with open(filepath, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 self.bitmaps = data.get("bitmaps", {})
+                self.build_key_adjacency()
                 self.file.set_current_file(filepath)
                 if self.bitmaps:
                     self.current_key = next(iter(self.bitmaps.keys()))
                 self.dirty = False
                 self._take_clean_snapshot()
                 self.history.clear_all()
+                self.cursor_positions = {}
                 self.push_screen(MainScreen())
         except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error loading file: {e}")

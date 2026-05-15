@@ -133,6 +133,7 @@ class ConfigKeyScreen(Screen):
                 self.app.set_current_key(val)
                 if val not in self.app.bitmaps:
                     self.app.bitmaps[val] = create_default_bitmap()
+                    self.app.build_key_adjacency()
                     self.app.mark_dirty()
                 self.app.pop_screen()
                 self.app.show_status(f"Switched to key {val}.")
@@ -235,6 +236,7 @@ class ConfigKeyRenameScreen(Screen):
         self.app.bitmaps[new_key] = self.app.bitmaps.pop(old_key)
         self.app.history.migrate(old_key, new_key)
         self.app.set_current_key(new_key)
+        self.app.build_key_adjacency()
         self.app.mark_dirty()
         self.app.show_status(f"Key '{old_key}' renamed to '{new_key}'.")
         self.app.pop_screen()
@@ -277,6 +279,7 @@ class ConfigKeyDeleteScreen(Screen):
             return
         del self.app.bitmaps[key]
         self.app.history.delete(key)
+        self.app.build_key_adjacency()
         if self.app.bitmaps:
             self.app.set_current_key(next(iter(self.app.bitmaps)))
         self.app.mark_dirty()
@@ -488,6 +491,7 @@ class ConfigLocationScreen(Screen):
                     if idx not in self.app.bitmaps:
                         self.app.bitmaps[idx] = create_default_bitmap()
                     self.app.bitmaps[idx]["location"] = {"x": x, "y": y}
+                    self.app.build_key_adjacency()
                     self.app.mark_dirty()
                     self.app.pop_screen()
                     self.app.show_status("Location saved.")

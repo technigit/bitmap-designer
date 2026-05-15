@@ -56,14 +56,7 @@ class DesignScreen(Screen):
     def on_screen_resume(self, _event) -> None:
         self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
         if self.app.current_key != self._key_on_enter:
-            self._key_on_enter = self.app.current_key
-            bm = self.app.bitmaps.get(self.app.current_key, {})
-            self.width = bm.get("bounds", {}).get("width", 10)
-            self.height = bm.get("bounds", {}).get("height", 10)
-            self.pixels = bm.get("bitmap", {}).get("pixels", [])
-            self.cursor_x = 0
-            self.cursor_y = 0
-            self.refresh_grid()
+            self._switch_to_key(self.app.current_key)
         self._update_hints()
 
     # Rebuild the grid display from pixel data.
@@ -104,17 +97,46 @@ class DesignScreen(Screen):
         elif key.startswith("alt"):
             step = 20
 
-        if key in ("left", "h", "a"):
+        if key in ("left", "h"):
             self.cursor_x = max(0, self.cursor_x - step)
-        elif key in ("right", "l", "d"):
+        elif key in ("right", "l"):
             self.cursor_x = min(self.width - 1, self.cursor_x + step)
-        elif key in ("up", "k", "w"):
+        elif key in ("up", "k"):
             self.cursor_y = max(0, self.cursor_y - step)
-        elif key in ("down", "j", "s"):
+        elif key in ("down", "j"):
             self.cursor_y = min(self.height - 1, self.cursor_y + step)
         else:
             return False
         return True
+
+    def _switch_key_dir(self, direction: str) -> None:
+        dest = self.app.navigate_key(direction)
+        if dest:
+            self._switch_to_key(dest)
+        else:
+            self.show_status(f"No bitmap key to the {direction}")
+
+    def _switch_to_key(self, new_key: str) -> None:
+        old_key = self._key_on_enter
+        if old_key == new_key:
+            return
+        self.app.history.get_undo(old_key).append((list(self.pixels), self.cursor_x, self.cursor_y))
+        self.app.history.get_redo(old_key).clear()
+        self.app.cursor_positions[old_key] = (self.cursor_x, self.cursor_y)
+        self.app.set_current_key(new_key)
+        self._key_on_enter = new_key
+        bm = self.app.bitmaps.get(new_key, {})
+        self.width = bm.get("bounds", {}).get("width", 10)
+        self.height = bm.get("bounds", {}).get("height", 10)
+        self.pixels = bm.get("bitmap", {}).get("pixels", [])
+        cx, cy = self.app.cursor_positions.get(new_key, (0, 0))
+        self.cursor_x = min(cx, self.width - 1)
+        self.cursor_y = min(cy, self.height - 1)
+        self.refresh_grid()
+        self._update_hints()
+        title = self.query_one("#title", Static)
+        title.update(self.app.title_with_file(self.base_title))
+        self.show_status(f"Switched to key {new_key}.")
 
     def on_key(self, event) -> None:
         key = event.key.lower()
@@ -131,7 +153,10 @@ class DesignScreen(Screen):
         if self._handle_movement(key):
             self.refresh_grid()
             return
-        if key == "space":
+        if key in ("d", "a", "s", "w"):
+            dirs = {"d": "right", "a": "left", "s": "down", "w": "up"}
+            self._switch_key_dir(dirs[key])
+        elif key == "space":
             self.paint_pixel()
         elif key == "f":
             self.flood_fill()
@@ -249,6 +274,7 @@ class DesignScreen(Screen):
         hints = Text()
         hints.append("[arrows/hjkl] move  ")
         hints.append("[space] paint\n")
+        hints.append("[wasd] switch key\n")
         hints.append("[F]ill  ")
         hints.append("[R]ect  ")
         hints.append("[P]review\n")
