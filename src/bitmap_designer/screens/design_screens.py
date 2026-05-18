@@ -11,6 +11,7 @@ from textual.containers import Vertical
 from ..codegen_service import CodegenService
 
 from .config_screens import ConfigKeyScreen
+from .map_screen import MapScreen
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
@@ -166,6 +167,8 @@ class DesignScreen(Screen):
             self.app.pop_screen()
         elif key == "p":
             CodegenService(self.app.bitmaps, self.app.show_status).preview()
+        elif key == "m":
+            self.app.push_screen(MapScreen())
 
         self.refresh_grid()
 
@@ -277,7 +280,8 @@ class DesignScreen(Screen):
         hints.append("[wasd] switch key\n")
         hints.append("[F]ill  ")
         hints.append("[R]ect  ")
-        hints.append("[P]review\n")
+        hints.append("[P]review  ")
+        hints.append("[M]ap\n")
         hints.append(f"[C]olor={self.app.current_color}  ")
         hints.append(f"[^K]ey={self.app.current_key}\n")
         if not self.undo_stack:

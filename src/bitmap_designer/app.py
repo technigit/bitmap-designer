@@ -12,6 +12,7 @@ from .history_service import HistoryService
 from .screens import StartupScreen, MainScreen, QuitScreen
 
 
+# pylint: disable=too-many-instance-attributes
 class BitmapDesignerApp(App):
     """Textual App subclass orchestrating all screens and application state."""
     CSS = """
@@ -34,6 +35,9 @@ class BitmapDesignerApp(App):
         self._clean_snapshot = None
         self._key_adjacency: dict[str, dict[str, str | None]] = {}
         self.cursor_positions: dict[str, tuple[int, int]] = {}
+        self.map_zoom: float | None = None
+        self.map_pan: tuple[int, int] = (0, 0)
+        self.map_pan_flip: bool = False
 
     @staticmethod
     def _get_location(bitmap_data: dict) -> tuple[int, int]:
@@ -76,8 +80,9 @@ class BitmapDesignerApp(App):
             adj[key] = best
         self._key_adjacency = adj
 
-    def navigate_key(self, direction: str) -> str | None:
-        return self._key_adjacency.get(self.current_key, {}).get(direction)
+    def navigate_key(self, direction: str, key: str | None = None) -> str | None:
+        src = key if key is not None else self.current_key
+        return self._key_adjacency.get(src, {}).get(direction)
 
     def _take_clean_snapshot(self) -> None:
         self._clean_snapshot = copy.deepcopy(self.bitmaps)
