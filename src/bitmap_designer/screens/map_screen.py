@@ -2,14 +2,17 @@
 from __future__ import annotations
 import math
 from dataclasses import dataclass
+from functools import partial
 from typing import TYPE_CHECKING
 
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.events import Resize as ResizeEvent
 from textual.screen import Screen
-from textual.widgets import Static
+from textual.widgets import Input, Static
 from textual.containers import Vertical
+
+from .popup_screen import PopupScreen
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
@@ -28,16 +31,90 @@ class DeviceContext:
     pan_y: int
 
 
-# pylint: disable=too-many-instance-attributes
+class FindKeyScreen(PopupScreen):
+    """Screen to find and select a bitmap key by name."""
+    base_title = "Find Key"
+    CSS = """
+    Input { margin: 0 0; }
+    #matches { margin-top: 1; }
+    #hints { margin-top: 1; opacity: 0.5; }
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.input = None
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Static(self.app.title_with_file(self.base_title), id="title")
+            self.input = Input(placeholder="Type key name...", id="find-input")
+            yield self.input
+            yield Static("", id="matches")
+            yield Static("[Enter] select  [Escape] cancel", id="hints", markup=False)
+            yield Static("", id="status")
+
+    def on_screen_resume(self, _event) -> None:
+        self.input.focus()
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        val = event.value.strip()
+        if val:
+            keys = [k for k in self.app.bitmaps if val.lower() in k.lower()]
+            display = "\n".join(keys[:15])
+            self.query_one("#matches", Static).update(display)
+        else:
+            self.query_one("#matches", Static).update("")
+
+    def show_status(self, message: str) -> None:
+        self.query_one("#status", Static).update(message)
+
+    def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
+        if event.key == "escape":
+            self.dismiss(None)
+        elif event.key in ("enter", "\n"):
+            val = (self.input.value or "").strip()
+            if val in self.app.bitmaps:
+                self.dismiss(val)
+            else:
+                self.show_status(f"Key '{val}' not found.")
+
+
 class MapScreen(Screen):
     """Overview map of all bitmaps arranged by spatial location."""
-    base_title = "Bitmap Map"
+    base_title = "Map Mode"
     CSS = """
     Vertical { height: 1fr; }
     #grid { height: 1fr; }
     #hints { opacity: 0.5; }
-    #status { dock: bottom; }
+    #status { dock: bottom; margin-left: 3; }
     """
+
+    _ACTIONS: dict[str, tuple[str, tuple]] = {
+        "d": ("_navigate", ("right", "No bitmap key to the right")),
+        "a": ("_navigate", ("left", "No bitmap key to the left")),
+        "s": ("_navigate", ("down", "No bitmap key below")),
+        "w": ("_navigate", ("up", "No bitmap key above")),
+        "enter": ("_select_current_key", ()),
+        "F": ("_zero_fit_content", ()),
+        "f": ("_zoom_to_key_selected", ()),
+        "plus": ("_zoom_change", (1.25,)),
+        "equals_sign": ("_zoom_change", (1.25,)),
+        "minus": ("_zoom_change", (0.8,)),
+        "underscore": ("_zoom_change", (0.8,)),
+        "0": ("_reset_zoom_view", ()),
+        "r": ("_reset_pan_view", ()),
+        "h": ("_pan", (-1, 0)),
+        "l": ("_pan", (1, 0)),
+        "k": ("_pan", (0, -1)),
+        "j": ("_pan", (0, 1)),
+        "p": ("_toggle_pan_mode", ()),
+        "slash": ("_enter_find_mode", ()),
+        "solidus": ("_enter_find_mode", ()),
+    }
 
     def __init__(self):
         super().__init__()
@@ -46,8 +123,6 @@ class MapScreen(Screen):
         self.pan_x, self.pan_y = self.app.map_pan
         self.pan_flip = self.app.map_pan_flip
         self.selected_key = self.app.current_key
-        self._find_mode = False
-        self._find_buffer = ""
         self._last_fit: str | None = None
 
     def compose(self) -> ComposeResult:
@@ -55,6 +130,7 @@ class MapScreen(Screen):
         with Vertical():
             yield Static("", id="grid")
             yield Static("", id="hints", markup=False)
+        yield Static("")
         yield Static("", id="status")
 
     def on_mount(self) -> None:
@@ -68,11 +144,10 @@ class MapScreen(Screen):
         await super()._on_resize(event)
         self._update()
 
-    # pylint: disable=attribute-defined-outside-init
     def _store_map_state(self) -> None:
-        self.app.map_zoom = self.zoom_scale
-        self.app.map_pan = (self.pan_x, self.pan_y)
-        self.app.map_pan_flip = self.pan_flip
+        setattr(self.app, "map_zoom", self.zoom_scale)
+        setattr(self.app, "map_pan", (self.pan_x, self.pan_y))
+        setattr(self.app, "map_pan_flip", self.pan_flip)
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
@@ -112,7 +187,6 @@ class MapScreen(Screen):
         self._last_fit = "zero"
         self._update()
 
-    # pylint: disable=too-many-locals
     def _zoom_to_key(self, key: str) -> None:
         self._last_fit = None
         cw, ch = self._compute_canvas_size()
@@ -156,9 +230,7 @@ class MapScreen(Screen):
             }
         return positions
 
-    # pylint: disable=too-many-locals
-    def _sample_pixel(self, ctx: DeviceContext, key: str,
-                      disp_col: int, disp_row: int) -> str:
+    def _get_bitmap_attrs(self, key: str) -> tuple[int, int, int, int, list]:
         data = self.app.bitmaps.get(key, {})
         loc = data.get("location", {})
         bx = loc.get("x", 0)
@@ -167,82 +239,68 @@ class MapScreen(Screen):
         bw = bounds["width"]
         bh = bounds["height"]
         pixels = data.get("bitmap", {}).get("pixels", [])
-        vx_s = bx + disp_col / ctx.zoom_scale
-        vx_e = bx + (disp_col + 1) / ctx.zoom_scale
-        vy_s = by + disp_row / (ctx.zoom_scale * ctx.aspect_y)
-        vy_e = by + (disp_row + 1) / (ctx.zoom_scale * ctx.aspect_y)
-        px_s = max(0, int(math.floor(vx_s)) - bx)
-        px_e = min(bw - 1, int(math.ceil(vx_e)) - 1 - bx)
-        py_s = max(0, int(math.floor(vy_s)) - by)
-        py_e = min(bh - 1, int(math.ceil(vy_e)) - 1 - by)
+        return bx, by, bw, bh, pixels
+
+    def _count_pixels(self, pixels: list, px: tuple[int, int],
+                      py: tuple[int, int]) -> dict:
         counts = {}
-        for py in range(py_s, py_e + 1):
-            if py >= len(pixels):
+        for row_idx in range(py[0], py[1] + 1):
+            if row_idx >= len(pixels):
                 continue
-            row = pixels[py]
-            for pcol in range(px_s, px_e + 1):
+            row = pixels[row_idx]
+            for pcol in range(px[0], px[1] + 1):
                 if pcol >= len(row):
                     continue
                 ch = row[pcol]
                 if ch != " ":
                     counts[ch] = counts.get(ch, 0) + 1
+        return counts
+
+    def _sample_pixel(self, ctx: DeviceContext, key: str,
+                      disp_col: int, disp_row: int) -> str:
+        bx, by, bw, bh, pixels = self._get_bitmap_attrs(key)
+        scale_y = ctx.zoom_scale * ctx.aspect_y
+        px = (max(0, int(math.floor(bx + disp_col / ctx.zoom_scale)) - bx),
+              min(bw - 1, int(math.ceil(bx + (disp_col + 1) / ctx.zoom_scale)) - 1 - bx))
+        py = (max(0, int(math.floor(by + disp_row / scale_y)) - by),
+              min(bh - 1, int(math.ceil(by + (disp_row + 1) / scale_y)) - 1 - by))
+        counts = self._count_pixels(pixels, px, py)
         if not counts:
             return " "
         max_c = max(counts.values())
-        best = max((c for c, n in counts.items() if n == max_c),
+        return max((c for c, n in counts.items() if n == max_c),
                    key=lambda c: int(c, 16))
-        return best
 
-    # pylint: disable=too-many-locals,too-many-arguments,too-many-positional-arguments
-    def _render_one(self, ctx: DeviceContext, key: str, pos: dict, cell,
-                    style: str | None, overwrite: bool) -> None:
-        p = pos
-        pl = p["pixel_left"]
-        pt = p["pixel_top"]
-        pw = p["pixel_w"]
-        ph = p["pixel_h"]
-        bl = pl - 1
-        br = pl + pw
-        bt = pt - 1
-        bb = pt + ph
-        lr = pt - 2
+    def _render_one(self, ctx: DeviceContext, key: str, pos: dict,
+                    cell, *, max_bounds: tuple[int, int]) -> None:
+        pl = pos["pixel_left"]
+        pt = pos["pixel_top"]
+        pw = pos["pixel_w"]
         for i, ch in enumerate(str(key)):
-            cell(bl + 1 + i, lr, ch, style, overwrite)
-        cell(bl, bt, "+", style, overwrite)
-        for cx in range(pl, br):
-            cell(cx, bt, "-", style, overwrite)
-        cell(br, bt, "+", style, overwrite)
-        cell(bl, bb, "+", style, overwrite)
-        for cx in range(pl, br):
-            cell(cx, bb, "-", style, overwrite)
-        cell(br, bb, "+", style, overwrite)
-        for row in range(ph):
-            cy = pt + row
-            cell(bl, cy, "|", style, overwrite)
-            cell(br, cy, "|", style, overwrite)
+            if pl + i < ctx.pan_x - 1 or pt - 2 < ctx.pan_y - 2:
+                break
+            if pl + i > max_bounds[0] or pt - 2 > max_bounds[1]:
+                break
+            cell(pl + i, pt - 2, ch)
+        cell(pl - 1, pt - 1, "+")
+        for cx in range(pl, pl + pw):
+            cell(cx, pt - 1, "-")
+        cell(pl + pw, pt - 1, "+")
+        cell(pl - 1, pt + pos["pixel_h"], "+")
+        for cx in range(pl, pl + pw):
+            cell(cx, pt + pos["pixel_h"], "-")
+        cell(pl + pw, pt + pos["pixel_h"], "+")
+        for row in range(pos["pixel_h"]):
+            cell(pl - 1, pt + row, "|")
+            cell(pl + pw, pt + row, "|")
             for col in range(pw):
-                cx = pl + col
-                pxch = self._sample_pixel(ctx, key, col, row)
-                cell(cx, cy, pxch, style, overwrite)
+                cell(pl + col, pt + row,
+                     self._sample_pixel(ctx, key, col, row))
 
-    # pylint: disable=too-many-branches
     def _render_grid(self, ctx: DeviceContext) -> Text:
         positions = self._compute_positions(ctx)
         grid = [[(" ", None) for _ in range(ctx.cw)]
                 for _ in range(ctx.ch)]
-
-        def set_cell(col: int, row: int, char: str, style: str | None,
-                     overwrite: bool) -> None:
-            if 0 <= row < ctx.ch and 0 <= col < ctx.cw:
-                if overwrite or grid[row][col][0] == " ":
-                    grid[row][col] = (char, style)
-
-        for key, pos in positions.items():
-            if key != self.selected_key:
-                self._render_one(ctx, key, pos, set_cell, "dim", False)
-        if self.selected_key in positions:
-            self._render_one(ctx, self.selected_key, positions[self.selected_key],
-                             set_cell, None, True)
 
         max_right = 0
         max_bottom = 0
@@ -252,6 +310,28 @@ class MapScreen(Screen):
             max_right = max(max_right, r)
             max_bottom = max(max_bottom, b)
 
+        def set_cell(col: int, row: int, char: str, style: str | None,
+                     overwrite: bool) -> None:
+            if 0 <= row < ctx.ch and 0 <= col < ctx.cw:
+                if overwrite or grid[row][col][0] == " ":
+                    grid[row][col] = (char, style)
+
+        max_bounds = (max_right, max_bottom)
+        for key, pos in positions.items():
+            if key != self.selected_key:
+                self._render_one(ctx, key, pos,
+                                 partial(set_cell, style="dim", overwrite=False),
+                                 max_bounds=max_bounds)
+        if self.selected_key in positions:
+            self._render_one(ctx, self.selected_key, positions[self.selected_key],
+                             partial(set_cell, style=None, overwrite=True),
+                             max_bounds=max_bounds)
+
+        self._draw_grid_borders(ctx, grid)
+        self._fill_grid_empty(ctx, grid, max_right, max_bottom)
+        return self._compress_grid(ctx, grid)
+
+    def _draw_grid_borders(self, ctx: DeviceContext, grid: list) -> None:
         for col in range(ctx.cw):
             grid[0][col] = ("─", BORDER)
             grid[ctx.ch - 1][col] = ("─", BORDER)
@@ -263,6 +343,8 @@ class MapScreen(Screen):
         grid[ctx.ch - 1][0] = ("└", BORDER)
         grid[ctx.ch - 1][ctx.cw - 1] = ("┘", BORDER)
 
+    def _fill_grid_empty(self, ctx: DeviceContext, grid: list,
+                         max_right: int, max_bottom: int) -> None:
         for row in range(ctx.ch):
             for col in range(ctx.cw):
                 if grid[row][col][0] != " ":
@@ -272,6 +354,7 @@ class MapScreen(Screen):
                 elif col > max_right or row > max_bottom:
                     grid[row][col] = ("█", "grey15")
 
+    def _compress_grid(self, ctx: DeviceContext, grid: list) -> Text:
         result = Text()
         for row in range(ctx.ch):
             if row > 0:
@@ -369,15 +452,12 @@ class MapScreen(Screen):
         self._update()
 
     def _enter_find_mode(self) -> None:
-        self._find_mode = True
-        self._find_buffer = ""
-        msg = "Find key: (type key name)"
-        self.query_one("#grid", Static).update(msg)
+        self.app.push_screen(FindKeyScreen(), self._on_find_key)
 
-    def _exit_find_mode(self) -> None:
-        self._find_mode = False
-        self._find_buffer = ""
-        self._update()
+    def _on_find_key(self, result: str | None) -> None:
+        if result is not None:
+            self.selected_key = result
+            self._zoom_to_key(result)
 
     def _navigate(self, direction: str, fail_msg: str) -> None:
         dest = self.app.navigate_key(direction, self.selected_key)
@@ -387,76 +467,41 @@ class MapScreen(Screen):
         else:
             self.show_status(fail_msg)
 
-    def _handle_find_key(self, key: str) -> None:
-        if key == "enter":
-            k = self._find_buffer.strip()
-            if k in self.app.bitmaps:
-                self.selected_key = k
-                self._zoom_to_key(k)
-                self._exit_find_mode()
-            else:
-                self.show_status(f"Key '{k}' not found.")
-                self._exit_find_mode()
-        elif key == "backspace":
-            self._find_buffer = self._find_buffer[:-1]
-            msg = f"Find key: {self._find_buffer or '(type key name)'}"
-            self.query_one("#grid", Static).update(msg)
-        elif len(key) == 1:
-            self._find_buffer += key
-            self.query_one("#grid", Static).update(f"Find key: {self._find_buffer}")
+    def _select_current_key(self) -> None:
+        self.app.set_current_key(self.selected_key)
+        self.app.pop_screen()
 
-    # pylint: disable=too-many-branches
+    def _zoom_to_key_selected(self) -> None:
+        self._zoom_to_key(self.selected_key)
+
+    def _reset_zoom_view(self) -> None:
+        self.zoom_scale = 1.0
+        self._last_fit = None
+        self._update()
+
+    def _reset_pan_view(self) -> None:
+        self.pan_x = 2
+        self.pan_y = 3
+        self._last_fit = None
+        self._update()
+
+    def _toggle_pan_mode(self) -> None:
+        self.pan_flip = not self.pan_flip
+        self._update_hints()
+
     def _handle_map_key(self, key: str, key_low: str) -> None:
-        if key_low in ("d", "a", "s", "w"):
-            dirs = {"d": ("right", "to the right"),
-                    "a": ("left", "to the left"),
-                    "s": ("down", "below"),
-                    "w": ("up", "above")}
-            d, msg = dirs[key_low]
-            self._navigate(d, f"No bitmap key {msg}")
-        elif key == "enter":
-            self.app.set_current_key(self.selected_key)
-            self.app.pop_screen()
-        elif key == "F":
-            self._zero_fit_content()
-        elif key == "f":
-            self._zoom_to_key(self.selected_key)
-        elif key in ("plus", "equals_sign"):
-            self._zoom_change(1.25)
-        elif key in ("minus", "underscore"):
-            self._zoom_change(0.8)
-        elif key_low == "0":
-            self.zoom_scale = 1.0
-            self._last_fit = None
-            self._update()
-        elif key_low == "r":
-            self.pan_x = 2
-            self.pan_y = 3
-            self._last_fit = None
-            self._update()
-        elif key_low == "h":
-            self._pan(-1, 0)
-        elif key_low == "l":
-            self._pan(1, 0)
-        elif key_low == "k":
-            self._pan(0, -1)
-        elif key_low == "j":
-            self._pan(0, 1)
-        elif key_low == "p":
-            self.pan_flip = not self.pan_flip
-            self._update_hints()
-        elif key in ("slash", "solidus"):
-            self._enter_find_mode()
+        action = self._ACTIONS.get(key) or self._ACTIONS.get(key_low)
+        if action:
+            method_name, args = action
+            getattr(self, method_name)(*args)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         key = event.key
         if key == "escape":
-            if self._find_mode:
-                self._exit_find_mode()
-            else:
-                self.app.pop_screen()
-            return
-        if self._find_mode:
-            self._handle_find_key(key)
+            self.app.pop_screen()
             return
         self._handle_map_key(key, key.lower())

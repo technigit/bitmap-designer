@@ -12,12 +12,12 @@ from .history_service import HistoryService
 from .screens import StartupScreen, MainScreen, QuitScreen
 
 
-# pylint: disable=too-many-instance-attributes
 class BitmapDesignerApp(App):
     """Textual App subclass orchestrating all screens and application state."""
     CSS = """
     #title { text-align: center; text-style: bold; margin-top: 1; margin-bottom: 2; }
     #hints { margin-top: 1; opacity: 0.5; }
+    #status { color: $accent; }
     Vertical { margin-left: 3; }
     """
     BINDINGS = [

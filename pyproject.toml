@@ -22,11 +22,17 @@ where = ["src"]
 disable = ["missing-function-docstring"]
 
 [tool.pylint.DESIGN]
-max-attributes = 10
+max-args = 6
+max-attributes = 15
+max-parents = 10
 
 [tool.pylint.MASTER]
 ignore = "tests"
 good-names = "bx,by,dx,dy,ox,oy,cx,cy,_"
+
+[tool.pylint.SIMILARITIES]
+ignore-signatures = "yes"
+min-similarity-lines = 6
 
 [tool.pylint.REPORTS]
 output-format = "colorized"

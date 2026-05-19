@@ -5,10 +5,11 @@ import json
 from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
-from textual.screen import Screen
 from textual.widgets import Static, Input
 from textual.widgets._input import Selection
 from textual.containers import Vertical
+
+from .popup_screen import PopupScreen
 
 from ..constants import DEFAULT_BITMAP_DIR, HINT_ESCAPE
 
@@ -18,21 +19,21 @@ if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
 
 
-class ManageScreen(Screen):
+class ManageScreen(PopupScreen):
     """Menu screen for file management operations."""
     base_title = "Manage File"
     TITLE = "Manage File"
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self.TITLE), id="title")
         with Vertical():
+            yield Static(self.app.title_with_file(self.TITLE), id="title")
             yield Static(
                 "[R]ename file\n"
                 "[D]elete file",
                 id="menu",
                 markup=False
             )
-        yield Static("", id="status")
+            yield Static("", id="status")
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
@@ -41,6 +42,10 @@ class ManageScreen(Screen):
         self.query_one("#title", Static).update(self.app.title_with_file(self.TITLE))
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key.lower() == "r":
             self.app.push_screen(RenameScreen())
         elif event.key.lower() == "d":
@@ -49,11 +54,10 @@ class ManageScreen(Screen):
             self.app.pop_screen()
 
 
-class RenameScreen(Screen):
+class RenameScreen(PopupScreen):
     """Screen to rename the current file."""
     CSS = """
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; }
     """
 
     def __init__(self):
@@ -63,8 +67,8 @@ class RenameScreen(Screen):
 
     def compose(self) -> ComposeResult:
         current = os.path.basename(self.app.file.current_file or "Untitled.json")
-        yield Static("Rename File", id="title")
         with Vertical():
+            yield Static("Rename File", id="title")
             self.input = Input(
                 value=current,
                 placeholder="New filename",
@@ -72,7 +76,7 @@ class RenameScreen(Screen):
             )
             yield self.input
             yield Static("[Enter] rename  [Escape] cancel", id="hints", markup=False)
-        yield Static("", id="status")
+            yield Static("", id="status")
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
@@ -82,6 +86,10 @@ class RenameScreen(Screen):
             self.input.selection = Selection(0, len(self.input.value) - 5)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
@@ -120,24 +128,27 @@ class RenameScreen(Screen):
             self.app.show_status(f"Error: {e}")
 
 
-class DeleteScreen(Screen):
+class DeleteScreen(PopupScreen):
     """Screen to confirm and delete the current file."""
     CSS = """
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; }
     """
 
     def compose(self) -> ComposeResult:
-        yield Static("Delete File", id="title")
         with Vertical():
+            yield Static("Delete File", id="title")
             yield Static("Are you sure you want to delete this file?", id="prompt")
-            yield Static("[Y]es  [N]o" + HINT_ESCAPE, id="hints", markup=False)
-        yield Static("", id="status")
+            yield Static("[Y]es  [N]o  " + HINT_ESCAPE, id="hints", markup=False)
+            yield Static("", id="status")
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key.lower() == "y":
             self.delete_file()
         elif event.key.lower() in ("n", "escape"):

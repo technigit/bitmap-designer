@@ -5,12 +5,13 @@ import json
 from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
-from textual.screen import Screen
 from textual.widgets import Static, Input
 from textual.widgets._input import Selection
 from textual.containers import Vertical
 
-from ..constants import DEFAULT_BITMAP_DIR
+from .popup_screen import PopupScreen
+
+from ..constants import DEFAULT_BITMAP_DIR, HINT_ESCAPE
 
 from .startup_screens import StartupScreen
 
@@ -18,12 +19,11 @@ if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
 
 
-class SaveScreen(Screen):
+class SaveScreen(PopupScreen):
     """Screen to save the current bitmap file."""
     CSS = """
     Input { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; }
     """
 
     def __init__(self):
@@ -32,13 +32,13 @@ class SaveScreen(Screen):
         self.filename_input = None
 
     def compose(self) -> ComposeResult:
-        yield Static("Save File", id="title")
         with Vertical():
+            yield Static("Save File", id="title")
             yield Static(f"Directory: {DEFAULT_BITMAP_DIR}", id="dir")
             self.filename_input = Input(value=self.filename, placeholder="Filename", id="filename")
             yield self.filename_input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
-        yield Static("", id="status")
+            yield Static("", id="status")
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
@@ -51,6 +51,10 @@ class SaveScreen(Screen):
                 self.filename_input.selection = Selection(0, len(basename) - 5)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
@@ -96,12 +100,11 @@ class SaveScreen(Screen):
             self.show_status(f"Error: {e}")
 
 
-class QuitSaveScreen(Screen):
+class QuitSaveScreen(PopupScreen):
     """Save dialog shown during the quit flow."""
     CSS = """
     Input { margin: 1 0; }
     #hints { opacity: 0.5; }
-    #status { dock: bottom; }
     """
 
     def __init__(self):
@@ -110,13 +113,13 @@ class QuitSaveScreen(Screen):
         self.filename_input = None
 
     def compose(self) -> ComposeResult:
-        yield Static("Save File", id="title")
         with Vertical():
+            yield Static("Save File", id="title")
             yield Static(f"Directory: {DEFAULT_BITMAP_DIR}", id="dir")
             self.filename_input = Input(value=self.filename, placeholder="Filename", id="filename")
             yield self.filename_input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
-        yield Static("", id="status")
+            yield Static("", id="status")
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
@@ -129,6 +132,10 @@ class QuitSaveScreen(Screen):
                 self.filename_input.selection = Selection(0, len(basename) - 5)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
@@ -173,12 +180,11 @@ class QuitSaveScreen(Screen):
             self.show_status(f"Error: {e}")
 
 
-class SaveScreenForClose(Screen):
+class SaveScreenForClose(PopupScreen):
     """Save dialog shown when closing a file."""
     CSS = """
     Input { margin: 1 0; }
     #hints { opacity: 0.5; }
-    #status { dock: bottom; }
     """
 
     def __init__(self):
@@ -187,13 +193,13 @@ class SaveScreenForClose(Screen):
         self.filename_input = None
 
     def compose(self) -> ComposeResult:
-        yield Static("Save File", id="title")
         with Vertical():
+            yield Static("Save File", id="title")
             yield Static(f"Directory: {DEFAULT_BITMAP_DIR}", id="dir")
             self.filename_input = Input(value=self.filename, placeholder="Filename", id="filename")
             yield self.filename_input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
-        yield Static("", id="status")
+            yield Static("", id="status")
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
@@ -206,6 +212,10 @@ class SaveScreenForClose(Screen):
                 self.filename_input.selection = Selection(0, len(basename) - 5)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
@@ -249,3 +259,34 @@ class SaveScreenForClose(Screen):
             self.app.push_screen(StartupScreen())
         except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error: {e}")
+
+
+class SaveFirstScreen(PopupScreen):
+    """Base for 'Save file first?' prompts in close/quit flows."""
+    TITLE = ""
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Static(self.TITLE, id="title")
+            yield Static("Save file first? (Y/n)", id="prompt")
+            yield Static(HINT_ESCAPE, id="hints", markup=False)
+
+    def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.app.refresh(repaint=True, layout=True)
+            return
+        if event.key in ("enter", "\n") or event.key.lower() == "y":
+            self._on_yes()
+        elif event.key.lower() == "n":
+            self._on_no()
+        elif event.key == "escape":
+            self._on_escape()
+
+    def _on_yes(self) -> None:
+        raise NotImplementedError
+
+    def _on_no(self) -> None:
+        raise NotImplementedError
+
+    def _on_escape(self) -> None:
+        raise NotImplementedError

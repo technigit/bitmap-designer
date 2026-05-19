@@ -57,6 +57,7 @@
             - [Escape] back // Close UI
     - Design UI (Central UI space)
         - display bitmap grid sized by bounds (within the available terminal viewport)
+        - current key name shown as a label above the grid, left-aligned to the pixel content area
         - cursor shows the color character (0-F) with reverse video
         - two text characters = 1 bitmap pixel in UI (for square appearance)
         - Note: pixelSize config only affects preview/output, not the text UI
@@ -98,6 +99,28 @@
             - [^R]edo - redo last undone action (dimmed when nothing to redo)
                 - status shows: "After change #N of M" or "Already at newest change"
             - [Escape] - exit Design mode (return Main UI)
+    - Map UI (modal window)
+        - Displays all bitmap keys as labeled rectangles on a virtual canvas, arranged by their location coordinates
+        - Key label shown above each bitmap rectangle
+        - Selected key highlighted (undimmed), others shown dimmed
+        - Canvas supports zoom, pan, and scroll modes
+        - Keyboard controls:
+            - [wasd] - select the nearest bitmap key in that direction
+            - [Enter] - switch to the selected key and return to Design UI
+            - [hjkl] - pan/scroll the canvas (direction depends on pan mode)
+            - [+=] / [-_] - zoom in / out
+            - [0] - reset zoom to 100%
+            - [⇧F] - fit all content into viewport
+            - [F] - zoom to fit the selected key
+            - [R] - reset pan/scroll position
+            - [P] - toggle between pan and scroll mode
+            - [/] - find key by name (opens FindKeyScreen popup)
+                - type key name, live substring matching shows results
+                - [Enter] confirms, [Escape] cancels
+                - selected key is zoomed to
+            - [Escape] - return to Design UI
+        - Bitmap labels are truncated at the fill area boundary (canvas margins and virtual bounds)
+        - Hints bar shows current key, zoom percentage, and available commands
     - Bitmap key UI (modal window) // select a unique dataspace for a bitmap with its own data
         - Prompt: Enter a key (short string, no spaces).
             - [Enter] - save configuration
@@ -262,9 +285,10 @@
 ### UI Layout
 - Title: centered horizontally, positioned on line 2 (one line from top of screen)
 - Content: 3-character left margin
+- Modal popups: centered vertically and horizontally, framed with a thick $primary border, width 80% (40–80 clamp), auto-height
 - Spacing: 2 blank lines between title and content
 - Menu/instructions: one line below content
-- Status line: at bottom of screen (when present)
+- Status line: at bottom of screen, $accent color, 1-line margin-top gap above; non-popup screens additionally have 3-character left indent
 
 ### Colors
 - 0 = transparent (resets pixel(s) to space in the UI and bitmap data)
@@ -451,3 +475,16 @@
 ### Default Key Handling
 - Any prompt showing (y/N) defaults to No - pressing Enter or n accepts the default (No).
 - Any prompt showing (Y/n) defaults to Yes - pressing Enter or y accepts the default (Yes).
+
+### TODO / Not Yet Implemented
+- **ASCII art header** — "Bitmap Designer" shown as plain text, not ASCII art
+- **Open UI: directory creation prompt** — no interactive prompt to create ~/bitmaps; just shows a message if missing
+- **Open UI: fallback to current directory** — no fallback to cwd when ~/bitmaps missing
+- **Rectangle paint mode (`[R]`)** — no interactive rectangle drawing in Design UI
+- **Scroll grid (`[yuio]`)** — no yuio key scroll support in Design UI
+- **Palette selection (`[P]`)** — no Palette option in Configuration UI; only the hardcoded palette
+- **`~/.bitmapsrc` config file** — no reading or writing of per-user config (palettes, preferences)
+- **Code generation rectangle optimization** — generates per-pixel fillRect calls instead of optimal rectangular blocks
+- **Red error messages** — error messages not styled red
+- **JSON validation on open** — no explicit format validation before loading a .json file
+- **Consistent status margin** — verify 1-line margin-top gap above status is consistently applied across all screens (including docked status in DesignScreen, MapScreen); reconcile PopupScreen #status { margin-top: 1; } rule with global approach if cleaner

@@ -3,19 +3,20 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
-from textual.screen import Screen
 from textual.widgets import Static
 from textual.containers import Vertical
 
+from .popup_screen import PopupScreen
+
 from ..constants import HINT_ESCAPE
 
-from .save_screens import QuitSaveScreen
+from .save_screens import QuitSaveScreen, SaveFirstScreen
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
 
 
-class QuitScreen(Screen):
+class QuitScreen(PopupScreen):
     """Initial quit confirmation screen."""
 
     def on_mount(self) -> None:
@@ -23,12 +24,15 @@ class QuitScreen(Screen):
             self.app.exit()
 
     def compose(self) -> ComposeResult:
-        yield Static("Quit", id="title")
         with Vertical():
+            yield Static("Quit", id="title")
             yield Static("Really quit? (y/N)", id="prompt")
             yield Static(HINT_ESCAPE, id="hints", markup=False)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key.lower() == "y":
             self.app.pop_screen()
             self.app.push_screen(QuitSaveFileFirstScreen())
@@ -36,19 +40,15 @@ class QuitScreen(Screen):
             self.app.pop_screen()
 
 
-class QuitSaveFileFirstScreen(Screen):
+class QuitSaveFileFirstScreen(SaveFirstScreen):
     """Screen asking whether to save before quitting."""
+    TITLE = "Quit - Save"
 
-    def compose(self) -> ComposeResult:
-        yield Static("Quit - Save", id="title")
-        with Vertical():
-            yield Static("Save file first? (Y/n)", id="prompt")
-            yield Static(HINT_ESCAPE, id="hints", markup=False)
+    def _on_yes(self):
+        self.app.push_screen(QuitSaveScreen())
 
-    def on_key(self, event) -> None:
-        if event.key in ("enter", "\n") or event.key.lower() == "y":
-            self.app.push_screen(QuitSaveScreen())
-        elif event.key.lower() == "n":
-            self.app.exit()
-        elif event.key == "escape":
-            self.app.pop_screen()
+    def _on_no(self):
+        self.app.exit()
+
+    def _on_escape(self):
+        self.app.pop_screen()

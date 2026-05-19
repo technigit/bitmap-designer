@@ -8,9 +8,11 @@ from textual.screen import Screen
 from textual.widgets import Static
 from textual.containers import Vertical
 
+from .popup_screen import PopupScreen
+
 from .startup_screens import StartupScreen
 from .design_screens import DesignScreen
-from .save_screens import SaveScreen, SaveScreenForClose
+from .save_screens import SaveFirstScreen, SaveScreen, SaveScreenForClose
 from .manage_screens import ManageScreen
 from .config_screens import ConfigScreen
 from .codegen_screens import CodegenScreen
@@ -27,6 +29,9 @@ class MainScreen(Screen):
     """Main menu screen hub linking to design, preview, save, codegen, and config."""
     base_title = "Main Menu"
     TITLE = "Main Menu"
+    CSS = """
+    #status { margin-left: 3; }
+    """
 
     def _menu_text(self) -> str:
         return (
@@ -58,6 +63,10 @@ class MainScreen(Screen):
             self.app.push_screen(FileChangedScreen(self.app.file.current_file))
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         key = event.key
         if key == "comma":
             self.app.push_screen(ConfigScreen())
@@ -81,7 +90,7 @@ class MainScreen(Screen):
             self.app.push_screen(CloseScreen())
 
 
-class CloseScreen(Screen):
+class CloseScreen(PopupScreen):
     """Close confirmation screen from the main menu."""
 
     def on_mount(self) -> None:
@@ -90,12 +99,15 @@ class CloseScreen(Screen):
             self.app.push_screen(StartupScreen())
 
     def compose(self) -> ComposeResult:
-        yield Static("Close", id="title")
         with Vertical():
+            yield Static("Close", id="title")
             yield Static("Really close? (y/N)", id="prompt")
             yield Static(HINT_ESCAPE, id="hints", markup=False)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key.lower() == "y":
             self.app.pop_screen()
             self.app.push_screen(SaveFileFirstScreen())
@@ -103,36 +115,35 @@ class CloseScreen(Screen):
             self.app.pop_screen()
 
 
-class SaveFileFirstScreen(Screen):
+class SaveFileFirstScreen(SaveFirstScreen):
     """Screen asking whether to save before closing."""
+    TITLE = "Close - Save"
 
-    def compose(self) -> ComposeResult:
-        yield Static("Close - Save", id="title")
-        with Vertical():
-            yield Static("Save file first? (Y/n)", id="prompt")
-            yield Static(HINT_ESCAPE, id="hints", markup=False)
+    def _on_yes(self):
+        self.app.push_screen(SaveScreenForClose())
 
-    def on_key(self, event) -> None:
-        if event.key in ("enter", "\n") or event.key.lower() == "y":
-            self.app.push_screen(SaveScreenForClose())
-        elif event.key.lower() == "n":
-            self.app.pop_screen()
-            self.app.push_screen(AreYouSureScreen())
-        elif event.key == "escape":
-            self.app.pop_screen()
-            self.app.push_screen(MainScreen())
+    def _on_no(self):
+        self.app.pop_screen()
+        self.app.push_screen(AreYouSureScreen())
+
+    def _on_escape(self):
+        self.app.pop_screen()
+        self.app.push_screen(MainScreen())
 
 
-class AreYouSureScreen(Screen):
+class AreYouSureScreen(PopupScreen):
     """Final confirmation screen when discarding changes."""
 
     def compose(self) -> ComposeResult:
-        yield Static("Close - Confirm", id="title")
         with Vertical():
+            yield Static("Close - Confirm", id="title")
             yield Static("Are you sure? (y/N)", id="prompt")
             yield Static(HINT_ESCAPE, id="hints", markup=False)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key.lower() == "y":
             self.app.mark_dirty(False)
             self.app.pop_screen()
@@ -142,11 +153,10 @@ class AreYouSureScreen(Screen):
             self.app.push_screen(MainScreen())
 
 
-class FileChangedScreen(Screen):
+class FileChangedScreen(PopupScreen):
     """Warning screen when the file has been externally edited."""
     CSS = """
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; }
     """
 
     def __init__(self, filepath: str):
@@ -154,19 +164,23 @@ class FileChangedScreen(Screen):
         self.filepath = filepath
 
     def compose(self) -> ComposeResult:
-        yield Static("Warning", id="title")
         with Vertical():
+            yield Static("Warning", id="title")
             yield Static(
                 f"File '{os.path.basename(self.filepath)}' has been externally edited.",
                 id="warning"
             )
             yield Static("[O]K (ignore), [R]eload", id="hints", markup=False)
-        yield Static("", id="status")
+            yield Static("", id="status")
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         key = event.key.lower()
         if key in ("o", "enter", "\n"):
             self.app.refresh_mtime()

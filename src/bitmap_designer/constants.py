@@ -4,7 +4,7 @@ import os
 
 ASCII_HEADER = "Bitmap Designer"
 
-HINT_ESCAPE = "  [Escape] cancel"
+HINT_ESCAPE = "[Escape] cancel"
 
 HOME_DIR = str(Path.home())
 DEFAULT_BITMAP_DIR = os.path.join(HOME_DIR, "bitmaps")

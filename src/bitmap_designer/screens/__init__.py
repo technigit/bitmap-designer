@@ -11,4 +11,4 @@ from .config_screens import (
 from .quit_screens import QuitScreen, QuitSaveFileFirstScreen
 from .main_screens import MainScreen, CloseScreen, SaveFileFirstScreen, AreYouSureScreen
 from .codegen_screens import CodegenScreen, ResponseScreen
-from .map_screen import MapScreen
+from .map_screen import MapScreen, FindKeyScreen

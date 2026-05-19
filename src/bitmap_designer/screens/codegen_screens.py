@@ -33,6 +33,9 @@ class CodegenScreen(Screen):
         self.query_one("#code").update(code or "No bitmap data.")
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key in ("enter", "\n"):
             code = CodegenService(self.app.bitmaps).generate_code()
             pyperclip.copy(code)
@@ -59,6 +62,9 @@ class ResponseScreen(Screen):
             self.app.pop_screen()
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):

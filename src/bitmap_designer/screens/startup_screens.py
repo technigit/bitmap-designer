@@ -8,6 +8,8 @@ from textual.screen import Screen
 from textual.widgets import Static
 from textual.containers import Vertical
 
+from .popup_screen import PopupScreen
+
 from ..constants import ASCII_HEADER, DEFAULT_BITMAP_DIR
 
 if TYPE_CHECKING:
@@ -30,6 +32,9 @@ class StartupScreen(Screen):
         self.app.set_current_color("1")
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.app.refresh(repaint=True, layout=True)
+            return
         key = event.key.lower()
         if key == "n":
             self.app.new_bitmap()
@@ -37,12 +42,11 @@ class StartupScreen(Screen):
             self.app.push_screen(OpenScreen())
 
 
-class OpenScreen(Screen):
+class OpenScreen(PopupScreen):
     """Screen to list and open .json bitmap files."""
     CSS = """
     #file_list { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; }
     """
 
     def __init__(self):
@@ -54,11 +58,11 @@ class OpenScreen(Screen):
         self.query_one("#status", Static).update(message)
 
     def compose(self) -> ComposeResult:
-        yield Static("Open Bitmap", id="title")
         with Vertical():
+            yield Static("Open Bitmap", id="title")
             yield Static("", id="file_list")
             yield Static("[Enter] Open  [Escape] Back", id="hints", markup=False)
-        yield Static("", id="status")
+            yield Static("", id="status")
 
     def on_mount(self) -> None:
         self.refresh_files()
@@ -91,6 +95,10 @@ class OpenScreen(Screen):
         self.query_one("#file_list").update("\n".join(lines))
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):

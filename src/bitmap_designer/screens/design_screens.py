@@ -8,6 +8,8 @@ from textual.screen import Screen
 from textual.widgets import Static
 from textual.containers import Vertical
 
+from .popup_screen import PopupScreen
+
 from ..codegen_service import CodegenService
 
 from .config_screens import ConfigKeyScreen
@@ -23,7 +25,7 @@ class DesignScreen(Screen):
     CSS = """
     #grid { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; }
+    #status { dock: bottom; margin-left: 3; }
     """
 
     def __init__(self, bitmap_data: dict):
@@ -62,7 +64,7 @@ class DesignScreen(Screen):
 
     # Rebuild the grid display from pixel data.
     def refresh_grid(self):
-        lines = []
+        lines = [" " + self.app.current_key]
         border = "+" + "-" * (self.width * 2) + "+"  # 2 chars per pixel in UI
         lines.append(border)
         for y in range(self.height):
@@ -140,6 +142,10 @@ class DesignScreen(Screen):
         self.show_status(f"Switched to key {new_key}.")
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         key = event.key.lower()
         if key == "u":
             self._undo()
@@ -298,7 +304,7 @@ class DesignScreen(Screen):
         self.query_one("#hints", Static).update(hints)
 
 
-class ColorScreen(Screen):
+class ColorScreen(PopupScreen):
     """Color palette selection screen (0-9, A-F)."""
     CSS = """
     #palette { margin: 0 0; }
@@ -307,8 +313,8 @@ class ColorScreen(Screen):
     """
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file("Select Color"), id="title")
         with Vertical():
+            yield Static(self.app.title_with_file("Select Color"), id="title")
             yield Static(
                 "0: transparent  1: black  2: white  3: red  4: yellow\n"
                 "5: green  6: cyan  7: magenta  8: orange  9: brown\n"
@@ -318,6 +324,9 @@ class ColorScreen(Screen):
             yield Static("[0-9A-F] select  [Escape] cancel", id="hints", markup=False)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.app.refresh(repaint=True, layout=True)
+            return
         key = event.key.lower()
         if key in "0123456789abcdef":
             self.app.set_current_color(key)

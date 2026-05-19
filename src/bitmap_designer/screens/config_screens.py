@@ -3,9 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
-from textual.screen import Screen
 from textual.widgets import Static, Input
 from textual.containers import Vertical
+
+from .popup_screen import PopupScreen
 
 from ..constants import HINT_ESCAPE, create_default_bitmap
 
@@ -13,26 +14,24 @@ if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
 
 
-class ConfigScreen(Screen):
+class ConfigScreen(PopupScreen):
     """Configuration menu screen."""
     base_title = "Configuration"
     CSS = """
     #menu { margin-top: 1; }
     #hints { opacity: 0.5; }
-    #status { dock: bottom; }
+
     """
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
+            yield Static(self.app.title_with_file(self.base_title), id="title")
             yield Static("", id="menu", markup=False)
             yield Static("", id="hints", markup=False)
-        yield Static("", id="status")  # Status line for messages
+            yield Static("", id="status")  # Status line for messages
 
     def on_mount(self) -> None:
         self._refresh_values()
-
-    def on_screen_resume(self, _event) -> None:
         self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
         self._refresh_values()
 
@@ -76,6 +75,10 @@ class ConfigScreen(Screen):
         self.query_one("#status", Static).update(message)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         key = event.key.lower()
         if key == "k":
             self.app.push_screen(ConfigKeyScreen())
@@ -97,13 +100,13 @@ class ConfigScreen(Screen):
             self.app.pop_screen()
 
 
-class ConfigKeyScreen(Screen):
+class ConfigKeyScreen(PopupScreen):
     """Screen to change the current bitmap key."""
     base_title = "Bitmap Key"
     CSS = """
     Input { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; }
+
     """
 
     def __init__(self):
@@ -111,12 +114,12 @@ class ConfigKeyScreen(Screen):
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
+            yield Static(self.app.title_with_file(self.base_title), id="title")
             self.input = Input(value=self.app.current_key, placeholder="Key", id="key")
             yield self.input
             yield Static("[Enter] set  [Escape] cancel", id="hints", markup=False)
-        yield Static("", id="status")  # Status line for messages
+            yield Static("", id="status")  # Status line for messages
 
     def on_screen_resume(self, _event) -> None:
         self.input.value = self.app.current_key
@@ -125,6 +128,10 @@ class ConfigKeyScreen(Screen):
         self.query_one("#status", Static).update(message)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
@@ -140,22 +147,23 @@ class ConfigKeyScreen(Screen):
             else:
                 self.app.show_status("Please enter a valid key (no spaces).")
 
-class ConfigKeyManageScreen(Screen):
+
+class ConfigKeyManageScreen(PopupScreen):
     """Screen for bitmap key management operations."""
     base_title = "Manage Key"
     CSS = """
     #menu { margin-top: 1; }
     #info { margin-top: 1; }
     #hints { opacity: 0.5; }
-    #status { dock: bottom; }
+
     """
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
+            yield Static(self.app.title_with_file(self.base_title), id="title")
             yield Static("[R]ename key\n[D]elete key\n\n[Escape] back", id="menu", markup=False)
             yield Static("", id="info")
-        yield Static("", id="status")
+            yield Static("", id="status")
 
     def on_mount(self) -> None:
         self._refresh_info()
@@ -183,6 +191,10 @@ class ConfigKeyManageScreen(Screen):
         self.query_one("#info", Static).update("\n".join(lines))
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key.lower() == "r":
             self.app.push_screen(ConfigKeyRenameScreen())
         elif event.key.lower() == "d":
@@ -191,13 +203,13 @@ class ConfigKeyManageScreen(Screen):
             self.app.pop_screen()
 
 
-class ConfigKeyRenameScreen(Screen):
+class ConfigKeyRenameScreen(PopupScreen):
     """Screen to rename the current bitmap key."""
     base_title = "Rename Key"
     CSS = """
     Input { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; }
+
     """
 
     def __init__(self):
@@ -205,17 +217,21 @@ class ConfigKeyRenameScreen(Screen):
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
+            yield Static(self.app.title_with_file(self.base_title), id="title")
             self.input = Input(value=self.app.current_key, placeholder="New key", id="key")
             yield self.input
             yield Static("[Enter] rename  [Escape] cancel", id="hints", markup=False)
-        yield Static("", id="status")
+            yield Static("", id="status")
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
@@ -242,28 +258,32 @@ class ConfigKeyRenameScreen(Screen):
         self.app.pop_screen()
 
 
-class ConfigKeyDeleteScreen(Screen):
+class ConfigKeyDeleteScreen(PopupScreen):
     """Screen to confirm and delete the current bitmap key."""
     base_title = "Delete Key"
     CSS = """
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; }
+
     """
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
+            yield Static(self.app.title_with_file(self.base_title), id="title")
             yield Static(
                 f"Delete key '{self.app.current_key}' and all its data?",
                 id="prompt"
             )
-            yield Static("[Y]es  [N]o" + HINT_ESCAPE, id="hints", markup=False)
-        yield Static("", id="status")
+            yield Static("[Y]es  [N]o  " + HINT_ESCAPE, id="hints", markup=False)
+            yield Static("", id="status")
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key.lower() == "y":
             self.delete_key()
         elif event.key.lower() in ("n", "escape"):
@@ -288,13 +308,13 @@ class ConfigKeyDeleteScreen(Screen):
         self.app.show_status(f"Key '{key}' deleted.")
 
 
-class ConfigBoundsScreen(Screen):
+class ConfigBoundsScreen(PopupScreen):
     """Screen to set bitmap width and height."""
     base_title = "Bitmap Bounds"
     CSS = """
     Input { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; }
+
     """
 
     def __init__(self):
@@ -305,17 +325,21 @@ class ConfigBoundsScreen(Screen):
         b = self.app.bitmaps.get(str(self.app.current_key), {}).get("bounds", {})
         bw = b.get("width", 10)
         bh = b.get("height", 10)
-        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
+            yield Static(self.app.title_with_file(self.base_title), id="title")
             self.input = Input(value=f"{bw} {bh}", placeholder="width height", id="bounds")
             yield self.input
             yield Static("[Enter] set  [Escape] cancel", id="hints", markup=False)
-        yield Static("", id="status")  # Status line for messages
+            yield Static("", id="status")  # Status line for messages
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
@@ -335,13 +359,13 @@ class ConfigBoundsScreen(Screen):
                 self.app.show_status("Please enter valid width and height (min 2).")
 
 
-class ConfigContextScreen(Screen):
+class ConfigContextScreen(PopupScreen):
     """Screen to set the canvas context variable name."""
     base_title = "Context variable"
     CSS = """
     Input { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; }
+
     """
 
     def __init__(self):
@@ -349,19 +373,23 @@ class ConfigContextScreen(Screen):
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
+            yield Static(self.app.title_with_file(self.base_title), id="title")
             bm = self.app.bitmaps.get(str(self.app.current_key), {})
             current = bm.get("context", "ctx")
             self.input = Input(value=current, placeholder="ctx", id="context")
             yield self.input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
-        yield Static("", id="status")  # Status line for messages
+            yield Static("", id="status")  # Status line for messages
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
@@ -374,13 +402,13 @@ class ConfigContextScreen(Screen):
             self.app.show_status("Context saved.")
 
 
-class ConfigXScreen(Screen):
+class ConfigXScreen(PopupScreen):
     """Screen to set the X variable name."""
     base_title = "X variable"
     CSS = """
     Input { margin:0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; }
+
     """
 
     def __init__(self):
@@ -388,19 +416,23 @@ class ConfigXScreen(Screen):
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
+            yield Static(self.app.title_with_file(self.base_title), id="title")
             bm = self.app.bitmaps.get(str(self.app.current_key), {})
             current = bm.get("x", f"x{self.app.current_key}")
             self.input = Input(value=current, placeholder="x", id="x")
             yield self.input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
-        yield Static("", id="status")  # Status line
+            yield Static("", id="status")  # Status line
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
@@ -413,13 +445,13 @@ class ConfigXScreen(Screen):
             self.app.show_status("X variable saved.")
 
 
-class ConfigYScreen(Screen):
+class ConfigYScreen(PopupScreen):
     """Screen to set the Y variable name."""
     base_title = "Y variable"
     CSS = """
     Input { margin:0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; }
+
     """
 
     def __init__(self):
@@ -427,19 +459,23 @@ class ConfigYScreen(Screen):
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
+            yield Static(self.app.title_with_file(self.base_title), id="title")
             bm = self.app.bitmaps.get(str(self.app.current_key), {})
             current = bm.get("y", f"y{self.app.current_key}")
             self.input = Input(value=current, placeholder="y", id="y")
             yield self.input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
-        yield Static("", id="status")  # Status line
+            yield Static("", id="status")  # Status line
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
@@ -452,13 +488,13 @@ class ConfigYScreen(Screen):
             self.app.show_status("Y variable saved.")
 
 
-class ConfigLocationScreen(Screen):
+class ConfigLocationScreen(PopupScreen):
     """Screen to set the bitmap origin coordinates."""
     base_title = "Location (x y)"
     CSS = """
     Input { margin:0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; }
+
     """
 
     def __init__(self):
@@ -466,19 +502,23 @@ class ConfigLocationScreen(Screen):
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
+            yield Static(self.app.title_with_file(self.base_title), id="title")
             bm = self.app.bitmaps.get(str(self.app.current_key), {})
             loc = bm.get("location", {"x": 0, "y": 0})
             self.input = Input(value=f"{loc['x']} {loc['y']}", placeholder="x y", id="location")
             yield self.input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
-        yield Static("", id="status")  # Status line
+            yield Static("", id="status")  # Status line
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
@@ -499,13 +539,13 @@ class ConfigLocationScreen(Screen):
                 self.app.show_status("Please enter valid x and y coordinates.")
 
 
-class ConfigPixelScreen(Screen):
+class ConfigPixelScreen(PopupScreen):
     """Screen to set the pixel size for rendering."""
     base_title = "Pixel Size"
     CSS = """
     Input { margin:0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; }
+
     """
 
     def __init__(self):
@@ -513,19 +553,23 @@ class ConfigPixelScreen(Screen):
         self.input = None
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
+            yield Static(self.app.title_with_file(self.base_title), id="title")
             bm = self.app.bitmaps.get(str(self.app.current_key), {})
             current = bm.get("pixelSize", 2)
             self.input = Input(value=str(current), placeholder="2", id="pixel")
             yield self.input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
-        yield Static("", id="status")  # Status line
+            yield Static("", id="status")  # Status line
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
     def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
         if event.key == "escape":
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
