@@ -17,32 +17,38 @@
                         - No: quit without saving
                     - If no: cancel quit (back to previous screen)
                     - If not dirty: quit immediately
-    - Open UI (modal window)
-        - if ~/bitmaps does not exist
-            - Prompt: Create ~/bitmaps directory? (Y/n)
-                - if yes
-                    - create ~/bitmaps directory
-                    - proceed to list .json files
-                - if no
-                    - Prompt: Use current directory? (Y/n)
-                        - if yes
-                            - proceed to list .json files in current directory
-                        - if no
-                            - return to Startup UI
-        - list .json files in ~/bitmaps (or the last visited directory), sorted by last modified (newest first)
-        - if none
-            - Response: No .json files were found. [OK]
-            - return to Startup UI
-        - menu commands below content:
-            - [up/down jk] - select file in list
-            - [Enter] - open selected file
-            - [Escape] - return to Startup UI
-        - validate file when opening
-            - if good
-                - go to Main UI
-            - if bad
-                - Response: Invalid .json file format. [OK]
-                - return to Startup UI
+    - Open UI (modal popup screen)
+        - centered popup with title "Open Bitmap"
+        - scrollable file list (max 50vh) inside a popup (max 60vh)
+        - list folders and .json files in a directory, merged, sorted by:
+            - last modified (newest first)
+            - natural name sort as tiebreaker
+        - folder entries shown with a trailing `/` suffix
+        - if ~/bitmaps does not exist:
+            - status message: "Create ~/bitmaps directory first."
+            - file list shows empty; user must create the directory manually
+        - if directory has no .json files and no subfolders:
+            - ../ entry shown if not at top level (works normally)
+            - disabled (unselectable) line: "No .json files found."
+        - subfolder navigation (any depth):
+            - enter a folder → directory changes, list reloads
+            - ../ at index 0 (Enter or click) → go up one level
+            - [Escape] → go up one level (or close dialog at top level)
+        - per-directory cursor restoration:
+            - when entering a subfolder, the current directory's selection is saved
+            - on return, the previously selected item is restored
+            - each directory has its own remembered selection
+        - keyboard commands:
+            - [up/down j/k] — navigate selection
+            - [Enter] — open selected file or enter selected folder
+            - [Escape] — go up one level, or close dialog at top level
+        - opening a .json file:
+            - validates file format
+            - if valid → go to Main UI
+            - if invalid → status: "Invalid .json file format." (dismissable)
+        - list highlight uses Textual built-in defaults:
+            - focused: $block-cursor-background (full primary), bold text
+            - blurred: $block-cursor-blurred-background (primary at 30% alpha)
 2. editor
     - Main UI
         - page title shows current filename: "Main Menu - filename.json"
