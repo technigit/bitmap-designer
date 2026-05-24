@@ -414,10 +414,8 @@ class MapScreen(Screen):
         zero_style = None if self._last_fit != "zero" else "dim"
         hints.append("[⇧F]it all  ", style=zero_style)
         hints.append("[F]it key selection\n")
-        pan_style = None if self._pan_available() else "dim"
         pan_label = "pan" if self.pan_flip else "scroll"
-        hints.append(f"[hjkl] {pan_label}" if pan_style is None else f"[hjkl] {pan_label}",
-                     style=pan_style)
+        hints.append(f"[hjkl] {pan_label}")
         hints.append("  ")
         reset_pan_style = None if self.pan_x != 2 or self.pan_y != 3 else "dim"
         hints.append(f"[R]eset {'pan' if self.pan_flip else 'scroll'}",

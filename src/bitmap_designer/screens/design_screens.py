@@ -117,14 +117,18 @@ class DesignScreen(Screen):
         if dest:
             self._switch_to_key(dest)
         else:
-            self.show_status(f"No bitmap key to the {direction}")
+            msgs = {
+                "right": "No bitmap key to the right",
+                "left": "No bitmap key to the left",
+                "down": "No bitmap key below",
+                "up": "No bitmap key above",
+            }
+            self.show_status(msgs[direction])
 
     def _switch_to_key(self, new_key: str) -> None:
         old_key = self._key_on_enter
         if old_key == new_key:
             return
-        self.app.history.get_undo(old_key).append((list(self.pixels), self.cursor_x, self.cursor_y))
-        self.app.history.get_redo(old_key).clear()
         self.app.cursor_positions[old_key] = (self.cursor_x, self.cursor_y)
         self.app.set_current_key(new_key)
         self._key_on_enter = new_key
