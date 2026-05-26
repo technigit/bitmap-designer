@@ -36,6 +36,10 @@ class DesignScreen(Screen):
         self.cursor_y = 0
         self.pixels = bitmap_data.get("bitmap", {}).get("pixels", [])
         self._key_on_enter = self.app.current_key
+        self.offset_x: int = 0
+        self.offset_y: int = 0
+        self.viewport_w: int = 0
+        self.viewport_h: int = 0
 
     @property
     def undo_stack(self):
@@ -45,6 +49,44 @@ class DesignScreen(Screen):
     def redo_stack(self):
         return self.app.history.get_redo(self.app.current_key)
 
+    # Recalculate viewport dimensions based on available screen space.
+    def _recalc_viewport(self):
+        self.viewport_w = max(1, (self.size.width - 8) // 2)
+        self.viewport_h = max(1, self.size.height - 14)
+        self._clamp_offset()
+
+    # Clamp offset so viewport stays within bitmap bounds.
+    def _clamp_offset(self):
+        self.offset_x = max(0, min(self.offset_x, max(0, self.width - self.viewport_w)))
+        self.offset_y = max(0, min(self.offset_y, max(0, self.height - self.viewport_h)))
+
+    # Adjust offset to keep cursor at least 2px from viewport edge.
+    def _ensure_cursor_visible(self):
+        margin = 2
+        if self.viewport_w >= self.width and self.viewport_h >= self.height:
+            self.offset_x = 0
+            self.offset_y = 0
+            return
+        if self.cursor_x < self.offset_x + margin:
+            self.offset_x = max(0, self.cursor_x - margin)
+        elif self.cursor_x >= self.offset_x + self.viewport_w - margin:
+            self.offset_x = min(
+                max(0, self.width - self.viewport_w),
+                self.cursor_x - self.viewport_w + margin + 1
+            )
+        if self.cursor_y < self.offset_y + margin:
+            self.offset_y = max(0, self.cursor_y - margin)
+        elif self.cursor_y >= self.offset_y + self.viewport_h - margin:
+            self.offset_y = min(
+                max(0, self.height - self.viewport_h),
+                self.cursor_y - self.viewport_h + margin + 1
+            )
+
+    # Shift the viewport by (dx, dy) bitmap pixels.
+    def _scroll(self, dx: int, dy: int):
+        self.offset_x = max(0, min(self.offset_x + dx, max(0, self.width - self.viewport_w)))
+        self.offset_y = max(0, min(self.offset_y + dy, max(0, self.height - self.viewport_h)))
+
     def compose(self) -> ComposeResult:
         yield Static(self.app.title_with_file(self.base_title), id="title")
         with Vertical():
@@ -53,6 +95,8 @@ class DesignScreen(Screen):
         yield Static("", id="status")  # Status line for messages
 
     def on_mount(self) -> None:
+        ox, oy = self.app.scroll_offsets.get(self.app.current_key, (0, 0))
+        self.offset_x, self.offset_y = ox, oy
         self.refresh_grid()
         self._update_hints()
 
@@ -64,25 +108,67 @@ class DesignScreen(Screen):
 
     # Rebuild the grid display from pixel data.
     def refresh_grid(self):
+        self._recalc_viewport()
+        vp_w = min(self.viewport_w, self.width - self.offset_x)
+        vp_h = min(self.viewport_h, self.height - self.offset_y)
+
+        scrolled_left = self.offset_x > 0
+        scrolled_right = self.offset_x + vp_w < self.width
+        scrolled_up = self.offset_y > 0
+        scrolled_down = self.offset_y + vp_h < self.height
+
         lines = [" " + self.app.current_key]
-        border = "+" + "-" * (self.width * 2) + "+"  # 2 chars per pixel in UI
-        lines.append(border)
-        for y in range(self.height):
-            row = "|"
-            for x in range(self.width):
+
+        # Top border with scroll indicators
+        top = "+"
+        if scrolled_left and scrolled_right:
+            top += "<"
+            top += "-" * max(0, vp_w * 2 - 1)
+            top += ">"
+        elif scrolled_left:
+            top += "<"
+            top += "-" * max(0, vp_w * 2 - 1)
+        elif scrolled_right:
+            top += "-" * max(0, vp_w * 2 - 1)
+            top += ">"
+        else:
+            top += "-" * (vp_w * 2)
+        top += "+"
+        lines.append(top)
+
+        for i in range(vp_h):
+            y = self.offset_y + i
+            row = "^" if (scrolled_up and i == 0) else "v" if (scrolled_down and i == vp_h - 1) else "|"
+            for j in range(vp_w):
+                x = self.offset_x + j
                 if x == self.cursor_x and y == self.cursor_y:
-                    # Cursor: show color char with reverse video
                     pixel = self._get_pixel(x, y)
                     if pixel == " ":
-                        row += "[reverse]  [/]"  # Two spaces, reversed
+                        row += "[reverse]  [/]"
                     else:
-                        row += f"[reverse]{pixel}{pixel}[/]"  # Color char twice, reversed
+                        row += f"[reverse]{pixel}{pixel}[/]"
                 else:
                     pixel = self._get_pixel(x, y)
-                    row += pixel * 2  # Always 2 chars per pixel in UI
-            row += "|"
+                    row += pixel * 2
+            row += "^" if (scrolled_up and i == 0) else "v" if (scrolled_down and i == vp_h - 1) else "|"
             lines.append(row)
-        lines.append(border)
+
+        # Bottom border with scroll indicators
+        bot = "+"
+        if scrolled_left and scrolled_right:
+            bot += "<"
+            bot += "-" * max(0, vp_w * 2 - 1)
+            bot += ">"
+        elif scrolled_left:
+            bot += "<"
+            bot += "-" * max(0, vp_w * 2 - 1)
+        elif scrolled_right:
+            bot += "-" * max(0, vp_w * 2 - 1)
+            bot += ">"
+        else:
+            bot += "-" * (vp_w * 2)
+        bot += "+"
+        lines.append(bot)
 
         grid = "\n".join(lines)
         self.query_one("#grid").update(grid)
@@ -97,8 +183,6 @@ class DesignScreen(Screen):
             step = 5
         elif key.startswith("ctrl"):
             step = 10
-        elif key.startswith("alt"):
-            step = 20
 
         if key in ("left", "h"):
             self.cursor_x = max(0, self.cursor_x - step)
@@ -108,6 +192,33 @@ class DesignScreen(Screen):
             self.cursor_y = max(0, self.cursor_y - step)
         elif key in ("down", "j"):
             self.cursor_y = min(self.height - 1, self.cursor_y + step)
+        else:
+            return False
+        self._ensure_cursor_visible()
+        return True
+
+    # Scroll the viewport with Alt+hjkl/arrows, with shift/ctrl for larger steps.
+    def _handle_scroll(self, key: str) -> bool:
+        if not key.startswith("alt+"):
+            return False
+
+        step = 1
+        rest = key.removeprefix("alt+")
+        if "shift" in rest:
+            step = 5
+        elif "ctrl" in rest:
+            step = 10
+
+        base = rest.split("+")[-1].lower()
+
+        if base in ("h", "left"):
+            self._scroll(-step, 0)
+        elif base in ("l", "right"):
+            self._scroll(step, 0)
+        elif base in ("k", "up"):
+            self._scroll(0, -step)
+        elif base in ("j", "down"):
+            self._scroll(0, step)
         else:
             return False
         return True
@@ -130,6 +241,7 @@ class DesignScreen(Screen):
         if old_key == new_key:
             return
         self.app.cursor_positions[old_key] = (self.cursor_x, self.cursor_y)
+        self.app.scroll_offsets[old_key] = (self.offset_x, self.offset_y)
         self.app.set_current_key(new_key)
         self._key_on_enter = new_key
         bm = self.app.bitmaps.get(new_key, {})
@@ -139,16 +251,24 @@ class DesignScreen(Screen):
         cx, cy = self.app.cursor_positions.get(new_key, (0, 0))
         self.cursor_x = min(cx, self.width - 1)
         self.cursor_y = min(cy, self.height - 1)
+        ox, oy = self.app.scroll_offsets.get(new_key, (0, 0))
+        self.offset_x, self.offset_y = ox, oy
         self.refresh_grid()
         self._update_hints()
         title = self.query_one("#title", Static)
         title.update(self.app.title_with_file(self.base_title))
         self.show_status(f"Switched to key {new_key}.")
 
+    def on_resize(self) -> None:
+        self.refresh_grid()
+
     def on_key(self, event) -> None:
         if event.key == "ctrl+l":
             self.show_status("")
             self.app.refresh(repaint=True, layout=True)
+            return
+        if self._handle_scroll(event.key):
+            self.refresh_grid()
             return
         key = event.key.lower()
         if key == "u":
@@ -157,7 +277,7 @@ class DesignScreen(Screen):
         if key == "ctrl+r":
             self._redo()
             return
-        if key == "ctrl+k":
+        if key in ("slash", "solidus"):
             self.app.push_screen(ConfigKeyScreen())
             event.stop()
             return
@@ -285,15 +405,10 @@ class DesignScreen(Screen):
     # Refresh the hints bar with current undo/redo availability.
     def _update_hints(self):
         hints = Text()
-        hints.append("[arrows/hjkl] move  ")
-        hints.append("[space] paint\n")
-        hints.append("[wasd] switch key\n")
+        hints.append(f"[C]olor={self.app.current_color}  ")
+        hints.append("[space] paint  ")
         hints.append("[F]ill  ")
         hints.append("[R]ect  ")
-        hints.append("[P]review  ")
-        hints.append("[M]ap\n")
-        hints.append(f"[C]olor={self.app.current_color}  ")
-        hints.append(f"[^K]ey={self.app.current_key}\n")
         if not self.undo_stack:
             hints.append("[U]ndo", style="dim")
         else:
@@ -304,6 +419,15 @@ class DesignScreen(Screen):
         else:
             hints.append("[^R]edo")
         hints.append("\n")
+        hints.append("[arrows/hjkl] move  ")
+        hints.append("[⌥+hjkl/arrows] scroll\n")
+        if len(self.app.bitmaps) <= 1:
+            hints.append("[wasd] switch key  ", style="dim")
+        else:
+            hints.append("[wasd] switch key  ")
+        hints.append("[/] find key\n")
+        hints.append("[M]ap  ")
+        hints.append("[P]review  ")
         hints.append("[Escape] back")
         self.query_one("#hints", Static).update(hints)
 

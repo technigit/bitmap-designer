@@ -75,16 +75,15 @@
             - [shift arrow keys / hjkl] - move cursor (5px)
             - [ctrl arrow keys / hjkl] - move cursor (10px)
             - [option arrow keys / hjkl] - move cursor (20px)
-            - [yuio] - scroll grid // in two dimensions
-            - [shift yuio] - scroll grid (5px)
-            - [ctrl yuio] - scroll grid (10px)
-            - [option yuio] - scroll grid (20px)
+            - [⌥+hjkl/arrows] - scroll grid // in two dimensions
+            - [⌥+shift+hjkl/arrows] - scroll grid (5px)
+            - [⌥+ctrl+hjkl/arrows] - scroll grid (10px)
             - [wasd] - switch bitmap key in that direction (up/left/down/right)
                 - based on bitmap location coordinates
                 - horizontal tie-break (a/d): favor topmost (smallest y)
                 - vertical tie-break (w/s): favor leftmost (smallest x)
                 - if no key in that direction, show a status message
-            - [^K]ey=N - switch bitmap key (N shows current key value) // Bitmap key UI
+            - [/] find key - switch to or create a bitmap key (opens ConfigKeyScreen) // Bitmap key UI
             - [C]olor=N - select current color (N shows current color value) // Color UI
             - [space] - paint one bitmap pixel at the cursor position with the current color
             - [F]ill - flood fill (paint bucket style) with current color
@@ -122,8 +121,8 @@
             - [P] - toggle between pan and scroll mode
             - [/] - find key by name (opens FindKeyScreen popup)
                 - type key name, live substring matching shows results
-                - [Enter] confirms, [Escape] cancels
-                - selected key is zoomed to
+                - [Enter] confirms or creates, [Escape] cancels
+                - existing keys are zoomed to; newly created keys are placed at an empty location and selected without zooming
             - [Escape] - return to Design UI
         - Bitmap labels are truncated at the fill area boundary (canvas margins and virtual bounds)
         - Hints bar shows current key, zoom percentage, and available commands
@@ -487,7 +486,6 @@
 - **Open UI: directory creation prompt** — no interactive prompt to create ~/bitmaps; just shows a message if missing
 - **Open UI: fallback to current directory** — no fallback to cwd when ~/bitmaps missing
 - **Rectangle paint mode (`[R]`)** — no interactive rectangle drawing in Design UI
-- **Scroll grid (`[yuio]`)** — no yuio key scroll support in Design UI
 - **Palette selection (`[P]`)** — no Palette option in Configuration UI; only the hardcoded palette
 - **`~/.bitmapsrc` config file** — no reading or writing of per-user config (palettes, preferences)
 - **Code generation rectangle optimization** — generates per-pixel fillRect calls instead of optimal rectangular blocks

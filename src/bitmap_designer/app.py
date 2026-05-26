@@ -35,6 +35,7 @@ class BitmapDesignerApp(App):
         self._clean_snapshot = None
         self._key_adjacency: dict[str, dict[str, str | None]] = {}
         self.cursor_positions: dict[str, tuple[int, int]] = {}
+        self.scroll_offsets: dict[str, tuple[int, int]] = {}
         self.map_zoom: float | None = None
         self.map_pan: tuple[int, int] = (0, 0)
         self.map_pan_flip: bool = False
@@ -137,6 +138,7 @@ class BitmapDesignerApp(App):
                 self._take_clean_snapshot()
                 self.history.clear_all()
                 self.cursor_positions = {}
+                self.scroll_offsets = {}
                 self.file.refresh_mtime()
         except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error reloading file: {e}")
@@ -173,6 +175,7 @@ class BitmapDesignerApp(App):
         self.current_color = "1"
         self.history.clear_all()
         self.cursor_positions = {}
+        self.scroll_offsets = {}
         self.push_screen(MainScreen())
 
     # Load bitmaps from a JSON file and open the main menu.
@@ -190,9 +193,31 @@ class BitmapDesignerApp(App):
                 self._take_clean_snapshot()
                 self.history.clear_all()
                 self.cursor_positions = {}
+                self.scroll_offsets = {}
                 self.push_screen(MainScreen())
         except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error loading file: {e}")
+
+    def find_empty_location(self) -> dict:
+        """Find an unoccupied (x, y) position for a new bitmap."""
+        step = 12
+        occupied: set[tuple[int, int]] = set()
+        for bm in self.bitmaps.values():
+            loc = self._get_location(bm)
+            bounds = bm.get("bounds", {"width": 10, "height": 10})
+            for dx in range(bounds["width"]):
+                for dy in range(bounds["height"]):
+                    occupied.add((loc[0] + dx, loc[1] + dy))
+        x, y = 0, 0
+        while any(
+            (x + dx, y + dy) in occupied
+            for dx in range(10) for dy in range(10)
+        ):
+            x += step
+            if x > 200:
+                x = 0
+                y += step
+        return {"x": x, "y": y}
 
     def set_current_color(self, color: str):
         self.current_color = color

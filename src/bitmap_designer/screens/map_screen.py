@@ -13,6 +13,7 @@ from textual.widgets import Input, Static
 from textual.containers import Vertical
 
 from .popup_screen import PopupScreen
+from ..constants import create_default_bitmap
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
@@ -47,13 +48,14 @@ class FindKeyScreen(PopupScreen):
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
-            self.input = Input(placeholder="Type key name...", id="find-input")
+            self.input = Input(value=self.app.current_key, placeholder="Type key name...", id="find-input")
             yield self.input
             yield Static("", id="matches")
-            yield Static("[Enter] select  [Escape] cancel", id="hints", markup=False)
+            yield Static("[Enter] select/create  [Escape] cancel", id="hints", markup=False)
             yield Static("", id="status")
 
     def on_screen_resume(self, _event) -> None:
+        self.input.value = self.app.current_key
         self.input.focus()
 
     def on_input_changed(self, event: Input.Changed) -> None:
@@ -77,10 +79,17 @@ class FindKeyScreen(PopupScreen):
             self.dismiss(None)
         elif event.key in ("enter", "\n"):
             val = (self.input.value or "").strip()
-            if val in self.app.bitmaps:
-                self.dismiss(val)
+            if val and " " not in val:
+                is_new = val not in self.app.bitmaps
+                if is_new:
+                    bm = create_default_bitmap()
+                    bm["location"] = self.app.find_empty_location()
+                    self.app.bitmaps[val] = bm
+                    self.app.build_key_adjacency()
+                    self.app.mark_dirty()
+                self.dismiss((val, is_new))
             else:
-                self.show_status(f"Key '{val}' not found.")
+                self.show_status("Please enter a valid key (no spaces).")
 
 
 class MapScreen(Screen):
@@ -401,9 +410,12 @@ class MapScreen(Screen):
 
     def _update_hints(self) -> None:
         hints = Text()
-        hints.append("[wasd] select key  ")
-        hints.append("[/] find key  ")
-        hints.append("[Enter] switch key\n")
+        if len(self.app.bitmaps) <= 1:
+            hints.append("[wasd] select key  ", style="dim")
+        else:
+            hints.append("[wasd] select key  ")
+        hints.append("[Enter] switch key  ")
+        hints.append("[/] find key  \n")
         zoom_in_style = None if self.zoom_scale < 20.0 else "dim"
         hints.append("[+=] zoom in  ", style=zoom_in_style)
         zoom_out_style = None if self.zoom_scale > 0.1 else "dim"
@@ -421,10 +433,10 @@ class MapScreen(Screen):
         hints.append(f"[R]eset {'pan' if self.pan_flip else 'scroll'}",
                      style=reset_pan_style)
         hints.append("  ")
-        hints.append("[Escape] back\n")
-        hints.append(f"[P]an {'on' if self.pan_flip else 'off'}  ")
+        hints.append(f"[P]an {'on' if self.pan_flip else 'off'}\n")
         hints.append(f"Key={self.selected_key}  ")
-        hints.append(f"Zoom={int(self.zoom_scale * 100)}%")
+        hints.append(f"Zoom={int(self.zoom_scale * 100)}%  ")
+        hints.append("[Escape] back\n")
         self.query_one("#hints", Static).update(hints)
 
     def _zoom_change(self, factor: float) -> None:
@@ -452,10 +464,14 @@ class MapScreen(Screen):
     def _enter_find_mode(self) -> None:
         self.app.push_screen(FindKeyScreen(), self._on_find_key)
 
-    def _on_find_key(self, result: str | None) -> None:
+    def _on_find_key(self, result: tuple[str, bool] | None) -> None:
         if result is not None:
-            self.selected_key = result
-            self._zoom_to_key(result)
+            key, is_new = result
+            self.selected_key = key
+            if not is_new:
+                self._zoom_to_key(key)
+            else:
+                self._update()
 
     def _navigate(self, direction: str, fail_msg: str) -> None:
         dest = self.app.navigate_key(direction, self.selected_key)

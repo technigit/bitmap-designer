@@ -171,5 +171,7 @@ class OpenScreen(PopupScreen):
             return
         if event.key in ("j", "down"):
             self.query_one("#file_list", ListView).action_cursor_down()
+            event.stop()
         elif event.key in ("k", "up"):
             self.query_one("#file_list", ListView).action_cursor_up()
+            event.stop()

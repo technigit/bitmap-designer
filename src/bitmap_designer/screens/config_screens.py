@@ -139,7 +139,9 @@ class ConfigKeyScreen(PopupScreen):
             if val and " " not in val:
                 self.app.set_current_key(val)
                 if val not in self.app.bitmaps:
-                    self.app.bitmaps[val] = create_default_bitmap()
+                    bm = create_default_bitmap()
+                    bm["location"] = self.app.find_empty_location()
+                    self.app.bitmaps[val] = bm
                     self.app.build_key_adjacency()
                     self.app.mark_dirty()
                 self.app.pop_screen()
