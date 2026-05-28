@@ -92,6 +92,14 @@ class FindKeyScreen(PopupScreen):
                 self.show_status("Please enter a valid key (no spaces).")
 
 
+PAN_KEYS = {
+    "left": (-1, 0), "h": (-1, 0),
+    "right": (1, 0), "l": (1, 0),
+    "up": (0, -1), "k": (0, -1),
+    "down": (0, 1), "j": (0, 1),
+}
+
+
 class MapScreen(Screen):
     """Overview map of all bitmaps arranged by spatial location."""
     base_title = "Map Mode"
@@ -116,10 +124,6 @@ class MapScreen(Screen):
         "underscore": ("_zoom_change", (0.8,)),
         "0": ("_reset_zoom_view", ()),
         "r": ("_reset_pan_view", ()),
-        "h": ("_pan", (-1, 0)),
-        "l": ("_pan", (1, 0)),
-        "k": ("_pan", (0, -1)),
-        "j": ("_pan", (0, 1)),
         "p": ("_toggle_pan_mode", ()),
         "slash": ("_enter_find_mode", ()),
         "solidus": ("_enter_find_mode", ()),
@@ -139,7 +143,6 @@ class MapScreen(Screen):
         with Vertical():
             yield Static("", id="grid")
             yield Static("", id="hints", markup=False)
-        yield Static("")
         yield Static("", id="status")
 
     def on_mount(self) -> None:
@@ -427,8 +430,8 @@ class MapScreen(Screen):
         hints.append("[⇧F]it all  ", style=zero_style)
         hints.append("[F]it key selection\n")
         pan_label = "pan" if self.pan_flip else "scroll"
-        hints.append(f"[hjkl] {pan_label}")
-        hints.append("  ")
+        hints.append(f"[arrows/hjkl] {pan_label}  ")
+        hints.append(f"[1-9] Step={self.app.step}\n")
         reset_pan_style = None if self.pan_x != 2 or self.pan_y != 3 else "dim"
         hints.append(f"[R]eset {'pan' if self.pan_flip else 'scroll'}",
                      style=reset_pan_style)
@@ -518,4 +521,25 @@ class MapScreen(Screen):
         if key == "escape":
             self.app.pop_screen()
             return
-        self._handle_map_key(key, key.lower())
+
+        key_low = key.lower()
+
+        if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
+            self.app.step = int(key)
+            self.show_status(f"Step set to {self.app.step}")
+            self._update_hints()
+            return
+
+        if key_low in PAN_KEYS:
+            step = self.app.step
+            parts = key.split("+")
+            mods = set(parts[:-1])
+            if parts[-1].isupper():
+                mods.add("shift")
+            if "shift" in mods:
+                step *= 5
+            dx, dy = PAN_KEYS[key_low]
+            self._pan(dx * step, dy * step)
+            return
+
+        self._handle_map_key(key, key_low)

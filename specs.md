@@ -71,13 +71,11 @@
         - page title shows current filename: "Design Mode - filename.json"
             - when dirty, appends " (modified)"
         - menu commands below content:
-            - [arrow keys / hjkl] - move cursor // in two dimensions
-            - [shift arrow keys / hjkl] - move cursor (5px)
-            - [ctrl arrow keys / hjkl] - move cursor (10px)
-            - [option arrow keys / hjkl] - move cursor (20px)
-            - [⌥+hjkl/arrows] - scroll grid // in two dimensions
-            - [⌥+shift+hjkl/arrows] - scroll grid (5px)
-            - [⌥+ctrl+hjkl/arrows] - scroll grid (10px)
+            - [arrows / hjkl] - move cursor // by current step (default 1)
+            - [⇧+arrows / ⇧+hjkl] - move cursor // by step × 5
+            - [0-9] - set step size (1 is default)
+            - [g] - toggle scroll mode
+            - [Escape] - exit Design mode (also exits scroll mode)
             - [wasd] - switch bitmap key in that direction (up/left/down/right)
                 - based on bitmap location coordinates
                 - horizontal tie-break (a/d): favor topmost (smallest y)
@@ -112,7 +110,9 @@
         - Keyboard controls:
             - [wasd] - select the nearest bitmap key in that direction
             - [Enter] - switch to the selected key and return to Design UI
-            - [hjkl] - pan/scroll the canvas (direction depends on pan mode)
+            - [arrows / hjkl] - pan/scroll the canvas // by current step (default 1)
+            - [⇧+arrows / ⇧+hjkl] - pan/scroll the canvas // by step × 5
+            - [1-9] - set step size
             - [+=] / [-_] - zoom in / out
             - [0] - reset zoom to 100%
             - [⇧F] - fit all content into viewport
@@ -480,6 +480,17 @@
 ### Default Key Handling
 - Any prompt showing (y/N) defaults to No - pressing Enter or n accepts the default (No).
 - Any prompt showing (Y/n) defaults to Yes - pressing Enter or y accepts the default (Yes).
+
+### Step & Scroll Mode
+
+- **Step** (`1`-`9`): persistent cursor/scroll delta (default 1).
+  Persists for the file session (survives screen transitions, Design
+  Mode re-entry). Resets to 1 at session boundaries (New/Open).
+- **Scroll mode** (`g`): toggle. While on, arrows/hjkl scroll instead
+  of moving cursor. Reset to off on any screen resume (sub-screen
+  dismiss, Design re-entry). `Esc` also exits scroll mode.
+- **Shift multiplier**: while held, step is multiplied by 5 for
+  faster movement/scroll. Works in both cursor and scroll mode.
 
 ### TODO / Not Yet Implemented
 - **ASCII art header** — "Bitmap Designer" shown as plain text, not ASCII art

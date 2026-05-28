@@ -39,6 +39,7 @@ class BitmapDesignerApp(App):
         self.map_zoom: float | None = None
         self.map_pan: tuple[int, int] = (0, 0)
         self.map_pan_flip: bool = False
+        self.step: int = 1
 
     @staticmethod
     def _get_location(bitmap_data: dict) -> tuple[int, int]:
@@ -176,6 +177,7 @@ class BitmapDesignerApp(App):
         self.history.clear_all()
         self.cursor_positions = {}
         self.scroll_offsets = {}
+        self.step = 1
         self.push_screen(MainScreen())
 
     # Load bitmaps from a JSON file and open the main menu.
@@ -194,6 +196,7 @@ class BitmapDesignerApp(App):
                 self.history.clear_all()
                 self.cursor_positions = {}
                 self.scroll_offsets = {}
+                self.step = 1
                 self.push_screen(MainScreen())
         except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error loading file: {e}")
