@@ -1,7 +1,8 @@
 # Roadmap
 
 ## Near-term
-- [ ] `:` command bar — Vim-style command input for extended operations
+- [x] `:` command bar — Vim-style command input for extended operations
+  - [ ] Tab completion in command bar
   - `scroll` / `noscroll` — toggle scroll mode
   - `q` — quit
   - `q!` — force quit

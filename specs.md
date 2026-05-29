@@ -270,6 +270,7 @@
         - if not dirty: quit immediately
         - if dirty:
             - Prompt: Really quit? (y/N)  // hint: [Escape] cancel
+                - if ! (exclamation mark): quit immediately (skips save prompt)
                 - if yes
                     - Prompt: Save file first? (Y/n)  // hint: [Escape] cancel
                         - if yes: Save UI → quit
@@ -480,6 +481,32 @@
 ### Default Key Handling
 - Any prompt showing (y/N) defaults to No - pressing Enter or n accepts the default (No).
 - Any prompt showing (Y/n) defaults to Yes - pressing Enter or y accepts the default (Yes).
+
+### `:` Command Bar (Design & Map modes)
+
+- Press `:` while in a Design or Map screen to enter command mode
+- The command buffer is displayed inline on the status line, prefixed with `:`
+- While in command mode, all other keyboard input is suspended
+- Supported commands:
+  - `q` — quit (with confirmation if modified)
+  - `q!` — force quit (discard changes)
+  - `w` — save current file
+  - `w <name>` — save as a new file
+  - `w!` — force save (overwrite external changes)
+  - `w! <name>` — force save and overwrite existing file
+  - `wq` — save and quit
+  - `e` — exit to previous screen
+  - `help` — show keybinding reference popup
+  - `scroll` / `noscroll` — toggle scroll mode in Design mode
+  - `pan` / `nopan` — toggle pan mode in Map mode
+  - `set step N` — set cursor/scroll step (1-9)
+  - `set key NAME` — switch to or create a bitmap key
+  - `set color C` — set current drawing color (0-9, A-F)
+  - `config` — open the configuration menu
+  - `config key NAME` — switch to key and open configuration
+- Vim-style messages: `"filename" written`, `No file name`, `Warning: File modified since reading (add ! to overwrite)`, `File exists (add ! to overwrite)`, `Unknown command: <cmd>`
+- Cancel with Escape
+- Tab completion: planned (see ROADMAP)
 
 ### Step & Scroll Mode
 

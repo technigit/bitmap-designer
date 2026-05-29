@@ -13,6 +13,7 @@ from textual.widgets import Input, Static
 from textual.containers import Vertical
 
 from .popup_screen import PopupScreen
+from .command_bar import handle_cmd_key
 from ..constants import create_default_bitmap
 
 if TYPE_CHECKING:
@@ -137,6 +138,8 @@ class MapScreen(Screen):
         self.pan_flip = self.app.map_pan_flip
         self.selected_key = self.app.current_key
         self._last_fit: str | None = None
+        self.cmd_mode = False
+        self.cmd_buffer = ""
 
     def compose(self) -> ComposeResult:
         yield Static(self.app.title_with_file(self.base_title), id="title")
@@ -151,6 +154,12 @@ class MapScreen(Screen):
             self.pan_y = 3
         self._update()
         self._store_map_state()
+
+    def on_screen_resume(self, _event) -> None:
+        self.step = self.app.step
+        self.selected_key = self.app.current_key
+        self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
+        self._update()
 
     async def _on_resize(self, event: ResizeEvent) -> None:
         await super()._on_resize(event)
@@ -431,7 +440,7 @@ class MapScreen(Screen):
         hints.append("[F]it key selection\n")
         pan_label = "pan" if self.pan_flip else "scroll"
         hints.append(f"[arrows/hjkl] {pan_label}  ")
-        hints.append(f"[1-9] Step={self.app.step}\n")
+        hints.append(f"[1-9] step={self.app.step}\n")
         reset_pan_style = None if self.pan_x != 2 or self.pan_y != 3 else "dim"
         hints.append(f"[R]eset {'pan' if self.pan_flip else 'scroll'}",
                      style=reset_pan_style)
@@ -513,6 +522,9 @@ class MapScreen(Screen):
             getattr(self, method_name)(*args)
 
     def on_key(self, event) -> None:
+        if handle_cmd_key(self, event):
+            return
+
         if event.key == "ctrl+l":
             self.show_status("")
             self.app.refresh(repaint=True, layout=True)

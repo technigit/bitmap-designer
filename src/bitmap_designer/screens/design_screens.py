@@ -9,6 +9,7 @@ from textual.widgets import Static
 from textual.containers import Vertical
 
 from .popup_screen import PopupScreen
+from .command_bar import handle_cmd_key
 
 from ..codegen_service import CodegenService
 
@@ -42,6 +43,8 @@ class DesignScreen(Screen):
         self.viewport_h: int = 0
         self.step = self.app.step
         self.scroll_mode = False
+        self.cmd_mode = False
+        self.cmd_buffer = ""
 
     @property
     def undo_stack(self):
@@ -317,6 +320,9 @@ class DesignScreen(Screen):
         self.refresh_grid()
 
     def on_key(self, event) -> None:
+        if handle_cmd_key(self, event):
+            return
+
         if event.key == "ctrl+l":
             self.show_status("")
             self.app.refresh(repaint=True, layout=True)
@@ -502,7 +508,7 @@ class DesignScreen(Screen):
         else:
             hints.append("[arrows/hjkl] move  ")
             hints.append("[g] scroll  ", style="dim" if self._content_fits else None)
-        hints.append(f"[1-9] Step={self.step}\n")
+        hints.append(f"[1-9] step={self.step}\n")
         if len(self.app.bitmaps) <= 1:
             hints.append("[wasd] switch key  ", style="dim")
         else:

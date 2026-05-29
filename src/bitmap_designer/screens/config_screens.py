@@ -33,7 +33,10 @@ class ConfigScreen(PopupScreen):
     def on_mount(self) -> None:
         self._refresh_values()
         self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
+
+    def on_screen_resume(self, _event) -> None:
         self._refresh_values()
+        self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
 
     def _refresh_values(self):
         idx = str(self.app.current_key)

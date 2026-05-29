@@ -36,6 +36,8 @@ class QuitScreen(PopupScreen):
         if event.key.lower() == "y":
             self.app.pop_screen()
             self.app.push_screen(QuitSaveFileFirstScreen())
+        elif event.key in ("!", "exclamation_mark", "shift+1"):
+            self.app.exit()
         elif event.key in ("enter", "\n") or event.key.lower() in ("n", "escape"):
             self.app.pop_screen()
 
