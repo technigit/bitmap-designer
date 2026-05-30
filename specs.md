@@ -93,6 +93,13 @@
                 - Notes:
                     - The rectangle corner selection can move into any quadrant around the cursor.
                     - The selection movement must be restricted within the bounds.
+                    - The rectangle area previews by rendering with the current color in place.
+            - Pixel display mode (default: swatches `"on"`)
+                - `"on"`: pixels shown as colored blocks using their hex color
+                - `"mixed"`: pixels shown as their color identifier in that color's hue
+                - `"off"`: plain number pairs, no color markup
+                - Set with `:set colorpixels [on|off|mixed]` in the command bar
+                - Shared setting across Design and Map UIs
             - [P]review - open/refresh the preview in a browser window
             - [U]ndo - undo last action (dimmed when nothing to undo)
                 - cursor position saved and restored with each undo/redo
@@ -126,6 +133,7 @@
             - [Escape] - return to Design UI
         - Bitmap labels are truncated at the fill area boundary (canvas margins and virtual bounds)
         - Hints bar shows current key, zoom percentage, and available commands
+        - Pixel display within bitmap rectangles respects the color pixels mode (swatches vs numbers)
     - Bitmap key UI (modal window) // select a unique dataspace for a bitmap with its own data
         - Prompt: Enter a key (short string, no spaces).
             - [Enter] - save configuration
@@ -248,17 +256,20 @@
             - [Enter] - save the configuration
                 - Response: Configuration saved.  [OK]
             - [Escape] - cancel/revert the configuration
-    - Close UI (Escape from Main UI)
+    - Close UI (Escape from Main UI, or :close from command bar)
         - if no changes were made (file not dirty)
             - return to the Startup UI (no prompts)
         - if changes were made (file is dirty)
-            - Prompt: Really close? (y/N)  // hint: [Escape] cancel
+            - Prompt: Really close? (y/N)  // hint: [!] force close, [Escape] cancel
+                - if ! (exclamation mark): close immediately (dirty bit cleared, skip save prompts)
                 - if yes
-                    - Prompt: Save file first? (Y/n)  // hint: [Escape] cancel
+                    - Prompt: Save file first? (Y/n)  // hint: [!] force close, [Escape] cancel
+                        - if ! (exclamation mark): close immediately (dirty bit cleared, skip save prompts)
                         - if yes
                             - Save UI → Startup UI (dirty bit cleared)
                         - if no
-                            - Prompt: Are you sure? (y/N)  // hint: [Escape] cancel
+                            - Prompt: Are you sure? (y/N)  // hint: [!] force close, [Escape] cancel
+                                - if ! (exclamation mark): close immediately (dirty bit cleared)
                                 - if yes
                                     - return to the Startup UI (dirty bit cleared)
                                 - if no
@@ -269,10 +280,11 @@
         - global command, works from any screen
         - if not dirty: quit immediately
         - if dirty:
-            - Prompt: Really quit? (y/N)  // hint: [Escape] cancel
+            - Prompt: Really quit? (y/N)  // hint: [!] force quit, [Escape] cancel
                 - if ! (exclamation mark): quit immediately (skips save prompt)
                 - if yes
-                    - Prompt: Save file first? (Y/n)  // hint: [Escape] cancel
+                    - Prompt: Save file first? (Y/n)  // hint: [!] force quit, [Escape] cancel
+                        - if ! (exclamation mark): quit immediately (skips save prompt)
                         - if yes: Save UI → quit
                         - if no: quit without saving
                 - if no: cancel quit (back to previous screen)
@@ -496,17 +508,34 @@
   - `w! <name>` — force save and overwrite existing file
   - `wq` — save and quit
   - `e` — exit to previous screen
+  - `close` — close project (with confirmation if modified)
+  - `close!` — force close (discard changes)
   - `help` — show keybinding reference popup
   - `scroll` / `noscroll` — toggle scroll mode in Design mode
   - `pan` / `nopan` — toggle pan mode in Map mode
   - `set step N` — set cursor/scroll step (1-9)
   - `set key NAME` — switch to or create a bitmap key
   - `set color C` — set current drawing color (0-9, A-F)
+  - `set colorpixels [on|off|mixed]` — set pixel display mode (cycles with no argument)
+  - `info` — show project metadata popup
   - `config` — open the configuration menu
   - `config key NAME` — switch to key and open configuration
 - Vim-style messages: `"filename" written`, `No file name`, `Warning: File modified since reading (add ! to overwrite)`, `File exists (add ! to overwrite)`, `Unknown command: <cmd>`
 - Cancel with Escape
 - Tab completion: planned (see ROADMAP)
+
+### Info Popup (`:info`)
+
+- Displays project metadata in a modal popup, available from Design and Map modes
+- File info: name, size on disk, modified status
+- Overview: total keys, total pixel area, filled cells across all keys
+- Canvas frame: bounding box of all bitmaps on the virtual canvas
+- Viewport: visible range within the canvas (or "fits" if all content visible)
+- Current key: name, bounds, location, filled ratio, undo/redo depth
+- Design mode extras: cursor position, current color
+- Map mode extras: zoom level
+- Key navigation: [wasd] switches to adjacent keys within the popup (content updates live)
+- Dismiss with [Enter] or [Escape]
 
 ### Step & Scroll Mode
 
@@ -523,7 +552,6 @@
 - **ASCII art header** — "Bitmap Designer" shown as plain text, not ASCII art
 - **Open UI: directory creation prompt** — no interactive prompt to create ~/bitmaps; just shows a message if missing
 - **Open UI: fallback to current directory** — no fallback to cwd when ~/bitmaps missing
-- **Rectangle paint mode (`[R]`)** — no interactive rectangle drawing in Design UI
 - **Palette selection (`[P]`)** — no Palette option in Configuration UI; only the hardcoded palette
 - **`~/.bitmapsrc` config file** — no reading or writing of per-user config (palettes, preferences)
 - **Code generation rectangle optimization** — generates per-pixel fillRect calls instead of optimal rectangular blocks

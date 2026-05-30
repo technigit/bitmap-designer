@@ -2,7 +2,6 @@
 from __future__ import annotations
 import math
 from dataclasses import dataclass
-from functools import partial
 from typing import TYPE_CHECKING
 
 from rich.text import Text
@@ -14,7 +13,7 @@ from textual.containers import Vertical
 
 from .popup_screen import PopupScreen
 from .command_bar import handle_cmd_key
-from ..constants import create_default_bitmap
+from ..constants import COLOR_MAP, create_default_bitmap
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
@@ -227,7 +226,7 @@ class MapScreen(Screen):
         self.zoom_scale = max(0.1, min(sx, sy))
         self.pan_x = int(cw / 2 - bx * self.zoom_scale - (bw * self.zoom_scale) / 2)
         self.pan_y = int(ch / 2 - by * self.zoom_scale * self._aspect_y
-                         - (bh * self.zoom_scale * self._aspect_y) / 2)
+                         - (bh * self.zoom_scale * self._aspect_y) / 2 + 1)
         self.selected_key = key
         self._update()
 
@@ -292,31 +291,45 @@ class MapScreen(Screen):
         return max((c for c, n in counts.items() if n == max_c),
                    key=lambda c: int(c, 16))
 
+    def _pixel_map_char(self, pixel_char: str) -> tuple[str, str | None]:
+        if pixel_char == " ":
+            return " ", None
+        hex_color = COLOR_MAP.get(pixel_char, "")
+        if self.app.color_pixels == "on":
+            return " ", f"on {hex_color}"
+        if self.app.color_pixels == "mixed":
+            return pixel_char, hex_color
+        return pixel_char, None
+
     def _render_one(self, ctx: DeviceContext, key: str, pos: dict,
-                    cell, *, max_bounds: tuple[int, int]) -> None:
+                    cell, *, max_bounds: tuple[int, int], dim: bool = False) -> None:
         pl = pos["pixel_left"]
         pt = pos["pixel_top"]
         pw = pos["pixel_w"]
+        border_style = "dim" if dim else None
         for i, ch in enumerate(str(key)):
             if pl + i < ctx.pan_x - 1 or pt - 2 < ctx.pan_y - 2:
                 break
             if pl + i > max_bounds[0] or pt - 2 > max_bounds[1]:
                 break
-            cell(pl + i, pt - 2, ch)
-        cell(pl - 1, pt - 1, "+")
+            cell(pl + i, pt - 2, ch, border_style, True)
+        cell(pl - 1, pt - 1, "+", border_style, True)
         for cx in range(pl, pl + pw):
-            cell(cx, pt - 1, "-")
-        cell(pl + pw, pt - 1, "+")
-        cell(pl - 1, pt + pos["pixel_h"], "+")
+            cell(cx, pt - 1, "-", border_style, True)
+        cell(pl + pw, pt - 1, "+", border_style, True)
+        cell(pl - 1, pt + pos["pixel_h"], "+", border_style, True)
         for cx in range(pl, pl + pw):
-            cell(cx, pt + pos["pixel_h"], "-")
-        cell(pl + pw, pt + pos["pixel_h"], "+")
+            cell(cx, pt + pos["pixel_h"], "-", border_style, True)
+        cell(pl + pw, pt + pos["pixel_h"], "+", border_style, True)
         for row in range(pos["pixel_h"]):
-            cell(pl - 1, pt + row, "|")
-            cell(pl + pw, pt + row, "|")
+            cell(pl - 1, pt + row, "|", border_style, True)
+            cell(pl + pw, pt + row, "|", border_style, True)
             for col in range(pw):
-                cell(pl + col, pt + row,
-                     self._sample_pixel(ctx, key, col, row))
+                pixel_char = self._sample_pixel(ctx, key, col, row)
+                display, px_style = self._pixel_map_char(pixel_char)
+                if px_style and dim:
+                    px_style = f"dim {px_style}"
+                cell(pl + col, pt + row, display, px_style, False)
 
     def _render_grid(self, ctx: DeviceContext) -> Text:
         positions = self._compute_positions(ctx)
@@ -340,13 +353,11 @@ class MapScreen(Screen):
         max_bounds = (max_right, max_bottom)
         for key, pos in positions.items():
             if key != self.selected_key:
-                self._render_one(ctx, key, pos,
-                                 partial(set_cell, style="dim", overwrite=False),
-                                 max_bounds=max_bounds)
+                self._render_one(ctx, key, pos, set_cell,
+                                 max_bounds=max_bounds, dim=True)
         if self.selected_key in positions:
             self._render_one(ctx, self.selected_key, positions[self.selected_key],
-                             partial(set_cell, style=None, overwrite=True),
-                             max_bounds=max_bounds)
+                             set_cell, max_bounds=max_bounds, dim=False)
 
         self._draw_grid_borders(ctx, grid)
         self._fill_grid_empty(ctx, grid, max_right, max_bottom)
@@ -523,6 +534,7 @@ class MapScreen(Screen):
 
     def on_key(self, event) -> None:
         if handle_cmd_key(self, event):
+            event.stop()
             return
 
         if event.key == "ctrl+l":

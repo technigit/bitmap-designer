@@ -27,7 +27,7 @@ class QuitScreen(PopupScreen):
         with Vertical():
             yield Static("Quit", id="title")
             yield Static("Really quit? (y/N)", id="prompt")
-            yield Static(HINT_ESCAPE, id="hints", markup=False)
+            yield Static("[!] force quit (without saving)  [Escape] cancel", id="hints", markup=False)
 
     def on_key(self, event) -> None:
         if event.key == "ctrl+l":
@@ -45,6 +45,18 @@ class QuitScreen(PopupScreen):
 class QuitSaveFileFirstScreen(SaveFirstScreen):
     """Screen asking whether to save before quitting."""
     TITLE = "Quit - Save"
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Static(self.TITLE, id="title")
+            yield Static("Save file first? (Y/n)", id="prompt")
+            yield Static("[!] force quit (without saving)  [Escape] cancel", id="hints", markup=False)
+
+    def on_key(self, event):
+        if event.key in ("!", "exclamation_mark", "shift+1"):
+            self.app.exit()
+        else:
+            super().on_key(event)
 
     def _on_yes(self):
         self.app.push_screen(QuitSaveScreen())

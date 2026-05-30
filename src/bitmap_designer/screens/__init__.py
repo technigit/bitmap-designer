@@ -13,3 +13,4 @@ from .main_screens import MainScreen, CloseScreen, SaveFileFirstScreen, AreYouSu
 from .codegen_screens import CodegenScreen, ResponseScreen
 from .map_screen import MapScreen, FindKeyScreen
 from .command_bar import HelpPopupScreen
+from .info_screen import InfoScreen

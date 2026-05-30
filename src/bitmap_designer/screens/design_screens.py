@@ -12,6 +12,7 @@ from .popup_screen import PopupScreen
 from .command_bar import handle_cmd_key
 
 from ..codegen_service import CodegenService
+from ..constants import COLOR_MAP
 
 from .config_screens import ConfigKeyScreen
 from .map_screen import MapScreen
@@ -43,6 +44,9 @@ class DesignScreen(Screen):
         self.viewport_h: int = 0
         self.step = self.app.step
         self.scroll_mode = False
+        self.rect_mode = False
+        self.rect_start_x = 0
+        self.rect_start_y = 0
         self.cmd_mode = False
         self.cmd_buffer = ""
 
@@ -111,8 +115,40 @@ class DesignScreen(Screen):
         self.refresh_grid()
         self._update_hints()
 
+    def _in_rect_selection(self, x: int, y: int) -> bool:
+        if not self.rect_mode:
+            return False
+        x1 = min(self.rect_start_x, self.cursor_x)
+        x2 = max(self.rect_start_x, self.cursor_x)
+        y1 = min(self.rect_start_y, self.cursor_y)
+        y2 = max(self.rect_start_y, self.cursor_y)
+        return x1 <= x <= x2 and y1 <= y <= y2
+
+    def _cell_markup(self, x: int, y: int, *, rect_preview: bool = False) -> str:
+        if rect_preview:
+            char = self.app.current_color
+        else:
+            char = self._get_pixel(x, y)
+        hex_color = COLOR_MAP.get(char, "")
+        cursor = (x == self.cursor_x and y == self.cursor_y)
+
+        if char == " ":
+            if cursor:
+                return "[reverse]  [/]"
+            return "  "
+
+        if cursor:
+            return f"[reverse]{char}{char}[/]"
+
+        if self.app.color_pixels == "on":
+            return f"[on {hex_color}]  [/]"
+        if self.app.color_pixels == "mixed":
+            return f"[{hex_color}]{char}{char}[/]"
+        return f"{char}{char}"
+
     def on_screen_resume(self, _event) -> None:
         self.scroll_mode = False
+        self.rect_mode = False
         self.step = self.app.step
         self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
         if self.app.current_key != self._key_on_enter:
@@ -154,15 +190,7 @@ class DesignScreen(Screen):
             row = "^" if (scrolled_up and i == 0) else "v" if (scrolled_down and i == vp_h - 1) else "|"
             for j in range(vp_w):
                 x = self.offset_x + j
-                if x == self.cursor_x and y == self.cursor_y:
-                    pixel = self._get_pixel(x, y)
-                    if pixel == " ":
-                        row += "[reverse]  [/]"
-                    else:
-                        row += f"[reverse]{pixel}{pixel}[/]"
-                else:
-                    pixel = self._get_pixel(x, y)
-                    row += pixel * 2
+                row += self._cell_markup(x, y, rect_preview=self._in_rect_selection(x, y))
             row += "^" if (scrolled_up and i == 0) else "v" if (scrolled_down and i == vp_h - 1) else "|"
             lines.append(row)
 
@@ -297,6 +325,7 @@ class DesignScreen(Screen):
         old_key = self._key_on_enter
         if old_key == new_key:
             return
+        self.rect_mode = False
         self.app.cursor_positions[old_key] = (self.cursor_x, self.cursor_y)
         self.app.scroll_offsets[old_key] = (self.offset_x, self.offset_y)
         self.app.set_current_key(new_key)
@@ -321,6 +350,7 @@ class DesignScreen(Screen):
 
     def on_key(self, event) -> None:
         if handle_cmd_key(self, event):
+            event.stop()
             return
 
         if event.key == "ctrl+l":
@@ -329,6 +359,51 @@ class DesignScreen(Screen):
             return
 
         key = event.key
+
+        if self.rect_mode:
+            k_low = key.lower()
+            if k_low in ("left", "right", "up", "down", "h", "j", "k", "l"):
+                parts = key.split("+")
+                base = parts[-1]
+                base_low = base.lower()
+                mods = set(parts[:-1])
+                if base.isupper():
+                    mods.add("shift")
+                step = self.step * (5 if "shift" in mods else 1)
+                if base_low in ("left", "h"):
+                    self.cursor_x = max(0, self.cursor_x - step)
+                elif base_low in ("right", "l"):
+                    self.cursor_x = min(self.width - 1, self.cursor_x + step)
+                elif base_low in ("up", "k"):
+                    self.cursor_y = max(0, self.cursor_y - step)
+                elif base_low in ("down", "j"):
+                    self.cursor_y = min(self.height - 1, self.cursor_y + step)
+                self._ensure_cursor_visible()
+                self.refresh_grid()
+                return
+            if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
+                self.step = int(key)
+                self.app.step = self.step
+                self.show_status(f"Step set to {self.step}")
+                self._update_hints()
+                return
+            if k_low in ("enter", "\n"):
+                self._paint_rectangle()
+                self.rect_mode = False
+                self.show_status("Rectangle painted")
+                self._update_hints()
+                self.refresh_grid()
+                return
+            if k_low == "escape":
+                self.cursor_x = self.rect_start_x
+                self.cursor_y = self.rect_start_y
+                self.rect_mode = False
+                self.show_status("Rectangle cancelled")
+                self._update_hints()
+                self.refresh_grid()
+                return
+            event.stop()
+            return
 
         if key == "g":
             if self._content_fits:
@@ -370,6 +445,14 @@ class DesignScreen(Screen):
             self.paint_pixel()
         elif k == "f":
             self.flood_fill()
+        elif k == "r":
+            self.rect_mode = True
+            self.rect_start_x = self.cursor_x
+            self.rect_start_y = self.cursor_y
+            self._update_hints()
+            self.show_status("Rectangle mode: select opposite corner, [Enter] confirm, [Escape] cancel")
+            self.refresh_grid()
+            return
         elif k == "c":
             self.app.push_screen(ColorScreen())
         elif k == "escape":
@@ -447,6 +530,20 @@ class DesignScreen(Screen):
             stack.append((cx, cy + 1))
             stack.append((cx, cy - 1))
 
+    def _paint_rectangle(self):
+        self._save_state()
+        x1 = min(self.rect_start_x, self.cursor_x)
+        x2 = max(self.rect_start_x, self.cursor_x)
+        y1 = min(self.rect_start_y, self.cursor_y)
+        y2 = max(self.rect_start_y, self.cursor_y)
+        fill = self.app.current_color
+        for y in range(y1, y2 + 1):
+            for x in range(x1, x2 + 1):
+                self._set_pixel(x, y, fill)
+        self.app.mark_dirty()
+        self._sync_pixels()
+        CodegenService(self.app.bitmaps).save_preview_html()
+
     # Write local pixel data back to the app's bitmap store.
     def _sync_pixels(self):
         idx = self.app.current_key
@@ -489,34 +586,50 @@ class DesignScreen(Screen):
     # Refresh the hints bar with current undo/redo availability.
     def _update_hints(self):
         hints = Text()
-        hints.append(f"[C]olor={self.app.current_color}  ")
-        hints.append("[space] paint  ")
-        hints.append("[F]ill  ")
-        hints.append("[R]ect  ")
-        if not self.undo_stack:
-            hints.append("[U]ndo", style="dim")
+        if self.rect_mode:
+            hints.append("[arrows/hjkl] select opposite corner  ")
+            hints.append(f"[1-9] step={self.step}\n")
+            hints.append("[Enter] confirm  [Escape] cancel  ")
+            hints.append(f"[C]olor={self.app.current_color}", style="dim")
+            hints.append("  [space] paint", style="dim")
+            hints.append("  [F]ill", style="dim")
+            hints.append("  [U]ndo", style="dim")
+            hints.append("  [^R]edo", style="dim")
+            hints.append("\n")
+            hints.append("[wasd] switch key", style="dim")
+            hints.append("  [/] find key", style="dim")
+            hints.append("  [g] scroll", style="dim")
+            hints.append("  [M]ap", style="dim")
+            hints.append("  [P]review", style="dim")
         else:
-            hints.append("[U]ndo")
-        hints.append("  ")
-        if not self.redo_stack:
-            hints.append("[^R]edo", style="dim")
-        else:
-            hints.append("[^R]edo")
-        hints.append("\n")
-        if self.scroll_mode:
-            hints.append("[arrows/hjkl] scroll  [Esc] exit scroll  ")
-        else:
-            hints.append("[arrows/hjkl] move  ")
-            hints.append("[g] scroll  ", style="dim" if self._content_fits else None)
-        hints.append(f"[1-9] step={self.step}\n")
-        if len(self.app.bitmaps) <= 1:
-            hints.append("[wasd] switch key  ", style="dim")
-        else:
-            hints.append("[wasd] switch key  ")
-        hints.append("[/] find key\n")
-        hints.append("[M]ap  ")
-        hints.append("[P]review  ")
-        hints.append("[Escape] back")
+            hints.append(f"[C]olor={self.app.current_color}  ")
+            hints.append("[space] paint  ")
+            hints.append("[F]ill  ")
+            hints.append("[R]ect  ")
+            if not self.undo_stack:
+                hints.append("[U]ndo", style="dim")
+            else:
+                hints.append("[U]ndo")
+            hints.append("  ")
+            if not self.redo_stack:
+                hints.append("[^R]edo", style="dim")
+            else:
+                hints.append("[^R]edo")
+            hints.append("\n")
+            if self.scroll_mode:
+                hints.append("[arrows/hjkl] scroll  [Esc] exit scroll  ")
+            else:
+                hints.append("[arrows/hjkl] move  ")
+                hints.append("[g] scroll  ", style="dim" if self._content_fits else None)
+            hints.append(f"[1-9] step={self.step}\n")
+            if len(self.app.bitmaps) <= 1:
+                hints.append("[wasd] switch key  ", style="dim")
+            else:
+                hints.append("[wasd] switch key  ")
+            hints.append("[/] find key\n")
+            hints.append("[M]ap  ")
+            hints.append("[P]review  ")
+            hints.append("[Escape] back")
         self.query_one("#hints", Static).update(hints)
 
 

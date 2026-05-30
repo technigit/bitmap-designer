@@ -9,6 +9,7 @@ from textual.containers import Vertical
 from textual.widgets import Static
 
 from .popup_screen import PopupScreen
+from .startup_screens import StartupScreen
 from ..constants import DEFAULT_BITMAP_DIR
 
 if TYPE_CHECKING:
@@ -25,14 +26,18 @@ CMD_HELP_TEXT = """\
 :w! <name> Force save and overwrite existing
 :wq      Save and quit
 :e       Exit to previous screen
+:close   Close project (with confirmation if modified)
+:close!  Force close (discard changes)
 :help    Show this help
 :scroll  Enable scroll mode (Design mode only)
 :noscroll Disable scroll mode (Design mode only)
 :pan     Enable pan mode (Map mode only)
 :nopan   Disable pan mode (Map mode only)
-:set step N    Set cursor/scroll step (1-9)
-:set key NAME  Switch to or create a bitmap key
-:set color C   Set current drawing color (0-9, A-F)
+:set step N       Set cursor/scroll step (1-9)
+:set key NAME     Switch to or create a bitmap key
+:set color C      Set current drawing color (0-9, A-F)
+:set colorpixels [on|off|mixed]  Set pixel display mode
+:info          Show project metadata
 :config        Open the configuration menu
 :config key NAME  Switch to key and open config\
 """
@@ -175,8 +180,15 @@ def _execute_command(screen, cmd_str: str) -> None:
                 from ..screens.quit_screens import QuitScreen
                 app.push_screen(QuitScreen())
 
-    elif command == "e":
-        app.pop_screen()
+    elif command == "close":
+        if force:
+            app.mark_dirty(False)
+        if not app.dirty or force:
+            app.pop_screen()
+            app.push_screen(StartupScreen())
+        else:
+            from ..screens.main_screens import CloseScreen
+            app.push_screen(CloseScreen())
 
     elif command == "scroll":
         if hasattr(screen, 'scroll_mode'):
@@ -215,6 +227,10 @@ def _execute_command(screen, cmd_str: str) -> None:
 
     elif command == "help":
         app.push_screen(HelpPopupScreen())
+
+    elif command == "info":
+        from ..screens.info_screen import InfoScreen, gather_info
+        app.push_screen(InfoScreen(gather_info(app, screen), app, screen))
 
     elif command == "set":
         if not args:
@@ -271,6 +287,23 @@ def _execute_command(screen, cmd_str: str) -> None:
                 _clear_status(screen, f"Color set to {c}")
             else:
                 _clear_status(screen, "Color must be 0-9 or A-F")
+        elif sub == "colorpixels":
+            if sub_args:
+                val = sub_args[0].lower()
+                if val in ("on", "off", "mixed"):
+                    app.color_pixels = val
+                else:
+                    _clear_status(screen, "Usage: set colorpixels [on|off|mixed]")
+                    return
+            else:
+                cycle = {"on": "off", "off": "mixed", "mixed": "on"}
+                app.color_pixels = cycle[app.color_pixels]
+            if hasattr(screen, 'refresh_grid'):
+                screen.refresh_grid()
+            if hasattr(screen, '_update'):
+                screen._update()
+            screen._update_hints()
+            _clear_status(screen, f"Color pixels {app.color_pixels}")
         else:
             _clear_status(screen, f"Unknown set subcommand: {sub}")
 

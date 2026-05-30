@@ -102,13 +102,17 @@ class CloseScreen(PopupScreen):
         with Vertical():
             yield Static("Close", id="title")
             yield Static("Really close? (y/N)", id="prompt")
-            yield Static(HINT_ESCAPE, id="hints", markup=False)
+            yield Static("[!] force close (without saving)  [Escape] cancel", id="hints", markup=False)
 
     def on_key(self, event) -> None:
         if event.key == "ctrl+l":
             self.app.refresh(repaint=True, layout=True)
             return
-        if event.key.lower() == "y":
+        if event.key in ("!", "exclamation_mark", "shift+1"):
+            self.app.mark_dirty(False)
+            self.app.pop_screen()
+            self.app.push_screen(StartupScreen())
+        elif event.key.lower() == "y":
             self.app.pop_screen()
             self.app.push_screen(SaveFileFirstScreen())
         elif event.key in ("enter", "\n") or event.key.lower() in ("n", "escape"):
@@ -118,6 +122,20 @@ class CloseScreen(PopupScreen):
 class SaveFileFirstScreen(SaveFirstScreen):
     """Screen asking whether to save before closing."""
     TITLE = "Close - Save"
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Static(self.TITLE, id="title")
+            yield Static("Save file first? (Y/n)", id="prompt")
+            yield Static("[!] force close (without saving)  [Escape] cancel", id="hints", markup=False)
+
+    def on_key(self, event):
+        if event.key in ("!", "exclamation_mark", "shift+1"):
+            self.app.mark_dirty(False)
+            self.app.pop_screen()
+            self.app.push_screen(StartupScreen())
+        else:
+            super().on_key(event)
 
     def _on_yes(self):
         self.app.push_screen(SaveScreenForClose())
@@ -138,13 +156,17 @@ class AreYouSureScreen(PopupScreen):
         with Vertical():
             yield Static("Close - Confirm", id="title")
             yield Static("Are you sure? (y/N)", id="prompt")
-            yield Static(HINT_ESCAPE, id="hints", markup=False)
+            yield Static("[!] force close (without saving)  [Escape] cancel", id="hints", markup=False)
 
     def on_key(self, event) -> None:
         if event.key == "ctrl+l":
             self.app.refresh(repaint=True, layout=True)
             return
-        if event.key.lower() == "y":
+        if event.key in ("!", "exclamation_mark", "shift+1"):
+            self.app.mark_dirty(False)
+            self.app.pop_screen()
+            self.app.push_screen(StartupScreen())
+        elif event.key.lower() == "y":
             self.app.mark_dirty(False)
             self.app.pop_screen()
             self.app.push_screen(StartupScreen())
