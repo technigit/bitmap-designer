@@ -222,6 +222,7 @@
                 - max width: none
                 - max height: none
             - [Enter] - save the configuration
+                - If the new bounds would overlap another bitmap, an encroachment warning popup lists affected keys and offers [Y]es (apply + auto-move overlapped bitmaps) / [N]o (cancel the edit)
                 - Response: Configuration saved.  [OK]
             - [Escape] - cancel/revert the configuration
         - [C]ontext - output variable name for ctx (default "ctx")
@@ -242,6 +243,7 @@
         - [L]ocation - offset coordinates on preview window
             - prompt for the X, Y offset coordinates
             - [Enter] - save the configuration
+                - If the new location would overlap another bitmap, an encroachment warning popup lists affected keys and offers [Y]es (apply + auto-move overlapped bitmaps) / [N]o (cancel the edit)
                 - Response: Configuration saved.  [OK]
             - [Escape] - cancel/revert the configuration
         - [P]alette - select color palette
@@ -518,7 +520,7 @@
   - `set color C` — set current drawing color (0-9, A-F)
   - `set colorpixels [on|off|mixed]` — set pixel display mode (cycles with no argument)
   - `info` — show project metadata popup
-  - `config` — open the configuration menu
+  - `config` — open the configuration menu (in Map mode, targets the selected/highlighted key)
   - `config key NAME` — switch to key and open configuration
 - Vim-style messages: `"filename" written`, `No file name`, `Warning: File modified since reading (add ! to overwrite)`, `File exists (add ! to overwrite)`, `Unknown command: <cmd>`
 - Cancel with Escape
@@ -530,7 +532,7 @@
 - File info: name, size on disk, modified status
 - Overview: total keys, total pixel area, filled cells across all keys
 - Canvas frame: bounding box of all bitmaps on the virtual canvas
-- Viewport: visible range within the canvas (or "fits" if all content visible)
+- Viewport: visible range within the canvas, always showing viewport dimensions (adds "fits" annotation when all content visible)
 - Current key: name, bounds, location, filled ratio, undo/redo depth
 - Design mode extras: cursor position, current color
 - Map mode extras: zoom level
@@ -547,14 +549,3 @@
   dismiss, Design re-entry). `Esc` also exits scroll mode.
 - **Shift multiplier**: while held, step is multiplied by 5 for
   faster movement/scroll. Works in both cursor and scroll mode.
-
-### TODO / Not Yet Implemented
-- **ASCII art header** — "Bitmap Designer" shown as plain text, not ASCII art
-- **Open UI: directory creation prompt** — no interactive prompt to create ~/bitmaps; just shows a message if missing
-- **Open UI: fallback to current directory** — no fallback to cwd when ~/bitmaps missing
-- **Palette selection (`[P]`)** — no Palette option in Configuration UI; only the hardcoded palette
-- **`~/.bitmapsrc` config file** — no reading or writing of per-user config (palettes, preferences)
-- **Code generation rectangle optimization** — generates per-pixel fillRect calls instead of optimal rectangular blocks
-- **Red error messages** — error messages not styled red
-- **JSON validation on open** — no explicit format validation before loading a .json file
-- **Consistent status margin** — verify 1-line margin-top gap above status is consistently applied across all screens (including docked status in DesignScreen, MapScreen); reconcile PopupScreen #status { margin-top: 1; } rule with global approach if cleaner

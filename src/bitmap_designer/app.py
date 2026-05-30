@@ -47,6 +47,17 @@ class BitmapDesignerApp(App):
         loc = bitmap_data.get("location", {})
         return loc.get("x", 0), loc.get("y", 0)
 
+    @staticmethod
+    def _rects_overlap(a_loc: tuple[int, int], a_bounds: dict,
+                       b_loc: tuple[int, int], b_bounds: dict) -> bool:
+        ax1, ay1 = a_loc
+        ax2 = ax1 + a_bounds["width"]
+        ay2 = ay1 + a_bounds["height"]
+        bx1, by1 = b_loc
+        bx2 = bx1 + b_bounds["width"]
+        by2 = by1 + b_bounds["height"]
+        return ax1 < bx2 and ax2 > bx1 and ay1 < by2 and ay2 > by1
+
     def build_key_adjacency(self) -> None:
         adj = {}
         locs = {k: self._get_location(self.bitmaps[k]) for k in self.bitmaps}
@@ -204,8 +215,8 @@ class BitmapDesignerApp(App):
         except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error loading file: {e}")
 
-    def find_empty_location(self) -> dict:
-        """Find an unoccupied (x, y) position for a new bitmap."""
+    def find_empty_location(self, width: int = 10, height: int = 10) -> dict:
+        """Find an unoccupied (x, y) position for a bitmap of given size."""
         step = 12
         occupied: set[tuple[int, int]] = set()
         for bm in self.bitmaps.values():
@@ -217,13 +228,40 @@ class BitmapDesignerApp(App):
         x, y = 0, 0
         while any(
             (x + dx, y + dy) in occupied
-            for dx in range(10) for dy in range(10)
+            for dx in range(width) for dy in range(height)
         ):
             x += step
             if x > 200:
                 x = 0
                 y += step
         return {"x": x, "y": y}
+
+    def resolve_collisions(self, changed_key: str) -> list[str]:
+        """Move any bitmaps encroached by changed_key's new bounds/location.
+        Returns list of keys that were moved."""
+        changed = self.bitmaps.get(changed_key)
+        if not changed:
+            return []
+        changed_loc = self._get_location(changed)
+        changed_bounds = changed["bounds"]
+        moved = []
+        for key in list(self.bitmaps.keys()):
+            if key == changed_key:
+                continue
+            bm = self.bitmaps[key]
+            loc = self._get_location(bm)
+            b_bounds = bm["bounds"]
+            if self._rects_overlap(changed_loc, changed_bounds, loc, b_bounds):
+                del self.bitmaps[key]
+                new_loc = self.find_empty_location(
+                    width=b_bounds["width"], height=b_bounds["height"]
+                )
+                self.bitmaps[key] = bm
+                bm["location"] = new_loc
+                moved.append(key)
+        if moved:
+            self.build_key_adjacency()
+        return moved
 
     def set_current_color(self, color: str):
         self.current_color = color

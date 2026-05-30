@@ -107,6 +107,7 @@ def gather_info(app, screen) -> dict:
             "x1": ox, "y1": oy,
             "x2": min(ox + vw, bw), "y2": min(oy + vh, bh),
             "total_w": bw, "total_h": bh,
+            "vp_w": vw, "vp_h": vh,
             "fits": vw >= bw and vh >= bh,
         }
     data["design_viewport"] = design_vp
@@ -132,6 +133,7 @@ def gather_info(app, screen) -> dict:
         map_vp = {
             "x1": x1, "y1": y1, "x2": x2, "y2": y2,
             "total_w": cw_bounds, "total_h": ch_bounds,
+            "vp_w": cw, "vp_h": ch,
             "fits": fits,
         }
     data["map_viewport"] = map_vp
@@ -174,11 +176,12 @@ def _info_text(data: dict) -> str:
     vp = data.get("design_viewport") or data.get("map_viewport")
     if vp:
         if vp["fits"]:
-            lines.append("[bold]Viewport:[/] fits")
+            lines.append(f"[bold]Viewport:[/] fits  viewport {vp['vp_w']}×{vp['vp_h']}")
         else:
             lines.append(
                 f"[bold]Viewport:[/] ({vp['x1']},{vp['y1']})→({vp['x2']},{vp['y2']})"
-                f" of {vp['total_w']}×{vp['total_h']}"
+                f"  viewport {vp['vp_w']}×{vp['vp_h']}"
+                f"  canvas {vp['total_w']}×{vp['total_h']}"
             )
 
     lines.append("")

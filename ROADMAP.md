@@ -1,23 +1,36 @@
 # Roadmap
 
-## Near-term
+## Shipped
 - [x] `:` command bar — Vim-style command input for extended operations
-  - [ ] Tab completion in command bar
-  - `scroll` / `noscroll` — toggle scroll mode
-  - `q` — quit
-  - `q!` — force quit
-  - `w` — save
-  - `wq` — save and quit
-  - `e` — exit Design Mode to Main UI
-  - `help` — keybindings reference popup
-  - `set step N` — set cursor/scroll step
-  - `set key NAME` — switch to or create bitmap key
+  - [x] `q` / `q!` — quit / force quit
+  - [x] `w` / `w!` — save / force save
+  - [x] `wq` / `wq!` — save and quit
+  - [x] `e` — exit to previous screen
+  - [x] `help` — keybindings reference popup
+  - [x] `scroll` / `noscroll` — toggle scroll mode
+  - [x] `pan` / `nopan` — toggle pan mode
+  - [x] `set step N` — set cursor/scroll step
+  - [x] `set key NAME` — switch to or create bitmap key
+  - [x] `set color C` — set current drawing color
+  - [x] `set colorpixels [on|off|mixed]` — pixel display mode
+  - [x] `info` — project metadata popup
+  - [x] `close` / `close!` — close project / force close
+  - [x] `config` / `config key NAME` — configuration UI
+- [x] Rectangle paint mode ([R]) with live preview
+- [x] Pixel display: swatches (`on`), colored numbers (`mixed`), plain (`off`)
+- [x] `:info` popup with live `wasd` key switching
+- [x] `:close` / `:close!` command with dirty-check confirmation
+- [x] `!` express-exit key in close and quit confirmation popups
+- [x] Map screen: zoom, pan, fit-to-selection, fit-all, find key
+- [x] Map screen: pixel display respects color pixels mode
 
-## From specs.md TODO
+## In progress
+- [ ] Tab completion in command bar
+
+## Backlog (from specs.md TODO)
 - [ ] ASCII art "Bitmap Designer" header
 - [ ] Open UI: interactive `~/bitmaps` creation prompt
 - [ ] Open UI: fallback to current directory when `~/bitmaps` missing
-- [ ] Rectangle paint mode ([R])
 - [ ] Palette selection in Configuration UI ([P])
 - [ ] `~/.bitmapsrc` config file (palettes, preferences)
 - [ ] Code generation: optimal rectangular blocks instead of per-pixel

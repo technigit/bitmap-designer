@@ -313,6 +313,48 @@ class ConfigKeyDeleteScreen(PopupScreen):
         self.app.show_status(f"Key '{key}' deleted.")
 
 
+def _encroached_keys(app, key: str, new_bounds: dict, loc_override: tuple[int, int] | None = None) -> list[str]:
+    """Check which keys would overlap if key had new_bounds at its current location
+    (or loc_override if given)."""
+    bm = app.bitmaps.get(key, {})
+    loc = loc_override if loc_override is not None else app._get_location(bm)
+    encroached = []
+    for other_key, other_bm in app.bitmaps.items():
+        if other_key == key:
+            continue
+        if app._rects_overlap(loc, new_bounds, app._get_location(other_bm), other_bm["bounds"]):
+            encroached.append(other_key)
+    return encroached
+
+
+class EncroachConfirmScreen(PopupScreen):
+    """Warn about encroachment and ask for confirmation."""
+
+    def __init__(self, encroached_keys: list[str]):
+        super().__init__()
+        self.encroached_keys = encroached_keys
+
+    def compose(self) -> ComposeResult:
+        keys_str = ", ".join(self.encroached_keys)
+        with Vertical():
+            yield Static("Encroachment Warning", id="title")
+            yield Static(
+                f"Resizing will overlap key(s): {keys_str}. "
+                f"They will be moved. Continue?",
+                id="prompt"
+            )
+            yield Static("[Y]es  [N]o", id="hints", markup=False)
+
+    def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.app.refresh(repaint=True, layout=True)
+            return
+        if event.key.lower() == "y":
+            self.dismiss(True)
+        elif event.key in ("enter", "\n") or event.key.lower() in ("n", "escape"):
+            self.dismiss(False)
+
+
 class ConfigBoundsScreen(PopupScreen):
     """Screen to set bitmap width and height."""
     base_title = "Bitmap Bounds"
@@ -340,6 +382,15 @@ class ConfigBoundsScreen(PopupScreen):
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
+    def _save_bounds(self, w: int, h: int) -> None:
+        idx = str(self.app.current_key)
+        if idx not in self.app.bitmaps:
+            self.app.bitmaps[idx] = create_default_bitmap()
+        self.app.bitmaps[idx]["bounds"] = {"width": w, "height": h}
+        self.app.resolve_collisions(idx)
+        self.app.mark_dirty()
+        self.app.pop_screen()
+
     def on_key(self, event) -> None:
         if event.key == "ctrl+l":
             self.show_status("")
@@ -355,13 +406,23 @@ class ConfigBoundsScreen(PopupScreen):
                     h = int(parts[1])
                     if w >= 2 and h >= 2:
                         idx = str(self.app.current_key)
-                        if idx not in self.app.bitmaps:
-                            self.app.bitmaps[idx] = create_default_bitmap()
-                        self.app.bitmaps[idx]["bounds"] = {"width": w, "height": h}
-                        self.app.mark_dirty()
-                        self.app.pop_screen()
+                        new_bounds = {"width": w, "height": h}
+                        encroached = _encroached_keys(self.app, idx, new_bounds)
+                        if encroached:
+                            self._pending_bounds = (w, h)
+                            self.app.push_screen(
+                                EncroachConfirmScreen(encroached),
+                                self._on_encroach
+                            )
+                        else:
+                            self._save_bounds(w, h)
             except ValueError:
                 self.app.show_status("Please enter valid width and height (min 2).")
+
+    def _on_encroach(self, confirmed: bool) -> None:
+        if confirmed:
+            w, h = self._pending_bounds
+            self._save_bounds(w, h)
 
 
 class ConfigContextScreen(PopupScreen):
@@ -519,6 +580,17 @@ class ConfigLocationScreen(PopupScreen):
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
+    def _save_location(self, x: int, y: int) -> None:
+        idx = str(self.app.current_key)
+        if idx not in self.app.bitmaps:
+            self.app.bitmaps[idx] = create_default_bitmap()
+        self.app.bitmaps[idx]["location"] = {"x": x, "y": y}
+        self.app.resolve_collisions(idx)
+        self.app.build_key_adjacency()
+        self.app.mark_dirty()
+        self.app.pop_screen()
+        self.app.show_status("Location saved.")
+
     def on_key(self, event) -> None:
         if event.key == "ctrl+l":
             self.show_status("")
@@ -533,15 +605,25 @@ class ConfigLocationScreen(PopupScreen):
                     x = int(parts[0])
                     y = int(parts[1])
                     idx = str(self.app.current_key)
-                    if idx not in self.app.bitmaps:
-                        self.app.bitmaps[idx] = create_default_bitmap()
-                    self.app.bitmaps[idx]["location"] = {"x": x, "y": y}
-                    self.app.build_key_adjacency()
-                    self.app.mark_dirty()
-                    self.app.pop_screen()
-                    self.app.show_status("Location saved.")
+                    new_loc = {"x": x, "y": y}
+                    bm = self.app.bitmaps.get(idx, create_default_bitmap())
+                    new_bounds = bm["bounds"]
+                    encroached = _encroached_keys(self.app, idx, new_bounds, loc_override=(x, y))
+                    if encroached:
+                        self._pending_location = (x, y)
+                        self.app.push_screen(
+                            EncroachConfirmScreen(encroached),
+                            self._on_encroach
+                        )
+                    else:
+                        self._save_location(x, y)
             except ValueError:
                 self.app.show_status("Please enter valid x and y coordinates.")
+
+    def _on_encroach(self, confirmed: bool) -> None:
+        if confirmed:
+            x, y = self._pending_location
+            self._save_location(x, y)
 
 
 class ConfigPixelScreen(PopupScreen):

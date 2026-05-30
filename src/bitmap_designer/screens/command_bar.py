@@ -92,6 +92,12 @@ def handle_cmd_key(screen, event) -> bool:
             screen.show_status(":" + screen.cmd_buffer)
         return True
 
+    ch = getattr(event, 'character', None)
+    if ch is not None:
+        screen.cmd_buffer += ch
+        screen.show_status(":" + screen.cmd_buffer)
+        return True
+
     if len(key) == 1 or key == "space":
         ch = " " if key == "space" else key
         screen.cmd_buffer += ch
@@ -336,6 +342,9 @@ def _execute_command(screen, cmd_str: str) -> None:
             else:
                 _clear_status(screen, f"Unknown config parameter: {param}")
                 return
+        else:
+            if hasattr(screen, 'selected_key') and screen.selected_key != app.current_key:
+                app.set_current_key(screen.selected_key)
         app.push_screen(ConfigScreen())
 
     else:

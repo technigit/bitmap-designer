@@ -12,7 +12,7 @@ from .popup_screen import PopupScreen
 from .command_bar import handle_cmd_key
 
 from ..codegen_service import CodegenService
-from ..constants import COLOR_MAP
+from ..constants import COLOR_MAP, create_default_bitmap
 
 from .config_screens import ConfigKeyScreen
 from .map_screen import MapScreen
@@ -153,6 +153,13 @@ class DesignScreen(Screen):
         self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
         if self.app.current_key != self._key_on_enter:
             self._switch_to_key(self.app.current_key)
+        else:
+            bm = self.app.bitmaps.get(self.app.current_key, create_default_bitmap())
+            self.width = bm["bounds"]["width"]
+            self.height = bm["bounds"]["height"]
+            self.pixels = bm["bitmap"]["pixels"]
+            self._ensure_cursor_visible()
+            self.refresh_grid()
         self._update_hints()
 
     # Rebuild the grid display from pixel data.
