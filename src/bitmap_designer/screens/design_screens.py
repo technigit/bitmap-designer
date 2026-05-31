@@ -9,8 +9,6 @@ from textual.widgets import Static
 from textual.containers import Vertical
 
 from .popup_screen import PopupScreen
-from .command_bar import handle_cmd_key
-
 from ..codegen_service import CodegenService
 from ..constants import COLOR_MAP, create_default_bitmap
 
@@ -49,6 +47,7 @@ class DesignScreen(Screen):
         self.rect_start_y = 0
         self.cmd_mode = False
         self.cmd_buffer = ""
+        self._last_boundary_msg = False
 
     @property
     def undo_stack(self):
@@ -194,11 +193,14 @@ class DesignScreen(Screen):
 
         for i in range(vp_h):
             y = self.offset_y + i
-            row = "^" if (scrolled_up and i == 0) else "v" if (scrolled_down and i == vp_h - 1) else "|"
+            indicator = ("^" if (scrolled_up and i == 0)
+                         else "v" if (scrolled_down and i == vp_h - 1)
+                         else "|")
+            row = indicator
             for j in range(vp_w):
                 x = self.offset_x + j
                 row += self._cell_markup(x, y, rect_preview=self._in_rect_selection(x, y))
-            row += "^" if (scrolled_up and i == 0) else "v" if (scrolled_down and i == vp_h - 1) else "|"
+            row += indicator
             lines.append(row)
 
         # Bottom border with scroll indicators
@@ -225,13 +227,13 @@ class DesignScreen(Screen):
         self.query_one("#status", Static).update(message)
 
     def _clear_boundary_status(self):
-        if getattr(self, '_last_boundary_msg', False):
+        if self._last_boundary_msg:
             self.query_one("#status", Static).update("")
             self._last_boundary_msg = False
 
     # Move cursor or scroll by arrow/hjkl keys, applying step and scroll mode.
     def _handle_movement(self, key: str) -> bool:
-        BOUNDARY_MSGS = {
+        boundary_msgs = {
             "left": "Already at left edge",
             "h": "Already at left edge",
             "right": "Already at right edge",
@@ -256,25 +258,25 @@ class DesignScreen(Screen):
         if self.scroll_mode:
             if base_lower in ("left", "h"):
                 if not self._scroll(-step, 0):
-                    self.show_status(BOUNDARY_MSGS[base_lower])
+                    self.show_status(boundary_msgs[base_lower])
                     self._last_boundary_msg = True
                 else:
                     self._clear_boundary_status()
             elif base_lower in ("right", "l"):
                 if not self._scroll(step, 0):
-                    self.show_status(BOUNDARY_MSGS[base_lower])
+                    self.show_status(boundary_msgs[base_lower])
                     self._last_boundary_msg = True
                 else:
                     self._clear_boundary_status()
             elif base_lower in ("up", "k"):
                 if not self._scroll(0, -step):
-                    self.show_status(BOUNDARY_MSGS[base_lower])
+                    self.show_status(boundary_msgs[base_lower])
                     self._last_boundary_msg = True
                 else:
                     self._clear_boundary_status()
             elif base_lower in ("down", "j"):
                 if not self._scroll(0, step):
-                    self.show_status(BOUNDARY_MSGS[base_lower])
+                    self.show_status(boundary_msgs[base_lower])
                     self._last_boundary_msg = True
                 else:
                     self._clear_boundary_status()
@@ -282,7 +284,7 @@ class DesignScreen(Screen):
             if base_lower in ("left", "h"):
                 new_x = max(0, self.cursor_x - step)
                 if new_x == self.cursor_x:
-                    self.show_status(BOUNDARY_MSGS[base_lower])
+                    self.show_status(boundary_msgs[base_lower])
                     self._last_boundary_msg = True
                 else:
                     self.cursor_x = new_x
@@ -290,7 +292,7 @@ class DesignScreen(Screen):
             elif base_lower in ("right", "l"):
                 new_x = min(self.width - 1, self.cursor_x + step)
                 if new_x == self.cursor_x:
-                    self.show_status(BOUNDARY_MSGS[base_lower])
+                    self.show_status(boundary_msgs[base_lower])
                     self._last_boundary_msg = True
                 else:
                     self.cursor_x = new_x
@@ -298,7 +300,7 @@ class DesignScreen(Screen):
             elif base_lower in ("up", "k"):
                 new_y = max(0, self.cursor_y - step)
                 if new_y == self.cursor_y:
-                    self.show_status(BOUNDARY_MSGS[base_lower])
+                    self.show_status(boundary_msgs[base_lower])
                     self._last_boundary_msg = True
                 else:
                     self.cursor_y = new_y
@@ -306,7 +308,7 @@ class DesignScreen(Screen):
             elif base_lower in ("down", "j"):
                 new_y = min(self.height - 1, self.cursor_y + step)
                 if new_y == self.cursor_y:
-                    self.show_status(BOUNDARY_MSGS[base_lower])
+                    self.show_status(boundary_msgs[base_lower])
                     self._last_boundary_msg = True
                 else:
                     self.cursor_y = new_y
@@ -356,6 +358,7 @@ class DesignScreen(Screen):
         self.refresh_grid()
 
     def on_key(self, event) -> None:
+        from .command_bar import handle_cmd_key
         if handle_cmd_key(self, event):
             event.stop()
             return
@@ -457,7 +460,8 @@ class DesignScreen(Screen):
             self.rect_start_x = self.cursor_x
             self.rect_start_y = self.cursor_y
             self._update_hints()
-            self.show_status("Rectangle mode: select opposite corner, [Enter] confirm, [Escape] cancel")
+            self.show_status("Rectangle mode: select opposite corner, "
+                             "[Enter] confirm, [Escape] cancel")
             self.refresh_grid()
             return
         elif k == "c":

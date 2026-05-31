@@ -41,7 +41,11 @@ def gather_info(app, screen) -> dict:
     data["total_keys"] = len(app.bitmaps)
 
     # Current key
-    current_key = getattr(screen, '_key_on_enter', None) or getattr(screen, 'selected_key', None) or app.current_key
+    current_key = (
+        getattr(screen, '_key_on_enter', None)
+        or getattr(screen, 'selected_key', None)
+        or app.current_key
+    )
     data["current_key"] = current_key
     bm = app.bitmaps.get(current_key, {})
     bounds = bm.get("bounds", {"width": 0, "height": 0})

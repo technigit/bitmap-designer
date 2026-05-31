@@ -8,8 +8,6 @@ from textual.containers import Vertical
 
 from .popup_screen import PopupScreen
 
-from ..constants import HINT_ESCAPE
-
 from .save_screens import QuitSaveScreen, SaveFirstScreen
 
 if TYPE_CHECKING:
@@ -27,7 +25,10 @@ class QuitScreen(PopupScreen):
         with Vertical():
             yield Static("Quit", id="title")
             yield Static("Really quit? (y/N)", id="prompt")
-            yield Static("[!] force quit (without saving)  [Escape] cancel", id="hints", markup=False)
+            yield Static(
+                "[!] force quit (without saving)  [Escape] cancel",
+                id="hints", markup=False
+            )
 
     def on_key(self, event) -> None:
         if event.key == "ctrl+l":
@@ -50,7 +51,10 @@ class QuitSaveFileFirstScreen(SaveFirstScreen):
         with Vertical():
             yield Static(self.TITLE, id="title")
             yield Static("Save file first? (Y/n)", id="prompt")
-            yield Static("[!] force quit (without saving)  [Escape] cancel", id="hints", markup=False)
+            yield Static(
+                "[!] force quit (without saving)  [Escape] cancel",
+                id="hints", markup=False
+            )
 
     def on_key(self, event):
         if event.key in ("!", "exclamation_mark", "shift+1"):

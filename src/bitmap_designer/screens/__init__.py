@@ -9,7 +9,8 @@ from .config_screens import (
     ConfigLocationScreen, ConfigPixelScreen,
 )
 from .quit_screens import QuitScreen, QuitSaveFileFirstScreen
-from .main_screens import MainScreen, CloseScreen, SaveFileFirstScreen, AreYouSureScreen
+from .main_screens import MainScreen
+from .close_screens import CloseScreen, SaveFileFirstScreen, AreYouSureScreen
 from .codegen_screens import CodegenScreen, ResponseScreen
 from .map_screen import MapScreen, FindKeyScreen
 from .command_bar import HelpPopupScreen

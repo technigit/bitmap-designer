@@ -193,7 +193,7 @@ def _execute_command(screen, cmd_str: str) -> None:
             app.pop_screen()
             app.push_screen(StartupScreen())
         else:
-            from ..screens.main_screens import CloseScreen
+            from .close_screens import CloseScreen
             app.push_screen(CloseScreen())
 
     elif command == "scroll":

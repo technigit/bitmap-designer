@@ -313,7 +313,9 @@ class ConfigKeyDeleteScreen(PopupScreen):
         self.app.show_status(f"Key '{key}' deleted.")
 
 
-def _encroached_keys(app, key: str, new_bounds: dict, loc_override: tuple[int, int] | None = None) -> list[str]:
+def _encroached_keys(
+    app, key: str, new_bounds: dict, loc_override: tuple[int, int] | None = None
+) -> list[str]:
     """Check which keys would overlap if key had new_bounds at its current location
     (or loc_override if given)."""
     bm = app.bitmaps.get(key, {})
@@ -367,6 +369,7 @@ class ConfigBoundsScreen(PopupScreen):
     def __init__(self):
         super().__init__()
         self.input = None
+        self._pending_bounds = None
 
     def compose(self) -> ComposeResult:
         b = self.app.bitmaps.get(str(self.app.current_key), {}).get("bounds", {})
@@ -566,6 +569,7 @@ class ConfigLocationScreen(PopupScreen):
     def __init__(self):
         super().__init__()
         self.input = None
+        self._pending_location = None
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -605,7 +609,6 @@ class ConfigLocationScreen(PopupScreen):
                     x = int(parts[0])
                     y = int(parts[1])
                     idx = str(self.app.current_key)
-                    new_loc = {"x": x, "y": y}
                     bm = self.app.bitmaps.get(idx, create_default_bitmap())
                     new_bounds = bm["bounds"]
                     encroached = _encroached_keys(self.app, idx, new_bounds, loc_override=(x, y))

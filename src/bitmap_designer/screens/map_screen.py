@@ -12,7 +12,6 @@ from textual.widgets import Input, Static
 from textual.containers import Vertical
 
 from .popup_screen import PopupScreen
-from .command_bar import handle_cmd_key
 from ..constants import COLOR_MAP, create_default_bitmap
 
 if TYPE_CHECKING:
@@ -48,7 +47,11 @@ class FindKeyScreen(PopupScreen):
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
-            self.input = Input(value=self.app.current_key, placeholder="Type key name...", id="find-input")
+            self.input = Input(
+                value=self.app.current_key,
+                placeholder="Type key name...",
+                id="find-input"
+            )
             yield self.input
             yield Static("", id="matches")
             yield Static("[Enter] select/create  [Escape] cancel", id="hints", markup=False)
@@ -137,6 +140,7 @@ class MapScreen(Screen):
         self.pan_flip = self.app.map_pan_flip
         self.selected_key = self.app.current_key
         self._last_fit: str | None = None
+        self.step = self.app.step
         self.cmd_mode = False
         self.cmd_buffer = ""
 
@@ -533,6 +537,7 @@ class MapScreen(Screen):
             getattr(self, method_name)(*args)
 
     def on_key(self, event) -> None:
+        from .command_bar import handle_cmd_key
         if handle_cmd_key(self, event):
             event.stop()
             return
