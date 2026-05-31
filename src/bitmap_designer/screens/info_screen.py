@@ -26,133 +26,143 @@ def _count_filled(pixels: list[str]) -> int:
     return sum(1 for row in pixels for ch in row if ch != " ")
 
 
-def gather_info(app, screen) -> dict:
+def _file_info(app) -> dict:
     data = {}
-
-    # File info
     data["filename"] = app.file.basename if app.file.current_file else "Unsaved"
     if app.file.current_file and os.path.exists(app.file.current_file):
         data["filesize"] = os.path.getsize(app.file.current_file)
     else:
         data["filesize"] = None
     data["dirty"] = app.dirty
+    return data
 
-    # Key counts
-    data["total_keys"] = len(app.bitmaps)
 
-    # Current key
-    current_key = (
-        getattr(screen, '_key_on_enter', None)
-        or getattr(screen, 'selected_key', None)
-        or app.current_key
-    )
-    data["current_key"] = current_key
+def _current_key_info(app, current_key: str) -> dict:
     bm = app.bitmaps.get(current_key, {})
     bounds = bm.get("bounds", {"width": 0, "height": 0})
     loc = bm.get("location", {"x": 0, "y": 0})
-    data["key_bounds"] = (bounds.get("width", 0), bounds.get("height", 0))
-    data["key_location"] = (loc.get("x", 0), loc.get("y", 0))
     pixels = bm.get("bitmap", {}).get("pixels", [])
-    key_pixel_count = data["key_bounds"][0] * data["key_bounds"][1]
+    w, h = bounds.get("width", 0), bounds.get("height", 0)
     key_filled = _count_filled(pixels)
-    data["key_filled"] = key_filled
-    data["key_total"] = key_pixel_count
+    return {
+        "current_key": current_key,
+        "key_bounds": (w, h),
+        "key_location": (loc.get("x", 0), loc.get("y", 0)),
+        "key_filled": key_filled,
+        "key_total": w * h,
+    }
 
-    # Pixel counts across all keys
-    total_pixel_area = 0
+
+def _pixel_counts(app) -> dict:
+    total_area = 0
     total_filled = 0
     for bm_data in app.bitmaps.values():
         b = bm_data.get("bounds", {"width": 0, "height": 0})
-        bkw = b.get("width", 0)
-        bkh = b.get("height", 0)
-        total_pixel_area += bkw * bkh
+        bkw, bkh = b.get("width", 0), b.get("height", 0)
+        total_area += bkw * bkh
         total_filled += _count_filled(bm_data.get("bitmap", {}).get("pixels", []))
-    data["total_pixel_area"] = total_pixel_area
-    data["total_filled"] = total_filled
+    return {"total_pixel_area": total_area, "total_filled": total_filled}
 
-    # Canvas frame
+
+def _canvas_frame(app) -> dict:
     min_x = min_y = float("inf")
     max_x = max_y = float("-inf")
     has_bitmaps = False
     for bm_data in app.bitmaps.values():
         loc = bm_data.get("location", {})
-        bx = loc.get("x", 0)
-        by = loc.get("y", 0)
+        bx, by = loc.get("x", 0), loc.get("y", 0)
         b = bm_data.get("bounds", {"width": 10, "height": 10})
-        bw = b["width"]
-        bh = b["height"]
+        bw, bh = b["width"], b["height"]
         min_x = min(min_x, bx)
         min_y = min(min_y, by)
         max_x = max(max_x, bx + bw)
         max_y = max(max_y, by + bh)
         has_bitmaps = True
     if has_bitmaps:
-        data["frame_x1"] = int(min_x)
-        data["frame_y1"] = int(min_y)
-        data["frame_x2"] = int(max_x)
-        data["frame_y2"] = int(max_y)
-        data["frame_w"] = int(max_x - min_x)
-        data["frame_h"] = int(max_y - min_y)
-    else:
-        data["frame_x1"] = data["frame_y1"] = 0
-        data["frame_x2"] = data["frame_y2"] = 0
-        data["frame_w"] = data["frame_h"] = 0
+        return {
+            "frame_x1": int(min_x), "frame_y1": int(min_y),
+            "frame_x2": int(max_x), "frame_y2": int(max_y),
+            "frame_w": int(max_x - min_x), "frame_h": int(max_y - min_y),
+        }
+    return {"frame_x1": 0, "frame_y1": 0, "frame_x2": 0, "frame_y2": 0,
+            "frame_w": 0, "frame_h": 0}
 
-    # Viewport — Design mode
-    design_vp = None
-    if hasattr(screen, 'offset_x'):
-        ox = screen.offset_x
-        oy = screen.offset_y
+
+def _design_viewport(screen) -> dict | None:
+    if not hasattr(screen, 'offset_x'):
+        return None
+    ox = screen.offset_x
+    oy = screen.offset_y
+    vp = getattr(screen, 'viewport', None)
+    if vp is not None:
+        vw, vh = vp[0], vp[1]
+    else:
         vw = getattr(screen, 'viewport_w', 0)
         vh = getattr(screen, 'viewport_h', 0)
-        bw = getattr(screen, 'width', 0)
-        bh = getattr(screen, 'height', 0)
-        design_vp = {
-            "x1": ox, "y1": oy,
-            "x2": min(ox + vw, bw), "y2": min(oy + vh, bh),
-            "total_w": bw, "total_h": bh,
-            "vp_w": vw, "vp_h": vh,
-            "fits": vw >= bw and vh >= bh,
-        }
-    data["design_viewport"] = design_vp
+    bw = getattr(screen, 'width', 0)
+    bh = getattr(screen, 'height', 0)
+    return {
+        "x1": ox, "y1": oy,
+        "x2": min(ox + vw, bw), "y2": min(oy + vh, bh),
+        "total_w": bw, "total_h": bh,
+        "vp_w": vw, "vp_h": vh,
+        "fits": vw >= bw and vh >= bh,
+    }
 
-    # Viewport — Map mode
-    map_vp = None
-    if hasattr(screen, 'zoom_scale'):
-        cw, ch = screen.compute_canvas_size()
-        zoom = screen.zoom_scale
-        aspect = screen.aspect_y
-        px, py = screen.pan_x, screen.pan_y
 
-        x1 = math.floor((0 - px) / zoom)
-        y1 = math.floor((0 - py) / (zoom * aspect))
-        x2 = math.ceil((cw - 1 - px) / zoom)
-        y2 = math.ceil((ch - 1 - py) / (zoom * aspect))
+def _map_viewport(screen, frame) -> dict | None:
+    if not hasattr(screen, 'zoom_scale'):
+        return None
+    cw, ch = screen.compute_canvas_size()
+    zoom = screen.zoom_scale
+    aspect = screen.aspect_y
+    px, py = screen.pan_x, screen.pan_y
 
-        cw_bounds = data["frame_w"]
-        ch_bounds = data["frame_h"]
-        fits = (x1 <= data["frame_x1"] and y1 <= data["frame_y1"]
-                and x2 >= data["frame_x2"] and y2 >= data["frame_y2"])
+    x1 = math.floor((0 - px) / zoom)
+    y1 = math.floor((0 - py) / (zoom * aspect))
+    x2 = math.ceil((cw - 1 - px) / zoom)
+    y2 = math.ceil((ch - 1 - py) / (zoom * aspect))
 
-        map_vp = {
-            "x1": x1, "y1": y1, "x2": x2, "y2": y2,
-            "total_w": cw_bounds, "total_h": ch_bounds,
-            "vp_w": cw, "vp_h": ch,
-            "fits": fits,
-        }
-    data["map_viewport"] = map_vp
+    fits = (x1 <= frame["frame_x1"] and y1 <= frame["frame_y1"]
+            and x2 >= frame["frame_x2"] and y2 >= frame["frame_y2"])
+    return {
+        "x1": x1, "y1": y1, "x2": x2, "y2": y2,
+        "total_w": frame["frame_w"], "total_h": frame["frame_h"],
+        "vp_w": cw, "vp_h": ch,
+        "fits": fits,
+    }
 
-    # History
-    undo_stack = app.history.get_undo(current_key)
-    redo_stack = app.history.get_redo(current_key)
-    data["undo_depth"] = len(undo_stack)
-    data["redo_depth"] = len(redo_stack)
 
-    # Mode-specific
-    data["cursor"] = (getattr(screen, 'cursor_x', None), getattr(screen, 'cursor_y', None))
-    data["color"] = app.current_color
-    data["zoom"] = getattr(screen, 'zoom_scale', None)
+def _history_info(app, current_key: str) -> dict:
+    undo = app.history.get_undo(current_key)
+    redo = app.history.get_redo(current_key)
+    return {"undo_depth": len(undo), "redo_depth": len(redo)}
 
+
+def _mode_info(screen, app) -> dict:
+    return {
+        "cursor": (getattr(screen, 'cursor_x', None), getattr(screen, 'cursor_y', None)),
+        "color": app.current_color,
+        "zoom": getattr(screen, 'zoom_scale', None),
+    }
+
+
+def gather_info(app, screen) -> dict:
+    current_key = (
+        getattr(screen, '_key_on_enter', None)
+        or getattr(screen, 'selected_key', None)
+        or app.current_key
+    )
+    data = {}
+    data.update(_file_info(app))
+    data["total_keys"] = len(app.bitmaps)
+    data.update(_current_key_info(app, current_key))
+    data.update(_pixel_counts(app))
+    data.update(_canvas_frame(app))
+    data["design_viewport"] = _design_viewport(screen)
+    data["map_viewport"] = _map_viewport(screen, data)
+    data.update(_history_info(app, current_key))
+    data.update(_mode_info(screen, app))
     return data
 
 

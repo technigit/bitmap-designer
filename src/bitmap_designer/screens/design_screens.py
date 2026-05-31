@@ -38,13 +38,10 @@ class DesignScreen(Screen):
         self._key_on_enter = self.app.current_key
         self.offset_x: int = 0
         self.offset_y: int = 0
-        self.viewport_w: int = 0
-        self.viewport_h: int = 0
-        self.step = self.app.step
+        self.viewport = [0, 0]
         self.scroll_mode = False
         self.rect_mode = False
-        self.rect_start_x = 0
-        self.rect_start_y = 0
+        self.rect_start = [0, 0]
         self.cmd_mode = False
         self.cmd_buffer = ""
         self._last_boundary_msg = False
@@ -59,46 +56,46 @@ class DesignScreen(Screen):
 
     # Recalculate viewport dimensions based on available screen space.
     def _recalc_viewport(self):
-        self.viewport_w = max(1, (self.size.width - 8) // 2)
-        self.viewport_h = max(1, self.size.height - 14)
+        self.viewport[0] = max(1, (self.size.width - 8) // 2)
+        self.viewport[1] = max(1, self.size.height - 14)
         self._clamp_offset()
 
     # Clamp offset so viewport stays within bitmap bounds.
     def _clamp_offset(self):
-        self.offset_x = max(0, min(self.offset_x, max(0, self.width - self.viewport_w)))
-        self.offset_y = max(0, min(self.offset_y, max(0, self.height - self.viewport_h)))
+        self.offset_x = max(0, min(self.offset_x, max(0, self.width - self.viewport[0])))
+        self.offset_y = max(0, min(self.offset_y, max(0, self.height - self.viewport[1])))
 
     @property
     def content_fits(self) -> bool:
-        return self.viewport_w >= self.width and self.viewport_h >= self.height
+        return self.viewport[0] >= self.width and self.viewport[1] >= self.height
 
     # Adjust offset to keep cursor at least 2px from viewport edge.
     def _ensure_cursor_visible(self):
         margin = 2
-        if self.viewport_w >= self.width and self.viewport_h >= self.height:
+        if self.viewport[0] >= self.width and self.viewport[1] >= self.height:
             self.offset_x = 0
             self.offset_y = 0
             return
         if self.cursor_x < self.offset_x + margin:
             self.offset_x = max(0, self.cursor_x - margin)
-        elif self.cursor_x >= self.offset_x + self.viewport_w - margin:
+        elif self.cursor_x >= self.offset_x + self.viewport[0] - margin:
             self.offset_x = min(
-                max(0, self.width - self.viewport_w),
-                self.cursor_x - self.viewport_w + margin + 1
+                max(0, self.width - self.viewport[0]),
+                self.cursor_x - self.viewport[0] + margin + 1
             )
         if self.cursor_y < self.offset_y + margin:
             self.offset_y = max(0, self.cursor_y - margin)
-        elif self.cursor_y >= self.offset_y + self.viewport_h - margin:
+        elif self.cursor_y >= self.offset_y + self.viewport[1] - margin:
             self.offset_y = min(
-                max(0, self.height - self.viewport_h),
-                self.cursor_y - self.viewport_h + margin + 1
+                max(0, self.height - self.viewport[1]),
+                self.cursor_y - self.viewport[1] + margin + 1
             )
 
     # Shift the viewport by (dx, dy) bitmap pixels. Returns True if offset changed.
     def _scroll(self, dx: int, dy: int) -> bool:
         old_x, old_y = self.offset_x, self.offset_y
-        self.offset_x = max(0, min(self.offset_x + dx, max(0, self.width - self.viewport_w)))
-        self.offset_y = max(0, min(self.offset_y + dy, max(0, self.height - self.viewport_h)))
+        self.offset_x = max(0, min(self.offset_x + dx, max(0, self.width - self.viewport[0])))
+        self.offset_y = max(0, min(self.offset_y + dy, max(0, self.height - self.viewport[1])))
         return self.offset_x != old_x or self.offset_y != old_y
 
     def compose(self) -> ComposeResult:
@@ -117,10 +114,10 @@ class DesignScreen(Screen):
     def _in_rect_selection(self, x: int, y: int) -> bool:
         if not self.rect_mode:
             return False
-        x1 = min(self.rect_start_x, self.cursor_x)
-        x2 = max(self.rect_start_x, self.cursor_x)
-        y1 = min(self.rect_start_y, self.cursor_y)
-        y2 = max(self.rect_start_y, self.cursor_y)
+        x1 = min(self.rect_start[0], self.cursor_x)
+        x2 = max(self.rect_start[0], self.cursor_x)
+        y1 = min(self.rect_start[1], self.cursor_y)
+        y2 = max(self.rect_start[1], self.cursor_y)
         return x1 <= x <= x2 and y1 <= y <= y2
 
     def _cell_markup(self, x: int, y: int, *, rect_preview: bool = False) -> str:
@@ -148,7 +145,6 @@ class DesignScreen(Screen):
     def on_screen_resume(self, _event) -> None:
         self.scroll_mode = False
         self.rect_mode = False
-        self.step = self.app.step
         self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
         if self.app.current_key != self._key_on_enter:
             self.switch_to_key(self.app.current_key)
@@ -164,64 +160,48 @@ class DesignScreen(Screen):
     # Rebuild the grid display from pixel data.
     def refresh_grid(self):
         self._recalc_viewport()
-        vp_w = min(self.viewport_w, self.width - self.offset_x)
-        vp_h = min(self.viewport_h, self.height - self.offset_y)
+        vp_w = min(self.viewport[0], self.width - self.offset_x)
+        vp_h = min(self.viewport[1], self.height - self.offset_y)
 
-        scrolled_left = self.offset_x > 0
-        scrolled_right = self.offset_x + vp_w < self.width
-        scrolled_up = self.offset_y > 0
-        scrolled_down = self.offset_y + vp_h < self.height
+        scrolled_l = self.offset_x > 0
+        scrolled_r = self.offset_x + vp_w < self.width
+        scrolled_u = self.offset_y > 0
+        scrolled_d = self.offset_y + vp_h < self.height
 
         lines = [" " + self.app.current_key]
+        lines.append(self._border_line(vp_w, scrolled_l, scrolled_r))
+        lines.extend(self._grid_lines(vp_w, vp_h, scrolled_u, scrolled_d))
+        lines.append(self._border_line(vp_w, scrolled_l, scrolled_r))
+        self.query_one("#grid").update("\n".join(lines))
 
-        # Top border with scroll indicators
-        top = "+"
-        if scrolled_left and scrolled_right:
-            top += "<"
-            top += "-" * max(0, vp_w * 2 - 2)
-            top += ">"
-        elif scrolled_left:
-            top += "<"
-            top += "-" * max(0, vp_w * 2 - 1)
-        elif scrolled_right:
-            top += "-" * max(0, vp_w * 2 - 1)
-            top += ">"
+    def _border_line(self, vp_w: int, sl: bool, sr: bool) -> str:
+        line = "+"
+        if sl and sr:
+            line += "<" + "-" * max(0, vp_w * 2 - 2) + ">"
+        elif sl:
+            line += "<" + "-" * max(0, vp_w * 2 - 1)
+        elif sr:
+            line += "-" * max(0, vp_w * 2 - 1) + ">"
         else:
-            top += "-" * (vp_w * 2)
-        top += "+"
-        lines.append(top)
+            line += "-" * (vp_w * 2)
+        line += "+"
+        return line
 
+    def _grid_lines(self, vp_w: int, vp_h: int,
+                    su: bool, sd: bool) -> list[str]:
+        rows = []
         for i in range(vp_h):
             y = self.offset_y + i
-            indicator = ("^" if (scrolled_up and i == 0)
-                         else "v" if (scrolled_down and i == vp_h - 1)
+            indicator = ("^" if (su and i == 0)
+                         else "v" if (sd and i == vp_h - 1)
                          else "|")
             row = indicator
             for j in range(vp_w):
                 x = self.offset_x + j
                 row += self._cell_markup(x, y, rect_preview=self._in_rect_selection(x, y))
             row += indicator
-            lines.append(row)
-
-        # Bottom border with scroll indicators
-        bot = "+"
-        if scrolled_left and scrolled_right:
-            bot += "<"
-            bot += "-" * max(0, vp_w * 2 - 2)
-            bot += ">"
-        elif scrolled_left:
-            bot += "<"
-            bot += "-" * max(0, vp_w * 2 - 1)
-        elif scrolled_right:
-            bot += "-" * max(0, vp_w * 2 - 1)
-            bot += ">"
-        else:
-            bot += "-" * (vp_w * 2)
-        bot += "+"
-        lines.append(bot)
-
-        grid = "\n".join(lines)
-        self.query_one("#grid").update(grid)
+            rows.append(row)
+        return rows
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
@@ -253,69 +233,154 @@ class DesignScreen(Screen):
         mods = set(parts[:-1])
         if base.isupper():
             mods.add("shift")
-        step = self.step * (5 if "shift" in mods else 1)
+        step = self.app.step * (5 if "shift" in mods else 1)
 
         if self.scroll_mode:
-            if base_lower in ("left", "h"):
-                if not self._scroll(-step, 0):
-                    self.show_status(boundary_msgs[base_lower])
-                    self._last_boundary_msg = True
-                else:
-                    self._clear_boundary_status()
-            elif base_lower in ("right", "l"):
-                if not self._scroll(step, 0):
-                    self.show_status(boundary_msgs[base_lower])
-                    self._last_boundary_msg = True
-                else:
-                    self._clear_boundary_status()
-            elif base_lower in ("up", "k"):
-                if not self._scroll(0, -step):
-                    self.show_status(boundary_msgs[base_lower])
-                    self._last_boundary_msg = True
-                else:
-                    self._clear_boundary_status()
-            elif base_lower in ("down", "j"):
-                if not self._scroll(0, step):
-                    self.show_status(boundary_msgs[base_lower])
-                    self._last_boundary_msg = True
-                else:
-                    self._clear_boundary_status()
+            self._scroll_move(base_lower, step, boundary_msgs)
         else:
-            if base_lower in ("left", "h"):
-                new_x = max(0, self.cursor_x - step)
-                if new_x == self.cursor_x:
-                    self.show_status(boundary_msgs[base_lower])
-                    self._last_boundary_msg = True
-                else:
-                    self.cursor_x = new_x
-                    self._clear_boundary_status()
-            elif base_lower in ("right", "l"):
-                new_x = min(self.width - 1, self.cursor_x + step)
-                if new_x == self.cursor_x:
-                    self.show_status(boundary_msgs[base_lower])
-                    self._last_boundary_msg = True
-                else:
-                    self.cursor_x = new_x
-                    self._clear_boundary_status()
-            elif base_lower in ("up", "k"):
-                new_y = max(0, self.cursor_y - step)
-                if new_y == self.cursor_y:
-                    self.show_status(boundary_msgs[base_lower])
-                    self._last_boundary_msg = True
-                else:
-                    self.cursor_y = new_y
-                    self._clear_boundary_status()
-            elif base_lower in ("down", "j"):
-                new_y = min(self.height - 1, self.cursor_y + step)
-                if new_y == self.cursor_y:
-                    self.show_status(boundary_msgs[base_lower])
-                    self._last_boundary_msg = True
-                else:
-                    self.cursor_y = new_y
-                    self._clear_boundary_status()
+            self._cursor_move(base_lower, step, boundary_msgs)
             self._ensure_cursor_visible()
 
         return True
+
+    def _scroll_move(self, base_lower: str, step: int, msgs: dict) -> None:
+        deltas = {
+            "left": (-step, 0), "h": (-step, 0),
+            "right": (step, 0), "l": (step, 0),
+            "up": (0, -step), "k": (0, -step),
+            "down": (0, step), "j": (0, step),
+        }
+        dx, dy = deltas[base_lower]
+        if not self._scroll(dx, dy):
+            self.show_status(msgs[base_lower])
+            self._last_boundary_msg = True
+        else:
+            self._clear_boundary_status()
+
+    def _cursor_move(self, base_lower: str, step: int, msgs: dict) -> None:
+        if base_lower in ("left", "h"):
+            nx = max(0, self.cursor_x - step)
+            if nx == self.cursor_x:
+                self.show_status(msgs[base_lower])
+                self._last_boundary_msg = True
+                return
+            self.cursor_x = nx
+        elif base_lower in ("right", "l"):
+            nx = min(self.width - 1, self.cursor_x + step)
+            if nx == self.cursor_x:
+                self.show_status(msgs[base_lower])
+                self._last_boundary_msg = True
+                return
+            self.cursor_x = nx
+        elif base_lower in ("up", "k"):
+            ny = max(0, self.cursor_y - step)
+            if ny == self.cursor_y:
+                self.show_status(msgs[base_lower])
+                self._last_boundary_msg = True
+                return
+            self.cursor_y = ny
+        elif base_lower in ("down", "j"):
+            ny = min(self.height - 1, self.cursor_y + step)
+            if ny == self.cursor_y:
+                self.show_status(msgs[base_lower])
+                self._last_boundary_msg = True
+                return
+            self.cursor_y = ny
+        self._clear_boundary_status()
+
+    def on_resize(self) -> None:
+        self.refresh_grid()
+
+    def _on_key_rect_mode(self, key: str) -> None:
+        k_low = key.lower()
+        if k_low in ("left", "right", "up", "down", "h", "j", "k", "l"):
+            parts = key.split("+")
+            base = parts[-1]
+            base_low = base.lower()
+            mods = set(parts[:-1])
+            if base.isupper():
+                mods.add("shift")
+            step = self.app.step * (5 if "shift" in mods else 1)
+            if base_low in ("left", "h"):
+                self.cursor_x = max(0, self.cursor_x - step)
+            elif base_low in ("right", "l"):
+                self.cursor_x = min(self.width - 1, self.cursor_x + step)
+            elif base_low in ("up", "k"):
+                self.cursor_y = max(0, self.cursor_y - step)
+            elif base_low in ("down", "j"):
+                self.cursor_y = min(self.height - 1, self.cursor_y + step)
+            self._ensure_cursor_visible()
+            self.refresh_grid()
+            return
+        if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
+            setattr(self.app, 'step', int(key))
+            self.show_status(f"Step set to {self.app.step}")
+            self.update_hints()
+            return
+        if k_low in ("enter", "\n"):
+            self._paint_rectangle()
+            self.rect_mode = False
+            self.show_status("Rectangle painted")
+            self.update_hints()
+            self.refresh_grid()
+            return
+        if k_low == "escape":
+            self.cursor_x = self.rect_start[0]
+            self.cursor_y = self.rect_start[1]
+            self.rect_mode = False
+            self.show_status("Rectangle cancelled")
+            self.update_hints()
+            self.refresh_grid()
+            return
+
+    def _on_key_action(self, k: str, event) -> None:
+        if k == "u":
+            self._undo()
+            return
+        if k == "ctrl+r":
+            self._redo()
+            return
+        if k in ("slash", "solidus"):
+            self.app.push_screen(ConfigKeyScreen())
+            event.stop()
+            return
+        if self._handle_movement(event.key):
+            self.refresh_grid()
+            return
+        self._on_key_shortcut(k)
+
+    def _on_key_shortcut(self, k: str) -> None:
+        if k in ("d", "a", "s", "w"):
+            dirs = {"d": "right", "a": "left", "s": "down", "w": "up"}
+            self._switch_key_dir(dirs[k])
+        elif k == "space":
+            self.paint_pixel()
+        elif k == "f":
+            self.flood_fill()
+        elif k == "r":
+            self.rect_mode = True
+            self.rect_start[0] = self.cursor_x
+            self.rect_start[1] = self.cursor_y
+            self.update_hints()
+            self.show_status("Rectangle mode: select opposite corner, "
+                             "[Enter] confirm, [Escape] cancel")
+            self.refresh_grid()
+            return
+        elif k == "c":
+            self.app.push_screen(ColorScreen())
+        elif k == "escape":
+            if self.scroll_mode:
+                self.scroll_mode = False
+                self.show_status("Exited scroll mode")
+                self.update_hints()
+                return
+            self.app.pop_screen()
+        elif k == "p":
+            CodegenService(self.app.bitmaps, self.app.show_status).preview()
+        elif k == "m":
+            self.app.push_screen(MapScreen())
+
+        self.refresh_grid()
 
     def _switch_key_dir(self, direction: str) -> None:
         dest = self.app.navigate_key(direction)
@@ -354,9 +419,6 @@ class DesignScreen(Screen):
         title.update(self.app.title_with_file(self.base_title))
         self.show_status(f"Switched to key {new_key}.")
 
-    def on_resize(self) -> None:
-        self.refresh_grid()
-
     def on_key(self, event) -> None:
         from .command_bar import handle_cmd_key
         if handle_cmd_key(self, event):
@@ -371,48 +433,7 @@ class DesignScreen(Screen):
         key = event.key
 
         if self.rect_mode:
-            k_low = key.lower()
-            if k_low in ("left", "right", "up", "down", "h", "j", "k", "l"):
-                parts = key.split("+")
-                base = parts[-1]
-                base_low = base.lower()
-                mods = set(parts[:-1])
-                if base.isupper():
-                    mods.add("shift")
-                step = self.step * (5 if "shift" in mods else 1)
-                if base_low in ("left", "h"):
-                    self.cursor_x = max(0, self.cursor_x - step)
-                elif base_low in ("right", "l"):
-                    self.cursor_x = min(self.width - 1, self.cursor_x + step)
-                elif base_low in ("up", "k"):
-                    self.cursor_y = max(0, self.cursor_y - step)
-                elif base_low in ("down", "j"):
-                    self.cursor_y = min(self.height - 1, self.cursor_y + step)
-                self._ensure_cursor_visible()
-                self.refresh_grid()
-                return
-            if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
-                self.step = int(key)
-                self.app.step = self.step
-                self.show_status(f"Step set to {self.step}")
-                self.update_hints()
-                return
-            if k_low in ("enter", "\n"):
-                self._paint_rectangle()
-                self.rect_mode = False
-                self.show_status("Rectangle painted")
-                self.update_hints()
-                self.refresh_grid()
-                return
-            if k_low == "escape":
-                self.cursor_x = self.rect_start_x
-                self.cursor_y = self.rect_start_y
-                self.rect_mode = False
-                self.show_status("Rectangle cancelled")
-                self.update_hints()
-                self.refresh_grid()
-                return
-            event.stop()
+            self._on_key_rect_mode(key)
             return
 
         if key == "g":
@@ -428,57 +449,12 @@ class DesignScreen(Screen):
             return
 
         if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
-            self.step = int(key)
-            self.app.step = self.step
-            self.show_status(f"Step set to {self.step}")
+            setattr(self.app, 'step', int(key))
+            self.show_status(f"Step set to {self.app.step}")
             self.update_hints()
             return
 
-        k = key.lower()
-        if k == "u":
-            self._undo()
-            return
-        if k == "ctrl+r":
-            self._redo()
-            return
-        if k in ("slash", "solidus"):
-            self.app.push_screen(ConfigKeyScreen())
-            event.stop()
-            return
-        if self._handle_movement(event.key):
-            self.refresh_grid()
-            return
-        if k in ("d", "a", "s", "w"):
-            dirs = {"d": "right", "a": "left", "s": "down", "w": "up"}
-            self._switch_key_dir(dirs[k])
-        elif k == "space":
-            self.paint_pixel()
-        elif k == "f":
-            self.flood_fill()
-        elif k == "r":
-            self.rect_mode = True
-            self.rect_start_x = self.cursor_x
-            self.rect_start_y = self.cursor_y
-            self.update_hints()
-            self.show_status("Rectangle mode: select opposite corner, "
-                             "[Enter] confirm, [Escape] cancel")
-            self.refresh_grid()
-            return
-        elif k == "c":
-            self.app.push_screen(ColorScreen())
-        elif k == "escape":
-            if self.scroll_mode:
-                self.scroll_mode = False
-                self.show_status("Exited scroll mode")
-                self.update_hints()
-                return
-            self.app.pop_screen()
-        elif k == "p":
-            CodegenService(self.app.bitmaps, self.app.show_status).preview()
-        elif k == "m":
-            self.app.push_screen(MapScreen())
-
-        self.refresh_grid()
+        self._on_key_action(key.lower(), event)
 
     # Paint the current color at the cursor position.
     def paint_pixel(self):
@@ -543,10 +519,10 @@ class DesignScreen(Screen):
 
     def _paint_rectangle(self):
         self._save_state()
-        x1 = min(self.rect_start_x, self.cursor_x)
-        x2 = max(self.rect_start_x, self.cursor_x)
-        y1 = min(self.rect_start_y, self.cursor_y)
-        y2 = max(self.rect_start_y, self.cursor_y)
+        x1 = min(self.rect_start[0], self.cursor_x)
+        x2 = max(self.rect_start[0], self.cursor_x)
+        y1 = min(self.rect_start[1], self.cursor_y)
+        y2 = max(self.rect_start[1], self.cursor_y)
         fill = self.app.current_color
         for y in range(y1, y2 + 1):
             for x in range(x1, x2 + 1):
@@ -599,7 +575,7 @@ class DesignScreen(Screen):
         hints = Text()
         if self.rect_mode:
             hints.append("[arrows/hjkl] select opposite corner  ")
-            hints.append(f"[1-9] step={self.step}\n")
+            hints.append(f"[1-9] step={self.app.step}\n")
             hints.append("[Enter] confirm  [Escape] cancel  ")
             hints.append(f"[C]olor={self.app.current_color}", style="dim")
             hints.append("  [space] paint", style="dim")
@@ -632,7 +608,7 @@ class DesignScreen(Screen):
             else:
                 hints.append("[arrows/hjkl] move  ")
                 hints.append("[g] scroll  ", style="dim" if self.content_fits else None)
-            hints.append(f"[1-9] step={self.step}\n")
+            hints.append(f"[1-9] step={self.app.step}\n")
             if len(self.app.bitmaps) <= 1:
                 hints.append("[wasd] switch key  ", style="dim")
             else:

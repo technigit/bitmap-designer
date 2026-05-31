@@ -305,35 +305,39 @@ class MapScreen(Screen):
             return pixel_char, hex_color
         return pixel_char, None
 
-    def _render_one(self, ctx: DeviceContext, key: str, pos: dict,
-                    cell, *, max_bounds: tuple[int, int], dim: bool = False) -> None:
+    def _render_one(self, ctx: DeviceContext, key: str, pos: dict, *,
+                    cell, opts: dict) -> None:
         pl = pos["pixel_left"]
         pt = pos["pixel_top"]
         pw = pos["pixel_w"]
-        border_style = "dim" if dim else None
-        for i, ch in enumerate(str(key)):
-            if pl + i < ctx.pan_x - 1 or pt - 2 < ctx.pan_y - 2:
-                break
-            if pl + i > max_bounds[0] or pt - 2 > max_bounds[1]:
-                break
-            cell(pl + i, pt - 2, ch, border_style, True)
-        cell(pl - 1, pt - 1, "+", border_style, True)
-        for cx in range(pl, pl + pw):
-            cell(cx, pt - 1, "-", border_style, True)
-        cell(pl + pw, pt - 1, "+", border_style, True)
-        cell(pl - 1, pt + pos["pixel_h"], "+", border_style, True)
-        for cx in range(pl, pl + pw):
-            cell(cx, pt + pos["pixel_h"], "-", border_style, True)
-        cell(pl + pw, pt + pos["pixel_h"], "+", border_style, True)
-        for row in range(pos["pixel_h"]):
-            cell(pl - 1, pt + row, "|", border_style, True)
-            cell(pl + pw, pt + row, "|", border_style, True)
+        dim = opts.get("dim", False)
+
+        def render_row(row: int) -> None:
             for col in range(pw):
                 pixel_char = self._sample_pixel(ctx, key, col, row)
                 display, px_style = self._pixel_map_char(pixel_char)
                 if px_style and dim:
                     px_style = f"dim {px_style}"
                 cell(pl + col, pt + row, display, px_style, False)
+
+        for i, ch in enumerate(str(key)):
+            if pl + i < ctx.pan_x - 1 or pt - 2 < ctx.pan_y - 2:
+                break
+            if pl + i > opts["bounds"][0] or pt - 2 > opts["bounds"][1]:
+                break
+            cell(pl + i, pt - 2, ch, "dim" if dim else None, True)
+        cell(pl - 1, pt - 1, "+", "dim" if dim else None, True)
+        for cx in range(pl, pl + pw):
+            cell(cx, pt - 1, "-", "dim" if dim else None, True)
+        cell(pl + pw, pt - 1, "+", "dim" if dim else None, True)
+        cell(pl - 1, pt + pos["pixel_h"], "+", "dim" if dim else None, True)
+        for cx in range(pl, pl + pw):
+            cell(cx, pt + pos["pixel_h"], "-", "dim" if dim else None, True)
+        cell(pl + pw, pt + pos["pixel_h"], "+", "dim" if dim else None, True)
+        for row in range(pos["pixel_h"]):
+            cell(pl - 1, pt + row, "|", "dim" if dim else None, True)
+            cell(pl + pw, pt + row, "|", "dim" if dim else None, True)
+            render_row(row)
 
     def _render_grid(self, ctx: DeviceContext) -> Text:
         positions = self._compute_positions(ctx)
@@ -357,11 +361,11 @@ class MapScreen(Screen):
         max_bounds = (max_right, max_bottom)
         for key, pos in positions.items():
             if key != self.selected_key:
-                self._render_one(ctx, key, pos, set_cell,
-                                 max_bounds=max_bounds, dim=True)
+                self._render_one(ctx, key, pos,
+                                 cell=set_cell, opts={"bounds": max_bounds, "dim": True})
         if self.selected_key in positions:
             self._render_one(ctx, self.selected_key, positions[self.selected_key],
-                             set_cell, max_bounds=max_bounds, dim=False)
+                             cell=set_cell, opts={"bounds": max_bounds, "dim": False})
 
         self._draw_grid_borders(ctx, grid)
         self._fill_grid_empty(ctx, grid, max_right, max_bottom)
