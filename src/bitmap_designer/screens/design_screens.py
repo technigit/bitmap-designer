@@ -69,7 +69,7 @@ class DesignScreen(Screen):
         self.offset_y = max(0, min(self.offset_y, max(0, self.height - self.viewport_h)))
 
     @property
-    def _content_fits(self) -> bool:
+    def content_fits(self) -> bool:
         return self.viewport_w >= self.width and self.viewport_h >= self.height
 
     # Adjust offset to keep cursor at least 2px from viewport edge.
@@ -112,7 +112,7 @@ class DesignScreen(Screen):
         ox, oy = self.app.scroll_offsets.get(self.app.current_key, (0, 0))
         self.offset_x, self.offset_y = ox, oy
         self.refresh_grid()
-        self._update_hints()
+        self.update_hints()
 
     def _in_rect_selection(self, x: int, y: int) -> bool:
         if not self.rect_mode:
@@ -151,7 +151,7 @@ class DesignScreen(Screen):
         self.step = self.app.step
         self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
         if self.app.current_key != self._key_on_enter:
-            self._switch_to_key(self.app.current_key)
+            self.switch_to_key(self.app.current_key)
         else:
             bm = self.app.bitmaps.get(self.app.current_key, create_default_bitmap())
             self.width = bm["bounds"]["width"]
@@ -159,7 +159,7 @@ class DesignScreen(Screen):
             self.pixels = bm["bitmap"]["pixels"]
             self._ensure_cursor_visible()
             self.refresh_grid()
-        self._update_hints()
+        self.update_hints()
 
     # Rebuild the grid display from pixel data.
     def refresh_grid(self):
@@ -320,7 +320,7 @@ class DesignScreen(Screen):
     def _switch_key_dir(self, direction: str) -> None:
         dest = self.app.navigate_key(direction)
         if dest:
-            self._switch_to_key(dest)
+            self.switch_to_key(dest)
         else:
             msgs = {
                 "right": "No bitmap key to the right",
@@ -330,7 +330,7 @@ class DesignScreen(Screen):
             }
             self.show_status(msgs[direction])
 
-    def _switch_to_key(self, new_key: str) -> None:
+    def switch_to_key(self, new_key: str) -> None:
         old_key = self._key_on_enter
         if old_key == new_key:
             return
@@ -349,7 +349,7 @@ class DesignScreen(Screen):
         ox, oy = self.app.scroll_offsets.get(new_key, (0, 0))
         self.offset_x, self.offset_y = ox, oy
         self.refresh_grid()
-        self._update_hints()
+        self.update_hints()
         title = self.query_one("#title", Static)
         title.update(self.app.title_with_file(self.base_title))
         self.show_status(f"Switched to key {new_key}.")
@@ -395,13 +395,13 @@ class DesignScreen(Screen):
                 self.step = int(key)
                 self.app.step = self.step
                 self.show_status(f"Step set to {self.step}")
-                self._update_hints()
+                self.update_hints()
                 return
             if k_low in ("enter", "\n"):
                 self._paint_rectangle()
                 self.rect_mode = False
                 self.show_status("Rectangle painted")
-                self._update_hints()
+                self.update_hints()
                 self.refresh_grid()
                 return
             if k_low == "escape":
@@ -409,14 +409,14 @@ class DesignScreen(Screen):
                 self.cursor_y = self.rect_start_y
                 self.rect_mode = False
                 self.show_status("Rectangle cancelled")
-                self._update_hints()
+                self.update_hints()
                 self.refresh_grid()
                 return
             event.stop()
             return
 
         if key == "g":
-            if self._content_fits:
+            if self.content_fits:
                 self.show_status("All content visible — scrolling disabled")
                 return
             self.scroll_mode = not self.scroll_mode
@@ -424,14 +424,14 @@ class DesignScreen(Screen):
                 self.show_status("Scroll mode on")
             else:
                 self.show_status("Scroll mode off")
-            self._update_hints()
+            self.update_hints()
             return
 
         if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
             self.step = int(key)
             self.app.step = self.step
             self.show_status(f"Step set to {self.step}")
-            self._update_hints()
+            self.update_hints()
             return
 
         k = key.lower()
@@ -459,7 +459,7 @@ class DesignScreen(Screen):
             self.rect_mode = True
             self.rect_start_x = self.cursor_x
             self.rect_start_y = self.cursor_y
-            self._update_hints()
+            self.update_hints()
             self.show_status("Rectangle mode: select opposite corner, "
                              "[Enter] confirm, [Escape] cancel")
             self.refresh_grid()
@@ -470,7 +470,7 @@ class DesignScreen(Screen):
             if self.scroll_mode:
                 self.scroll_mode = False
                 self.show_status("Exited scroll mode")
-                self._update_hints()
+                self.update_hints()
                 return
             self.app.pop_screen()
         elif k == "p":
@@ -564,7 +564,7 @@ class DesignScreen(Screen):
     def _save_state(self):
         self.undo_stack.append((list(self.pixels), self.cursor_x, self.cursor_y))
         self.redo_stack.clear()
-        self._update_hints()
+        self.update_hints()
 
     def _undo(self):
         if not self.undo_stack:
@@ -575,7 +575,7 @@ class DesignScreen(Screen):
         self.pixels, self.cursor_x, self.cursor_y = self.undo_stack.pop()
         self._sync_pixels()
         self.app.mark_dirty()
-        self._update_hints()
+        self.update_hints()
         self.refresh_grid()
         total = len(self.undo_stack) + len(self.redo_stack)
         self.show_status(f"Before change #{len(self.undo_stack) + 1} of {total}")
@@ -589,13 +589,13 @@ class DesignScreen(Screen):
         self.pixels, self.cursor_x, self.cursor_y = self.redo_stack.pop()
         self._sync_pixels()
         self.app.mark_dirty()
-        self._update_hints()
+        self.update_hints()
         self.refresh_grid()
         total = len(self.undo_stack) + len(self.redo_stack)
         self.show_status(f"After change #{len(self.undo_stack)} of {total}")
 
     # Refresh the hints bar with current undo/redo availability.
-    def _update_hints(self):
+    def update_hints(self):
         hints = Text()
         if self.rect_mode:
             hints.append("[arrows/hjkl] select opposite corner  ")
@@ -631,7 +631,7 @@ class DesignScreen(Screen):
                 hints.append("[arrows/hjkl] scroll  [Esc] exit scroll  ")
             else:
                 hints.append("[arrows/hjkl] move  ")
-                hints.append("[g] scroll  ", style="dim" if self._content_fits else None)
+                hints.append("[g] scroll  ", style="dim" if self.content_fits else None)
             hints.append(f"[1-9] step={self.step}\n")
             if len(self.app.bitmaps) <= 1:
                 hints.append("[wasd] switch key  ", style="dim")

@@ -8,9 +8,13 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Static
 
+from .close_screens import CloseScreen
+from .config_screens import ConfigScreen
+from .info_screen import InfoScreen, gather_info
 from .popup_screen import PopupScreen
+from .quit_screens import QuitScreen
 from .startup_screens import StartupScreen
-from ..constants import DEFAULT_BITMAP_DIR
+from ..constants import DEFAULT_BITMAP_DIR, create_default_bitmap
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
@@ -172,7 +176,6 @@ def _execute_command(screen, cmd_str: str) -> None:
         if force:
             app.exit()
         else:
-            from ..screens.quit_screens import QuitScreen
             app.push_screen(QuitScreen())
 
     elif command == "w":
@@ -183,7 +186,6 @@ def _execute_command(screen, cmd_str: str) -> None:
             if force:
                 app.exit()
             else:
-                from ..screens.quit_screens import QuitScreen
                 app.push_screen(QuitScreen())
 
     elif command == "close":
@@ -193,16 +195,15 @@ def _execute_command(screen, cmd_str: str) -> None:
             app.pop_screen()
             app.push_screen(StartupScreen())
         else:
-            from .close_screens import CloseScreen
             app.push_screen(CloseScreen())
 
     elif command == "scroll":
         if hasattr(screen, 'scroll_mode'):
-            if hasattr(screen, '_content_fits') and screen._content_fits:
+            if hasattr(screen, 'content_fits') and screen.content_fits:
                 _clear_status(screen, "All content visible — scrolling disabled")
             else:
                 screen.scroll_mode = True
-                screen._update_hints()
+                screen.update_hints()
                 _clear_status(screen, "Scroll mode on")
         else:
             _clear_status(screen, "Unknown command")
@@ -210,7 +211,7 @@ def _execute_command(screen, cmd_str: str) -> None:
     elif command == "noscroll":
         if hasattr(screen, 'scroll_mode'):
             screen.scroll_mode = False
-            screen._update_hints()
+            screen.update_hints()
             _clear_status(screen, "Scroll mode off")
         else:
             _clear_status(screen, "Unknown command")
@@ -218,7 +219,7 @@ def _execute_command(screen, cmd_str: str) -> None:
     elif command == "pan":
         if hasattr(screen, 'pan_flip'):
             screen.pan_flip = True
-            screen._update_hints()
+            screen.update_hints()
             _clear_status(screen, "Pan mode on")
         else:
             _clear_status(screen, "Unknown command")
@@ -226,7 +227,7 @@ def _execute_command(screen, cmd_str: str) -> None:
     elif command == "nopan":
         if hasattr(screen, 'pan_flip'):
             screen.pan_flip = False
-            screen._update_hints()
+            screen.update_hints()
             _clear_status(screen, "Pan mode off")
         else:
             _clear_status(screen, "Unknown command")
@@ -235,7 +236,6 @@ def _execute_command(screen, cmd_str: str) -> None:
         app.push_screen(HelpPopupScreen())
 
     elif command == "info":
-        from ..screens.info_screen import InfoScreen, gather_info
         app.push_screen(InfoScreen(gather_info(app, screen), app, screen))
 
     elif command == "set":
@@ -254,7 +254,7 @@ def _execute_command(screen, cmd_str: str) -> None:
                     app.step = n
                     if hasattr(screen, 'step'):
                         screen.step = n
-                    screen._update_hints()
+                    screen.update_hints()
                     _clear_status(screen, f"Step set to {n}")
                 else:
                     _clear_status(screen, "Step must be 1-9")
@@ -270,18 +270,17 @@ def _execute_command(screen, cmd_str: str) -> None:
                 return
             is_new = key_name not in app.bitmaps
             if is_new:
-                from ..constants import create_default_bitmap
                 bm = create_default_bitmap()
                 bm["location"] = app.find_empty_location()
                 app.bitmaps[key_name] = bm
                 app.build_key_adjacency()
                 app.mark_dirty()
             app.set_current_key(key_name)
-            if hasattr(screen, '_switch_to_key'):
-                screen._switch_to_key(key_name)
+            if hasattr(screen, 'switch_to_key'):
+                screen.switch_to_key(key_name)
             elif hasattr(screen, 'selected_key'):
                 screen.selected_key = key_name
-                screen._update()
+                screen.refresh_map()
             _clear_status(screen, f"Switched to key {key_name}")
         elif sub == "color":
             if not sub_args:
@@ -306,15 +305,14 @@ def _execute_command(screen, cmd_str: str) -> None:
                 app.color_pixels = cycle[app.color_pixels]
             if hasattr(screen, 'refresh_grid'):
                 screen.refresh_grid()
-            if hasattr(screen, '_update'):
-                screen._update()
-            screen._update_hints()
+            if hasattr(screen, 'refresh_map'):
+                screen.refresh_map()
+            screen.update_hints()
             _clear_status(screen, f"Color pixels {app.color_pixels}")
         else:
             _clear_status(screen, f"Unknown set subcommand: {sub}")
 
     elif command == "config":
-        from ..screens.config_screens import ConfigScreen
         if args:
             param = args[0]
             if param == "key":
@@ -327,18 +325,17 @@ def _execute_command(screen, cmd_str: str) -> None:
                     return
                 is_new = key_name not in app.bitmaps
                 if is_new:
-                    from ..constants import create_default_bitmap
                     bm = create_default_bitmap()
                     bm["location"] = app.find_empty_location()
                     app.bitmaps[key_name] = bm
                     app.build_key_adjacency()
                     app.mark_dirty()
                 app.set_current_key(key_name)
-                if hasattr(screen, '_switch_to_key'):
-                    screen._switch_to_key(key_name)
+                if hasattr(screen, 'switch_to_key'):
+                    screen.switch_to_key(key_name)
                 elif hasattr(screen, 'selected_key'):
                     screen.selected_key = key_name
-                    screen._update()
+                    screen.refresh_map()
             else:
                 _clear_status(screen, f"Unknown config parameter: {param}")
                 return

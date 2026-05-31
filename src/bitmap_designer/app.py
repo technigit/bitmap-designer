@@ -43,12 +43,12 @@ class BitmapDesignerApp(App):
         self.color_pixels: str = "on"
 
     @staticmethod
-    def _get_location(bitmap_data: dict) -> tuple[int, int]:
+    def get_location(bitmap_data: dict) -> tuple[int, int]:
         loc = bitmap_data.get("location", {})
         return loc.get("x", 0), loc.get("y", 0)
 
     @staticmethod
-    def _rects_overlap(a_loc: tuple[int, int], a_bounds: dict,
+    def rects_overlap(a_loc: tuple[int, int], a_bounds: dict,
                        b_loc: tuple[int, int], b_bounds: dict) -> bool:
         ax1, ay1 = a_loc
         ax2 = ax1 + a_bounds["width"]
@@ -60,7 +60,7 @@ class BitmapDesignerApp(App):
 
     def build_key_adjacency(self) -> None:
         adj = {}
-        locs = {k: self._get_location(self.bitmaps[k]) for k in self.bitmaps}
+        locs = {k: self.get_location(self.bitmaps[k]) for k in self.bitmaps}
         for key, (bx, by) in locs.items():
             best = {"left": None, "right": None, "up": None, "down": None}
             best_dist = {"left": None, "right": None, "up": None, "down": None}
@@ -220,7 +220,7 @@ class BitmapDesignerApp(App):
         step = 12
         occupied: set[tuple[int, int]] = set()
         for bm in self.bitmaps.values():
-            loc = self._get_location(bm)
+            loc = self.get_location(bm)
             bounds = bm.get("bounds", {"width": 10, "height": 10})
             for dx in range(bounds["width"]):
                 for dy in range(bounds["height"]):
@@ -242,16 +242,16 @@ class BitmapDesignerApp(App):
         changed = self.bitmaps.get(changed_key)
         if not changed:
             return []
-        changed_loc = self._get_location(changed)
+        changed_loc = self.get_location(changed)
         changed_bounds = changed["bounds"]
         moved = []
         for key in list(self.bitmaps.keys()):
             if key == changed_key:
                 continue
             bm = self.bitmaps[key]
-            loc = self._get_location(bm)
+            loc = self.get_location(bm)
             b_bounds = bm["bounds"]
-            if self._rects_overlap(changed_loc, changed_bounds, loc, b_bounds):
+            if self.rects_overlap(changed_loc, changed_bounds, loc, b_bounds):
                 del self.bitmaps[key]
                 new_loc = self.find_empty_location(
                     width=b_bounds["width"], height=b_bounds["height"]

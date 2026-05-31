@@ -319,12 +319,12 @@ def _encroached_keys(
     """Check which keys would overlap if key had new_bounds at its current location
     (or loc_override if given)."""
     bm = app.bitmaps.get(key, {})
-    loc = loc_override if loc_override is not None else app._get_location(bm)
+    loc = loc_override if loc_override is not None else app.get_location(bm)
     encroached = []
     for other_key, other_bm in app.bitmaps.items():
         if other_key == key:
             continue
-        if app._rects_overlap(loc, new_bounds, app._get_location(other_bm), other_bm["bounds"]):
+        if app.rects_overlap(loc, new_bounds, app.get_location(other_bm), other_bm["bounds"]):
             encroached.append(other_key)
     return encroached
 

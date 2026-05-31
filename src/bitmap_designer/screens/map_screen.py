@@ -135,7 +135,7 @@ class MapScreen(Screen):
     def __init__(self):
         super().__init__()
         self.zoom_scale = self.app.map_zoom if self.app.map_zoom is not None else 1.0
-        self._aspect_y = 0.5
+        self.aspect_y = 0.5
         self.pan_x, self.pan_y = self.app.map_pan
         self.pan_flip = self.app.map_pan_flip
         self.selected_key = self.app.current_key
@@ -155,18 +155,18 @@ class MapScreen(Screen):
         if self.app.map_zoom is None:
             self.pan_x = 2
             self.pan_y = 3
-        self._update()
+        self.refresh_map()
         self._store_map_state()
 
     def on_screen_resume(self, _event) -> None:
         self.step = self.app.step
         self.selected_key = self.app.current_key
         self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
-        self._update()
+        self.refresh_map()
 
     async def _on_resize(self, event: ResizeEvent) -> None:
         await super()._on_resize(event)
-        self._update()
+        self.refresh_map()
 
     def _store_map_state(self) -> None:
         setattr(self.app, "map_zoom", self.zoom_scale)
@@ -176,7 +176,7 @@ class MapScreen(Screen):
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
-    def _compute_canvas_size(self) -> tuple[int, int]:
+    def compute_canvas_size(self) -> tuple[int, int]:
         g = self.query_one("#grid", Static)
         return max(2, g.size.width - 2), max(2, g.size.height)
 
@@ -199,21 +199,21 @@ class MapScreen(Screen):
         return min_x, min_y, max_x - min_x, max_y - min_y
 
     def _zero_fit_content(self) -> None:
-        cw, ch = self._compute_canvas_size()
+        cw, ch = self.compute_canvas_size()
         _, _, vw, vh = self._compute_virtual_bounds()
         if vw <= 0 or vh <= 0:
             return
         sx = (cw - 4) / vw
-        sy = (ch - 5) / (vh * self._aspect_y)
+        sy = (ch - 5) / (vh * self.aspect_y)
         self.zoom_scale = max(0.1, min(sx, sy))
         self.pan_x = 2
         self.pan_y = 3
         self._last_fit = "zero"
-        self._update()
+        self.refresh_map()
 
     def _zoom_to_key(self, key: str) -> None:
         self._last_fit = None
-        cw, ch = self._compute_canvas_size()
+        cw, ch = self.compute_canvas_size()
         data = self.app.bitmaps.get(key)
         if not data:
             return
@@ -226,13 +226,13 @@ class MapScreen(Screen):
         target_w = int(cw * 0.95)
         target_h = int(ch * 0.95)
         sx = target_w / (bw + 2) if bw > 0 else 1
-        sy = target_h / ((bh + 3) * self._aspect_y) if bh > 0 else 1
+        sy = target_h / ((bh + 3) * self.aspect_y) if bh > 0 else 1
         self.zoom_scale = max(0.1, min(sx, sy))
         self.pan_x = int(cw / 2 - bx * self.zoom_scale - (bw * self.zoom_scale) / 2)
-        self.pan_y = int(ch / 2 - by * self.zoom_scale * self._aspect_y
-                         - (bh * self.zoom_scale * self._aspect_y) / 2 + 1)
+        self.pan_y = int(ch / 2 - by * self.zoom_scale * self.aspect_y
+                         - (bh * self.zoom_scale * self.aspect_y) / 2 + 1)
         self.selected_key = key
-        self._update()
+        self.refresh_map()
 
     def _compute_positions(self, ctx: DeviceContext) -> dict:
         positions = {}
@@ -410,10 +410,10 @@ class MapScreen(Screen):
         return result
 
     def _pan_available(self) -> bool:
-        cw, ch = self._compute_canvas_size()
+        cw, ch = self.compute_canvas_size()
         _, _, vw, vh = self._compute_virtual_bounds()
         return (vw * self.zoom_scale > cw - 2 or
-                vh * self.zoom_scale * self._aspect_y > ch - 2)
+                vh * self.zoom_scale * self.aspect_y > ch - 2)
 
 
     def _pan(self, dx: int, dy: int) -> None:
@@ -424,18 +424,18 @@ class MapScreen(Screen):
         else:
             self.pan_x += dx
             self.pan_y += dy
-        self._update()
+        self.refresh_map()
 
-    def _update(self) -> None:
-        cw, ch = self._compute_canvas_size()
+    def refresh_map(self) -> None:
+        cw, ch = self.compute_canvas_size()
         ctx = DeviceContext(cw=cw, ch=ch, zoom_scale=self.zoom_scale,
-                            aspect_y=self._aspect_y, pan_x=self.pan_x,
+                            aspect_y=self.aspect_y, pan_x=self.pan_x,
                             pan_y=self.pan_y)
         self.query_one("#grid", Static).update(self._render_grid(ctx))
-        self._update_hints()
+        self.update_hints()
         self._store_map_state()
 
-    def _update_hints(self) -> None:
+    def update_hints(self) -> None:
         hints = Text()
         if len(self.app.bitmaps) <= 1:
             hints.append("[wasd] select key  ", style="dim")
@@ -476,17 +476,17 @@ class MapScreen(Screen):
         bw = bounds_["width"]
         bh = bounds_["height"]
         cx = bx * self.zoom_scale + self.pan_x + (bw * self.zoom_scale) / 2
-        cy = (by * self.zoom_scale * self._aspect_y + self.pan_y
-              + (bh * self.zoom_scale * self._aspect_y) / 2)
+        cy = (by * self.zoom_scale * self.aspect_y + self.pan_y
+              + (bh * self.zoom_scale * self.aspect_y) / 2)
         new_s = self.zoom_scale * factor
         new_s = max(0.1, min(new_s, 20.0))
         self.zoom_scale = new_s
         ncx = bx * self.zoom_scale + self.pan_x + (bw * self.zoom_scale) / 2
-        ncy = (by * self.zoom_scale * self._aspect_y + self.pan_y
-               + (bh * self.zoom_scale * self._aspect_y) / 2)
+        ncy = (by * self.zoom_scale * self.aspect_y + self.pan_y
+               + (bh * self.zoom_scale * self.aspect_y) / 2)
         self.pan_x += int(cx - ncx)
         self.pan_y += int(cy - ncy)
-        self._update()
+        self.refresh_map()
 
     def _enter_find_mode(self) -> None:
         self.app.push_screen(FindKeyScreen(), self._on_find_key)
@@ -498,13 +498,13 @@ class MapScreen(Screen):
             if not is_new:
                 self._zoom_to_key(key)
             else:
-                self._update()
+                self.refresh_map()
 
     def _navigate(self, direction: str, fail_msg: str) -> None:
         dest = self.app.navigate_key(direction, self.selected_key)
         if dest:
             self.selected_key = dest
-            self._update()
+            self.refresh_map()
         else:
             self.show_status(fail_msg)
 
@@ -518,17 +518,17 @@ class MapScreen(Screen):
     def _reset_zoom_view(self) -> None:
         self.zoom_scale = 1.0
         self._last_fit = None
-        self._update()
+        self.refresh_map()
 
     def _reset_pan_view(self) -> None:
         self.pan_x = 2
         self.pan_y = 3
         self._last_fit = None
-        self._update()
+        self.refresh_map()
 
     def _toggle_pan_mode(self) -> None:
         self.pan_flip = not self.pan_flip
-        self._update_hints()
+        self.update_hints()
 
     def _handle_map_key(self, key: str, key_low: str) -> None:
         action = self._ACTIONS.get(key) or self._ACTIONS.get(key_low)
@@ -556,7 +556,7 @@ class MapScreen(Screen):
         if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
             self.app.step = int(key)
             self.show_status(f"Step set to {self.app.step}")
-            self._update_hints()
+            self.update_hints()
             return
 
         if key_low in PAN_KEYS:

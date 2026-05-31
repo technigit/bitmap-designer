@@ -119,9 +119,9 @@ def gather_info(app, screen) -> dict:
     # Viewport — Map mode
     map_vp = None
     if hasattr(screen, 'zoom_scale'):
-        cw, ch = screen._compute_canvas_size()
+        cw, ch = screen.compute_canvas_size()
         zoom = screen.zoom_scale
-        aspect = screen._aspect_y
+        aspect = screen.aspect_y
         px, py = screen.pan_x, screen.pan_y
 
         x1 = math.floor((0 - px) / zoom)
@@ -253,12 +253,12 @@ class InfoScreen(PopupScreen):
             if dest:
                 self._app.set_current_key(dest)
                 scr = self._screen
-                if hasattr(scr, '_switch_to_key'):
-                    scr._switch_to_key(dest)
+                if hasattr(scr, 'switch_to_key'):
+                    scr.switch_to_key(dest)
                 elif hasattr(scr, 'selected_key'):
                     scr.selected_key = dest
-                    if hasattr(scr, '_update'):
-                        scr._update()
+                    if hasattr(scr, 'refresh_map'):
+                        scr.refresh_map()
                 self._refresh()
                 self.query_one("#status", Static).update(f"Switched to key {dest}")
             else:
