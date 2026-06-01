@@ -1,6 +1,8 @@
 # Roadmap
 
 ## Shipped
+- [x] Palette management: per-file custom palettes with inheritance, hardcoded presets, palette editor, and palette resolution system
+- [x] glyphmode display mode: palette glyph replaces raw color ID in pixel grids
 - [x] `:` command bar — Vim-style command input for extended operations
   - [x] `q` / `q!` — quit / force quit
   - [x] `w` / `w!` — save / force save
@@ -31,12 +33,12 @@
 - [ ] ASCII art "Bitmap Designer" header
 - [ ] Open UI: interactive `~/bitmaps` creation prompt
 - [ ] Open UI: fallback to current directory when `~/bitmaps` missing
-- [ ] Palette selection in Configuration UI ([P])
 - [ ] `~/.bitmapsrc` config file (palettes, preferences)
 - [ ] Code generation: optimal rectangular blocks instead of per-pixel
 - [ ] Red error messages
 - [ ] JSON validation on file open
 - [ ] Consistent 1-line status margin across all screens
+- [ ] Cursor hide/show
 
 ## Future / stretch
 - [ ] Preview improvements

@@ -2,6 +2,8 @@
 from pathlib import Path
 import os
 
+from .palette_service import HARDCODED_PRESETS
+
 ASCII_HEADER = "Bitmap Designer"
 
 HINT_ESCAPE = "[Escape] cancel"
@@ -20,9 +22,7 @@ def create_default_bitmap() -> dict:
         "bitmap": {"pixels": []},
     }
 
-COLOR_MAP = {
-    "1": "#000000", "2": "#FFFFFF", "3": "#FF4A00", "4": "#FFD24A",
-    "5": "#5CFF4A", "6": "#4AA8A8", "7": "#C24AFF", "8": "#FF9A00", "9": "#8A4A00",
-    "a": "#0f2a66", "b": "#d2d2d2", "c": "#909090", "d": "#ff7a9a",
-    "e": "#ffd24a", "f": "#ffffff",
+# Backward-compat flat hex map derived from the default preset.
+COLOR_MAP: dict[str, str] = {
+    cid: cdef["hex"] for cid, cdef in HARDCODED_PRESETS["default"]["colors"].items()
 }

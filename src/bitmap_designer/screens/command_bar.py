@@ -41,6 +41,7 @@ CMD_HELP_TEXT = """\
 :set key NAME     Switch to or create a bitmap key
 :set color C      Set current drawing color (0-9, A-F)
 :set colorpixels [on|off|mixed]  Set pixel display mode
+:set glyphmode [on|off]        Toggle palette glyph display
 :info          Show project metadata
 :config        Open the configuration menu
 :config key NAME  Switch to key and open config\
@@ -110,7 +111,11 @@ def _clear_status(screen, msg: str) -> None:
 def _write_bitmap(app, filepath: str) -> None:
     """Write bitmap data to a JSON file."""
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    data = {"version": "1.0", "bitmaps": app.bitmaps}
+    data: dict = {"version": "1.0", "bitmaps": app.bitmaps}
+    if app.palette_id:
+        data["palette"] = app.palette_id
+    if app.custom_palettes:
+        data["palettes"] = app.custom_palettes
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
@@ -305,6 +310,24 @@ def _set_colorpixels(screen, sub_args, app):
     _clear_status(screen, f"Color pixels {app.color_pixels}")
 
 
+def _set_glyphmode(screen, sub_args, app):
+    if sub_args:
+        val = sub_args[0].lower()
+        if val in ("on", "off"):
+            app.glyphmode = val == "on"
+        else:
+            _clear_status(screen, "Usage: set glyphmode [on|off]")
+            return
+    else:
+        app.glyphmode = not app.glyphmode
+    if hasattr(screen, 'refresh_grid'):
+        screen.refresh_grid()
+    if hasattr(screen, 'refresh_map'):
+        screen.refresh_map()
+    screen.update_hints()
+    _clear_status(screen, f"Glyphmode {'on' if app.glyphmode else 'off'}")
+
+
 def _cmd_set(screen, args, _force, app):
     if not args:
         _clear_status(screen, "Usage: set step N | set key NAME | set color C")
@@ -316,6 +339,7 @@ def _cmd_set(screen, args, _force, app):
         "key": _switch_or_create_key,
         "color": _set_color,
         "colorpixels": _set_colorpixels,
+        "glyphmode": _set_glyphmode,
     }
     handler = dispatch.get(sub)
     if handler:

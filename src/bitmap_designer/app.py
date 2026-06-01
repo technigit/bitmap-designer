@@ -9,10 +9,11 @@ from textual.binding import Binding
 from .constants import DEFAULT_BITMAP_DIR, create_default_bitmap
 from .file_service import FileService
 from .history_service import HistoryService
+from .palette_service import resolve_palette, resolve_palette_with_status
 from .screens import StartupScreen, MainScreen, QuitScreen
 
 
-class BitmapDesignerApp(App):
+class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,too-many-public-methods
     """Textual App subclass orchestrating all screens and application state."""
     CSS = """
     #title { text-align: center; text-style: bold; margin-top: 1; margin-bottom: 2; }
@@ -22,6 +23,7 @@ class BitmapDesignerApp(App):
     """
     BINDINGS = [
         Binding("q", "quit", "Quit", show=False),
+
     ]
 
     def __init__(self):
@@ -41,6 +43,23 @@ class BitmapDesignerApp(App):
         self.map_pan_flip: bool = False
         self.step: int = 1
         self.color_pixels: str = "on"
+        self.glyphmode: bool = False
+        self.palette_id: str | None = None
+        self.custom_palettes: dict[str, dict] = {}
+        self.active_palette: dict[str, dict] = self._init_palette()
+
+    def _init_palette(self) -> dict[str, dict]:
+        return resolve_palette(self.palette_id, self.custom_palettes or None)
+
+    def _init_palette_from_data(self, data: dict) -> None:
+        self.palette_id = data.get("palette")
+        self.custom_palettes = data.get("palettes", {})
+        resolved, status = resolve_palette_with_status(
+            self.palette_id, self.custom_palettes or None
+        )
+        self.active_palette = resolved
+        if status:
+            self.show_status(status)
 
     @staticmethod
     def get_location(bitmap_data: dict) -> tuple[int, int]:
@@ -99,13 +118,23 @@ class BitmapDesignerApp(App):
         return self._key_adjacency.get(src, {}).get(direction)
 
     def _take_clean_snapshot(self) -> None:
-        self._clean_snapshot = copy.deepcopy(self.bitmaps)
+        self._clean_snapshot = (
+            copy.deepcopy(self.bitmaps),
+            self.palette_id,
+            copy.deepcopy(self.custom_palettes),
+        )
 
     def _is_modified(self) -> bool:
         if self.history.any_nonempty():
             return True
-        if self._clean_snapshot is not None and self.bitmaps != self._clean_snapshot:
-            return True
+        if self._clean_snapshot is not None:
+            snap_bitmaps, snap_pid, snap_customs = self._clean_snapshot
+            if self.bitmaps != snap_bitmaps:
+                return True
+            if self.palette_id != snap_pid:
+                return True
+            if self.custom_palettes != snap_customs:
+                return True
         return False
 
     def mark_dirty(self, value: bool = True) -> None:
@@ -117,10 +146,13 @@ class BitmapDesignerApp(App):
         self._refresh_current_title()
 
     def _refresh_current_title(self):
-        screen = self.screen
-        title = screen.query_one("#title", Static)
-        if hasattr(screen, 'base_title'):
-            title.update(self.title_with_file(screen.base_title))
+        try:
+            screen = self.screen
+            title = screen.query_one("#title", Static)
+            if hasattr(screen, 'base_title'):
+                title.update(self.title_with_file(screen.base_title))
+        except Exception:  # pylint: disable=W0718
+            pass
 
     def title_with_file(self, base_title: str) -> str:
         if self.file.current_file:
@@ -152,6 +184,7 @@ class BitmapDesignerApp(App):
                 self.history.clear_all()
                 self.cursor_positions = {}
                 self.scroll_offsets = {}
+                self._init_palette_from_data(data)
                 self.file.refresh_mtime()
         except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error reloading file: {e}")
@@ -191,6 +224,10 @@ class BitmapDesignerApp(App):
         self.scroll_offsets = {}
         self.step = 1
         self.color_pixels = "on"
+        self.glyphmode = False
+        self.palette_id = None
+        self.custom_palettes = {}
+        self.active_palette = self._init_palette()
         self.push_screen(MainScreen())
 
     # Load bitmaps from a JSON file and open the main menu.
@@ -211,6 +248,8 @@ class BitmapDesignerApp(App):
                 self.scroll_offsets = {}
                 self.step = 1
                 self.color_pixels = "on"
+                self.glyphmode = False
+                self._init_palette_from_data(data)
                 self.push_screen(MainScreen())
         except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error loading file: {e}")
@@ -265,6 +304,27 @@ class BitmapDesignerApp(App):
 
     def set_current_color(self, color: str):
         self.current_color = color
+
+    def set_palette(self, palette_id: str | None, show_status_msg: bool = True) -> None:
+        self.palette_id = palette_id
+        resolved, status = resolve_palette_with_status(
+            palette_id, self.custom_palettes or None
+        )
+        self.active_palette = resolved
+        self.mark_dirty()
+        if status and show_status_msg:
+            self.show_status(status)
+
+    def set_custom_palettes(self, palettes: dict[str, dict]) -> None:
+        self.custom_palettes = palettes
+        resolved, status = resolve_palette_with_status(
+            self.palette_id, self.custom_palettes or None
+        )
+        self.active_palette = resolved
+        self.mark_dirty()
+        if status:
+            self.show_status(status)
+
 
 def run():
     """Run the bitmap designer application."""

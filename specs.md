@@ -99,6 +99,8 @@
                 - `"mixed"`: pixels shown as their color identifier in that color's hue
                 - `"off"`: plain number pairs, no color markup
                 - Set with `:set colorpixels [on|off|mixed]` in the command bar
+                - `:set glyphmode [on|off]` — when on, palette glyph replaces
+                  raw color ID in `"mixed"` and `"off"` modes
                 - Shared setting across Design and Map UIs
             - [P]review - open/refresh the preview in a browser window
             - [U]ndo - undo last action (dimmed when nothing to undo)
@@ -246,13 +248,35 @@
                 - If the new location would overlap another bitmap, an encroachment warning popup lists affected keys and offers [Y]es (apply + auto-move overlapped bitmaps) / [N]o (cancel the edit)
                 - Response: Configuration saved.  [OK]
             - [Escape] - cancel/revert the configuration
-        - [P]alette - select color palette
-            - shows list of available palettes (up to 9) from ~/.bitmapsrc
-            - [1-9] - select palette by numerical key
-            - Current selection is highlighted
-            - [Enter] - save configuration
-                - Response: Configuration saved.  [OK]
-            - [Escape] - cancel/revert the configuration
+        - [P]alette - palette management (modal popup)
+            - Shows available palettes:
+                - Hardcoded presets first, marked `(built-in)`
+                - Custom file palettes below
+                - Current selection highlighted
+            - Commands:
+                - [up/down j/k] — navigate list
+                - [Enter] — select highlighted palette, set as active
+                  `"palette"`, go back
+                - [C] — create new custom palette (template = current
+                  active palette; prompts for ID; validates
+                  no-spaces-for-bare rule)
+                - [E] — edit highlighted custom palette
+                  (not available on built-ins; opens Palette Editor)
+                - [D] — delete highlighted custom palette
+                  (not available on built-ins; confirmation prompt;
+                  cannot delete the last palette that is the active
+                  selection)
+                - [Escape] — cancel, go back
+            - Palette Editor (sub-screen, opened via [E] or [C]):
+                - Shows all 16 color slots (0-F) pre-filled from the
+                  resolved inherited palette
+                - Color 0 shown as read-only: "transparent"
+                - Colors 1-F: select a slot → edit hex, char, name in
+                  sub-prompts. Leave blank = omit from this palette
+                  (fall through to inherit chain)
+                - Only explicitly set values saved to JSON (partial palette)
+                - [Enter] — save
+                - [Escape] — cancel
         - Pixel [S]ize - pixel size
             - prompt for the bitmap pixel size (default 2x2 canvas pixels)
             - [Enter] - save the configuration
@@ -311,16 +335,33 @@
 - Status line: at bottom of screen, $accent color, 1-line margin-top gap above; non-popup screens additionally have 3-character left indent
 
 ### Colors
-- 0 = transparent (resets pixel(s) to space in the UI and bitmap data)
-    - Note: never actually paint transparent colors in the generated code.
-- 16-color palette accessible by keyboard (0-F)
-- Up to 9 palettes can be defined in ~/.bitmapsrc
-- Palette selection available in Configuration UI ([P]alette)
-- Select palettes by numerical key [1-9]
-- Cursor shows the color character (0-F) with reverse video (not [] brackets)
-- inspired by retro-style, 16-bit colors (e.g., black, white, green, magenta, blue, orange, blue, green, as seen in Apple II Plus HIRES graphics mode)
 
-- palette example 1
+- 0 = transparent. Reserved. Always displays as space in UI and
+  bitmap data. Never painted in generated code. Not user-configurable.
+- 1-F = 15 paintable colors defined by the active palette.
+- 16-color palette accessible by keyboard (0-F)
+
+Palette resolution priority (highest to lowest):
+  1. Custom palette entry in the file's `"palettes"` matched by
+     active `"palette"` selector.
+  2. Custom palette's `"inherit"` chain (walked linear; cycles
+     detected and break to fallback with a status message).
+  3. Hardcoded built-in preset `"default"`.
+
+Hardcoded presets: shipped read-only, identified by string ID
+(e.g., `"default"`, future: `"solarized"`, `"grayscale"`, etc.).
+The `"default"` preset is always available.
+
+Custom palettes: stored per-file in `"palettes"` block, partial or
+full. Missing color definitions fall through the resolution chain.
+Custom palette IDs are simple alphanumeric strings; the UI enforces
+no-spaces for bare input. Quotes in the command bar allow spaces.
+
+Cursor shows the color character (1-F) with reverse video.
+Palette selection, creation, editing, and deletion through
+Configuration UI [P]alette.
+
+Hardcoded preset: default
     - 0  transparent          space
     - 1  black        #000000  .     (black)
     - 2  deep blue    #0f2a66  ▓     (navy)
@@ -331,24 +372,6 @@
     - 7  aqua         #6ff0c8  ~     (aqua)
     - 8  maroon       #7a1717  X     (maroon)
     - 9  magenta      #a24aff  *     (fuchsia)
-    - A  orange       #ff9a00  @     (orange)
-    - B  light gray   #d2d2d2  .     (lightgray)
-    - C  mid gray     #909090  :     (gray)
-    - D  pink         #ff7a9a  %     (hotpink)
-    - E  yellow       #ffd24a  =     (yellow)
-    - F  white        #ffffff  ·     (white)
-
-- palette example 2
-    - 0  transparent          space
-    - 1  black        #000000  .     (black)
-    - 2  white        #FFFFFF  @     (white)
-    - 3  red          #FF4A00  #     (orangered)
-    - 4  yellow       #FFD24A  $     (gold)
-    - 5  green        #5CFF4A  %     (chartreuse)
-    - 6  cyan         #4AA8A8  ^     (cadetblue)
-    - 7  magenta      #C24AFF  &     (mediumorchid)
-    - 8  orange       #FF9A00  *     (darkorange)
-    - 9  brown        #8A4B00  (     (sienna)
     - A  orange       #ff9a00  @     (orange)
     - B  light gray   #d2d2d2  .     (lightgray)
     - C  mid gray     #909090  :     (gray)
@@ -367,6 +390,17 @@
 // Example values — illustrative, not prescriptive
     {
         "version": "1.0",
+        "palette": "default",
+        "palettes": {
+            "my-variant": {
+                "inherit": "default",
+                "name": "My Red Theme",
+                "colors": {
+                    "3": {"char": "#", "hex": "#FF0000", "name": "red"},
+                    "8": {"char": "X", "hex": "#CC0000", "name": "dark red"}
+                }
+            }
+        },
         "bitmaps": {
             "1": {
                 "bounds": {"width": 10, "height": 10},
@@ -414,6 +448,28 @@
             },
         }
     }
+
+Palette fields:
+
+- `"palette"` (string, optional): Active palette ID. References a key
+  in `"palettes"` or a hardcoded preset. Absent → first custom palette,
+  or `"default"` if none.
+- `"palettes"` (object, optional): Custom palette definitions keyed by ID.
+  Each palette may contain:
+  - `"name"` (string, optional): Human-readable label.
+  - `"inherit"` (string, optional): Base palette ID for undefined colors.
+    Can reference any palette — another custom palette or a hardcoded
+    preset. Cycles are detected and resolved gracefully with a status
+    message and fallback to `"default"`. Absent → no explicit inheritance;
+    single-color misses fall through to the resolution chain.
+  - `"colors"` (object): Partial or full map of color indices
+    (`"1"`-`"F"`) to definitions. Each color entry has:
+    - `"char"` (string): Single display character.
+    - `"hex"` (string): HTML hex color (e.g. `"#FF0000"`).
+    - `"name"` (string): Human-readable name.
+
+Bitmap fields (unchanged):
+
 - group data by bitmap key
     - one bitmap per bitmap key
     - each bitmap should contain pixel data
@@ -422,9 +478,6 @@
     - each character represents a canvas pixel: color codes 1-F are single characters, transparent (color code 0) is stored as a space character
     - In text UI: 2 characters = 1 pixel (for square appearance)
     - pixelSize config only affects preview/output, not text UI
-    - colors
-        - 16-color palette (0-F) for keyboard accessibility
-        - 0 = transparent (space in UI and bitmap pixel data)
 
 ### Example Output Snippet
 // Illustrative example — actual output depends on bitmap configuration
@@ -519,6 +572,7 @@
   - `set key NAME` — switch to or create a bitmap key
   - `set color C` — set current drawing color (0-9, A-F)
   - `set colorpixels [on|off|mixed]` — set pixel display mode (cycles with no argument)
+  - `set glyphmode [on|off]` — toggle palette glyph display (cycles with no argument)
   - `info` — show project metadata popup
   - `config` — open the configuration menu (in Map mode, targets the selected/highlighted key)
   - `config key NAME` — switch to key and open configuration

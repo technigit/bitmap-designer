@@ -76,7 +76,10 @@ class MainScreen(Screen):
             )
             self.app.push_screen(DesignScreen(bitmap))
         elif key_lower == "p":
-            CodegenService(self.app.bitmaps, self.app.show_status).preview()
+            svc = CodegenService(
+                self.app.bitmaps, self.app.show_status, palette=self.app.active_palette
+            )
+            svc.preview()
         elif key_lower == "s":
             self.app.push_screen(SaveScreen())
         elif key_lower == "g":

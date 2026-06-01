@@ -11,8 +11,9 @@ from textual.screen import Screen
 from textual.widgets import Input, Static
 from textual.containers import Vertical
 
+from .command_bar import handle_cmd_key
 from .popup_screen import PopupScreen
-from ..constants import COLOR_MAP, create_default_bitmap
+from ..constants import create_default_bitmap
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
@@ -298,12 +299,16 @@ class MapScreen(Screen):
     def _pixel_map_char(self, pixel_char: str) -> tuple[str, str | None]:
         if pixel_char == " ":
             return " ", None
-        hex_color = COLOR_MAP.get(pixel_char, "")
+        color_entry = self.app.active_palette.get(pixel_char, {})
+        hex_color = color_entry.get("hex", "")
+        display_char = (
+            color_entry.get("glyph", pixel_char) if self.app.glyphmode else pixel_char
+        )
         if self.app.color_pixels == "on":
             return " ", f"on {hex_color}"
         if self.app.color_pixels == "mixed":
-            return pixel_char, hex_color
-        return pixel_char, None
+            return display_char, hex_color
+        return display_char, None
 
     def _render_one(self, ctx: DeviceContext, key: str, pos: dict, *,
                     cell, opts: dict) -> None:
@@ -541,7 +546,6 @@ class MapScreen(Screen):
             getattr(self, method_name)(*args)
 
     def on_key(self, event) -> None:
-        from .command_bar import handle_cmd_key
         if handle_cmd_key(self, event):
             event.stop()
             return

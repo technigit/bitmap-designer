@@ -10,8 +10,9 @@ from textual.containers import Vertical
 
 from .popup_screen import PopupScreen
 from ..codegen_service import CodegenService
-from ..constants import COLOR_MAP, create_default_bitmap
+from ..constants import create_default_bitmap
 
+from .command_bar import handle_cmd_key
 from .config_screens import ConfigKeyScreen
 from .map_screen import MapScreen
 
@@ -125,7 +126,11 @@ class DesignScreen(Screen):
             char = self.app.current_color
         else:
             char = self._get_pixel(x, y)
-        hex_color = COLOR_MAP.get(char, "")
+        color_entry = self.app.active_palette.get(char, {})
+        hex_color = color_entry.get("hex", "")
+        display_char = (
+            color_entry.get("glyph", char) if self.app.glyphmode else char
+        )
         cursor = (x == self.cursor_x and y == self.cursor_y)
 
         if char == " ":
@@ -134,13 +139,13 @@ class DesignScreen(Screen):
             return "  "
 
         if cursor:
-            return f"[reverse]{char}{char}[/]"
+            return f"[reverse]{display_char}{display_char}[/]"
 
         if self.app.color_pixels == "on":
             return f"[on {hex_color}]  [/]"
         if self.app.color_pixels == "mixed":
-            return f"[{hex_color}]{char}{char}[/]"
-        return f"{char}{char}"
+            return f"[{hex_color}]{display_char}{display_char}[/]"
+        return f"{display_char}{display_char}"
 
     def on_screen_resume(self, _event) -> None:
         self.scroll_mode = False
@@ -376,7 +381,10 @@ class DesignScreen(Screen):
                 return
             self.app.pop_screen()
         elif k == "p":
-            CodegenService(self.app.bitmaps, self.app.show_status).preview()
+            svc = CodegenService(
+                self.app.bitmaps, self.app.show_status, palette=self.app.active_palette
+            )
+            svc.preview()
         elif k == "m":
             self.app.push_screen(MapScreen())
 
@@ -420,7 +428,6 @@ class DesignScreen(Screen):
         self.show_status(f"Switched to key {new_key}.")
 
     def on_key(self, event) -> None:
-        from .command_bar import handle_cmd_key
         if handle_cmd_key(self, event):
             event.stop()
             return
@@ -470,7 +477,7 @@ class DesignScreen(Screen):
         self.pixels[self.cursor_y] = "".join(row)
         self.app.mark_dirty()
         self._sync_pixels()
-        CodegenService(self.app.bitmaps).save_preview_html()
+        CodegenService(self.app.bitmaps, palette=self.app.active_palette).save_preview_html()
 
     # Fill a connected region from the cursor with the current color.
     def flood_fill(self):
@@ -482,7 +489,7 @@ class DesignScreen(Screen):
         self._flood_fill(self.cursor_x, self.cursor_y, target, fill_color)
         self.app.mark_dirty()
         self._sync_pixels()
-        CodegenService(self.app.bitmaps).save_preview_html()
+        CodegenService(self.app.bitmaps, palette=self.app.active_palette).save_preview_html()
 
     def _get_pixel(self, x: int, y: int) -> str:
         if y < len(self.pixels) and x < len(self.pixels[y]):
@@ -529,18 +536,20 @@ class DesignScreen(Screen):
                 self._set_pixel(x, y, fill)
         self.app.mark_dirty()
         self._sync_pixels()
-        CodegenService(self.app.bitmaps).save_preview_html()
+        CodegenService(self.app.bitmaps, palette=self.app.active_palette).save_preview_html()
 
-    # Write local pixel data back to the app's bitmap store.
-    def _sync_pixels(self):
-        idx = self.app.current_key
-        if idx in self.app.bitmaps:
-            self.app.bitmaps[idx]["bitmap"] = {"pixels": self.pixels}
+
 
     def _save_state(self):
         self.undo_stack.append((list(self.pixels), self.cursor_x, self.cursor_y))
         self.redo_stack.clear()
         self.update_hints()
+
+    def _sync_pixels(self) -> None:
+        key = self.app.current_key
+        if key in self.app.bitmaps:
+            self.app.bitmaps[key]["bitmap"]["pixels"] = list(self.pixels)
+            self.app.mark_dirty()
 
     def _undo(self):
         if not self.undo_stack:
@@ -621,7 +630,7 @@ class DesignScreen(Screen):
 
 
 class ColorScreen(PopupScreen):
-    """Color palette selection screen (0-9, A-F)."""
+    """Color palette selection screen (0-F)."""
     CSS = """
     #palette { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
@@ -631,16 +640,36 @@ class ColorScreen(PopupScreen):
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Static(self.app.title_with_file("Select Color"), id="title")
-            yield Static(
-                "0: transparent  1: black  2: white  3: red  4: yellow\n"
-                "5: green  6: cyan  7: magenta  8: orange  9: brown\n"
-                "A-F: extended colors",
-                id="palette"
-            )
+            yield Static("", id="palette")
             yield Static("[0-9A-F] select  [Escape] cancel", id="hints", markup=False)
+            yield Static("", id="status")
+
+    def on_mount(self) -> None:
+        self._refresh()
+
+    def on_screen_resume(self, _event) -> None:
+        self._refresh()
+
+    def _refresh(self):
+        pal = self.app.active_palette
+        lines = []
+        for i in range(16):
+            cid = format(i, "x")
+            entry = pal.get(cid, {"glyph": " ", "hex": "#000000", "name": "?"})
+            hex_color = entry.get("hex", "#000000")
+            glyph_display = entry.get("glyph", " ")
+            name = entry.get("name", "?")
+            marker = " <" if cid == self.app.current_color else ""
+            label = f"{cid.upper()}: {name} ({glyph_display})  [{hex_color}]{cid.upper()}[/]"
+            lines.append(label + marker)
+        self.query_one("#palette", Static).update("\n".join(lines))
+
+    def show_status(self, message: str) -> None:
+        self.query_one("#status", Static).update(message)
 
     def on_key(self, event) -> None:
         if event.key == "ctrl+l":
+            self.show_status("")
             self.app.refresh(repaint=True, layout=True)
             return
         key = event.key.lower()

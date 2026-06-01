@@ -1,17 +1,16 @@
 """Preview HTML and JS code generation from bitmap data."""
 import webbrowser
 
-from .constants import COLOR_MAP
-
 
 class CodegenService:
     """Generates preview HTML and JS code from bitmap data."""
 
     PREVIEW_PATH = "/tmp/bitmap-preview.html"
 
-    def __init__(self, bitmaps: dict, show_status=None):
+    def __init__(self, bitmaps: dict, show_status=None, palette: dict[str, dict] | None = None):
         self.bitmaps = bitmaps
         self.show_status = show_status or (lambda msg: None)
+        self.palette = palette or {}
 
     def preview(self) -> None:
         self.save_preview_html()
@@ -29,7 +28,7 @@ class CodegenService:
     def generate_preview_html(self) -> str:
         js_code = []
         for idx, bm in self.bitmaps.items():
-            js_code.extend(self._bitmap_to_js(idx, bm))
+            js_code.extend(self._bitmap_to_js(idx, bm, self.palette))
         canvas_js = "\n    ".join(js_code)
         return f"""<!DOCTYPE html>
 <html>
@@ -65,12 +64,16 @@ class CodegenService:
             for y, row in enumerate(pixels):
                 for x, char in enumerate(row):
                     if char != " ":
-                        lines.append(f"ctx.fillStyle('{char}');")
+                        entry = self.palette.get(char.lower(), {})
+                        color = entry.get("hex", char)
+                        lines.append(f"ctx.fillStyle('{color}');")
                         lines.append(f"ctx.fillRect({x_var} + {x}, {y_var} + {y}, 1, 1);")
         return "\n".join(lines)
 
     @staticmethod
-    def _bitmap_to_js(idx: str, bm: dict) -> list[str]:
+    def _bitmap_to_js(  # pylint: disable=too-many-locals
+        idx: str, bm: dict, palette: dict[str, dict]
+    ) -> list[str]:
         lines = []
         x_var = bm.get("x", f"x{idx}")
         y_var = bm.get("y", f"y{idx}")
@@ -83,7 +86,8 @@ class CodegenService:
         for y, row in enumerate(pixels):
             for x, char in enumerate(row):
                 if char != " ":
-                    color = COLOR_MAP.get(char.lower(), char)
+                    entry = palette.get(char.lower(), {})
+                    color = entry.get("hex", char)
                     lines.append(f"ctx.fillStyle = '{color}';")
                     rect = f"{x_var} + {x} * {pixel_size},"
                     rect += f"{y_var} + {y} * {pixel_size}, {pixel_size}, {pixel_size}"

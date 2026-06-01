@@ -19,6 +19,18 @@ if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
 
 
+def _build_save_data(app) -> dict:
+    data: dict = {
+        "version": "1.0",
+        "bitmaps": app.bitmaps,
+    }
+    if app.palette_id:
+        data["palette"] = app.palette_id
+    if app.custom_palettes:
+        data["palettes"] = app.custom_palettes
+    return data
+
+
 class SaveScreen(PopupScreen):
     """Screen to save the current bitmap file."""
     CSS = """
@@ -84,10 +96,7 @@ class SaveScreen(PopupScreen):
             self.show_status(f"File '{filename}' already exists.")
             return
 
-        data = {
-            "version": "1.0",
-            "bitmaps": self.app.bitmaps,
-        }
+        data = _build_save_data(self.app)
 
         try:
             with open(filepath, "w", encoding="utf-8") as f:
@@ -165,10 +174,7 @@ class QuitSaveScreen(PopupScreen):
             self.show_status(f"File '{filename}' already exists.")
             return
 
-        data = {
-            "version": "1.0",
-            "bitmaps": self.app.bitmaps,
-        }
+        data = _build_save_data(self.app)
 
         try:
             with open(filepath, "w", encoding="utf-8") as f:
@@ -245,10 +251,7 @@ class SaveScreenForClose(PopupScreen):
             self.show_status(f"File '{filename}' already exists.")
             return
 
-        data = {
-            "version": "1.0",
-            "bitmaps": self.app.bitmaps,
-        }
+        data = _build_save_data(self.app)
 
         try:
             with open(filepath, "w", encoding="utf-8") as f:

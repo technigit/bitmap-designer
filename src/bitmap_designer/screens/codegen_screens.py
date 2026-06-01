@@ -29,7 +29,7 @@ class CodegenScreen(Screen):
             yield Static("[Enter] copy  [Escape] close", id="hints")
 
     def on_mount(self) -> None:
-        code = CodegenService(self.app.bitmaps).generate_code()
+        code = CodegenService(self.app.bitmaps, palette=self.app.active_palette).generate_code()
         self.query_one("#code").update(code or "No bitmap data.")
 
     def on_key(self, event) -> None:
@@ -37,7 +37,7 @@ class CodegenScreen(Screen):
             self.app.refresh(repaint=True, layout=True)
             return
         if event.key in ("enter", "\n"):
-            code = CodegenService(self.app.bitmaps).generate_code()
+            code = CodegenService(self.app.bitmaps, palette=self.app.active_palette).generate_code()
             pyperclip.copy(code)
             self.app.show_status("Code copied to clipboard.")
         elif event.key == "escape":
