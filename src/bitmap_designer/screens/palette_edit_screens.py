@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
-from textual.widgets import Static, Input
+from textual.widgets import ListItem, ListView, Static, Input
 from textual.containers import Vertical
 
 from .popup_screen import PopupScreen
@@ -118,7 +118,8 @@ class ConfigPaletteEditScreen(PopupScreen):
     """Edit color slots of a custom palette."""
     base_title = "Edit Palette"
     CSS = """
-    #color-list { margin: 0 0; }
+    #palette-edit-outer { max-height: 60vh; }
+    #color-list { max-height: 50vh; }
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
@@ -126,12 +127,12 @@ class ConfigPaletteEditScreen(PopupScreen):
     def __init__(self, palette_id: str):
         super().__init__()
         self.palette_id = palette_id
-        self._cursor = 0
 
     def compose(self) -> ComposeResult:
-        with Vertical():
+        with Vertical(id="palette-edit-outer"):
             yield Static(self.app.title_with_file(self.base_title), id="title")
-            yield Static("", id="color-list")
+            yield Static(f"Palette: {self.palette_id}", id="palette-name")
+            yield ListView(id="color-list")
             yield Static(
                 "[j/k/up/down] navigate  [Enter] edit slot  "
                 + HINT_ESCAPE,
@@ -142,20 +143,22 @@ class ConfigPaletteEditScreen(PopupScreen):
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
-    def on_mount(self) -> None:
-        self._update_display()
+    async def on_mount(self) -> None:
+        await self._rebuild()
 
-    def on_screen_resume(self, _event) -> None:
-        self._update_display()
+    async def on_screen_resume(self, _event) -> None:
+        await self._rebuild()
 
     def _get_palette_colors(self) -> dict[str, dict]:
         pal = self.app.custom_palettes.get(self.palette_id, {})
         return pal.get("colors", {})
 
-    def _update_display(self):
+    async def _rebuild(self):
         pal = self.app.active_palette
         custom_colors = self._get_palette_colors()
-        lines = [f"Palette: {self.palette_id}"]
+        list_view = self.query_one("#color-list", ListView)
+        await list_view.clear()
+        items = []
         for i in range(16):
             cid = format(i, "x")
             entry = pal.get(cid, {"glyph": " ", "hex": "#000000", "name": "?"})
@@ -163,14 +166,11 @@ class ConfigPaletteEditScreen(PopupScreen):
             glyph_display = entry["glyph"]
             name = entry["name"]
             inherited = cid not in custom_colors
-            inherited_mark = " (inherited)" if inherited else ""
-            cursor_mark = " >" if i == self._cursor else "  "
-            label = (
-                f"{cursor_mark}{cid.upper()}: {name}  "
-                f"glyph={glyph_display}  hex={hex_color}{inherited_mark}"
-            )
-            lines.append(label)
-        self.query_one("#color-list", Static).update("\n".join(lines))
+            inherited_str = "(inherited)" if inherited else ""
+            label = f"  {cid.upper()}: {name}  glyph={glyph_display}  hex={hex_color}{inherited_str}"
+            items.append(ListItem(Static(label)))
+        await list_view.extend(items)
+        list_view.index = 0
 
     def on_key(self, event) -> None:
         if event.key == "ctrl+l":
@@ -178,22 +178,27 @@ class ConfigPaletteEditScreen(PopupScreen):
             self.app.refresh(repaint=True, layout=True)
             return
         k = event.key.lower()
-        if k in ("j", "down") and self._cursor < 15:
-            self._cursor += 1
-            self._update_display()
-        elif k in ("k", "up") and self._cursor > 0:
-            self._cursor -= 1
-            self._update_display()
-        elif k in ("enter", "\n"):
-            cid = format(self._cursor, "x")
-            if cid == "0":
-                self.show_status("Color 0 is reserved transparent.")
-                return
-            self.app.push_screen(
-                ConfigPaletteColorEditScreen(self.palette_id, cid)
-            )
+        if k in ("j", "down"):
+            self.query_one("#color-list", ListView).action_cursor_down()
+            event.stop()
+        elif k in ("k", "up"):
+            self.query_one("#color-list", ListView).action_cursor_up()
+            event.stop()
         elif k == "escape":
             self.app.pop_screen()
+
+    def on_list_view_selected(self, _event: ListView.Selected) -> None:
+        list_view = self.query_one("#color-list", ListView)
+        idx = list_view.index
+        if idx is None:
+            return
+        cid = format(idx, "x")
+        if cid == "0":
+            self.show_status("Color 0 is reserved transparent.")
+            return
+        self.app.push_screen(
+            ConfigPaletteColorEditScreen(self.palette_id, cid)
+        )
 
 
 class ConfigPaletteColorEditScreen(PopupScreen):

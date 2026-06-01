@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
-from textual.widgets import Static, Input
+from textual.widgets import ListItem, ListView, Static, Input
 from textual.containers import Vertical
 
 from .popup_screen import PopupScreen
@@ -15,6 +15,7 @@ from .palette_edit_screens import (
 
 from ..constants import HINT_ESCAPE, create_default_bitmap
 from ..palette_service import HARDCODED_PRESETS
+from ..text_utils import columnate
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
@@ -68,18 +69,13 @@ class ConfigScreen(PopupScreen):
             bm.get("y", f"y{idx}"),
         ]
 
-        def _format_group(labels, values):
-            pad = max(len(l) for l in labels)
-            return "\n".join(
-                f"{label}{' ' * (pad - len(label) + 2)}{value}"
-                for label, value in zip(labels, values)
-            )
-
         palette_name = self.app.palette_id or (
             next(iter(self.app.custom_palettes)) if self.app.custom_palettes else "default"
         )
-        lines = _format_group(labels_design, values_design)
-        lines += "\n\n" + _format_group(labels_code, values_code)
+        rows = list(zip(labels_design, values_design))
+        rows.append(("", ""))
+        rows.extend(zip(labels_code, values_code))
+        lines = columnate(rows)
         lines += f"\n\n[P]alette: {palette_name}"
         lines += "\n\n[M]anage key\n\n[Escape] back"
         self.query_one("#menu", Static).update(lines)
@@ -693,7 +689,8 @@ class ConfigPaletteScreen(PopupScreen):
     """Palette management: list, select, create, edit, delete."""
     base_title = "Palette"
     CSS = """
-    #palette-list { margin: 0 0; }
+    #palette-outer { max-height: 60vh; }
+    #palette-list { max-height: 50vh; }
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
@@ -701,12 +698,11 @@ class ConfigPaletteScreen(PopupScreen):
     def __init__(self):
         super().__init__()
         self._entries: list[tuple[str, bool]] = []  # (id, is_custom)
-        self._cursor = 0
 
     def compose(self) -> ComposeResult:
-        with Vertical():
+        with Vertical(id="palette-outer"):
             yield Static(self.app.title_with_file(self.base_title), id="title")
-            yield Static("", id="palette-list")
+            yield ListView(id="palette-list")
             yield Static(
                 "[j/k/up/down] navigate  [Enter] select  [C]reate  [E]dit  [D]elete  "
                 + HINT_ESCAPE,
@@ -717,39 +713,41 @@ class ConfigPaletteScreen(PopupScreen):
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
-    def on_mount(self) -> None:
-        self._rebuild()
+    async def on_mount(self) -> None:
+        await self._rebuild()
 
-    def on_screen_resume(self, _event) -> None:
-        self._rebuild()
+    async def on_screen_resume(self, _event) -> None:
+        await self._rebuild()
 
-    def _rebuild(self):
+    async def _rebuild(self):
         self._entries = []
         for pid in sorted(HARDCODED_PRESETS):
             self._entries.append((pid, False))
         for pid in sorted(self.app.custom_palettes):
             self._entries.append((pid, True))
-        self._cursor = 0
-        self._update_display()
 
-    def _update_display(self):
         effective = self.app.palette_id
         if effective is None:
             if self.app.custom_palettes:
                 effective = next(iter(self.app.custom_palettes))
             else:
                 effective = "default"
-        lines = []
-        for i, (pid, is_custom) in enumerate(self._entries):
-            marker = " >" if i == self._cursor else "  "
-            prefix = "(custom) " if is_custom else ""
-            suffix = " <" if pid == effective else ""
-            lines.append(f"{marker}{prefix}{pid}{suffix}")
-        self.query_one("#palette-list", Static).update("\n".join(lines))
+
+        list_view = self.query_one("#palette-list", ListView)
+        await list_view.clear()
+        items = []
+        for pid, is_custom in self._entries:
+            prefix = "* " if pid == effective else "  "
+            suffix = "  (custom)" if is_custom else "  (built-in)"
+            items.append(ListItem(Static(f"{prefix}{pid}{suffix}")))
+        await list_view.extend(items)
+        list_view.index = 0
 
     def _selected_id(self) -> str | None:
-        if 0 <= self._cursor < len(self._entries):
-            return self._entries[self._cursor][0]
+        list_view = self.query_one("#palette-list", ListView)
+        idx = list_view.index
+        if idx is not None and 0 <= idx < len(self._entries):
+            return self._entries[idx][0]
         return None
 
     def on_key(self, event) -> None:
@@ -758,22 +756,26 @@ class ConfigPaletteScreen(PopupScreen):
             self.app.refresh(repaint=True, layout=True)
             return
         k = event.key.lower()
-        if k in ("j", "down") and self._cursor < len(self._entries) - 1:
-            self._cursor += 1
-            self._update_display()
-        elif k in ("k", "up") and self._cursor > 0:
-            self._cursor -= 1
-            self._update_display()
-        elif k in ("enter", "\n"):
-            self._on_select()
+        if k in ("j", "down"):
+            self.query_one("#palette-list", ListView).action_cursor_down()
+            event.stop()
+        elif k in ("k", "up"):
+            self.query_one("#palette-list", ListView).action_cursor_up()
+            event.stop()
         elif k == "c":
             self._on_create()
+            event.stop()
         elif k == "e":
             self._on_edit()
+            event.stop()
         elif k == "d":
             self._on_delete()
+            event.stop()
         elif k == "escape":
             self.app.pop_screen()
+
+    def on_list_view_selected(self, _event: ListView.Selected) -> None:
+        self._on_select()
 
     def _on_select(self) -> None:
         pid = self._selected_id()

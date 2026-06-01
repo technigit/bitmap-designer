@@ -11,6 +11,7 @@ from textual.containers import Vertical
 from .popup_screen import PopupScreen
 from ..codegen_service import CodegenService
 from ..constants import create_default_bitmap
+from ..text_utils import columnate
 
 from .command_bar import handle_cmd_key
 from .config_screens import ConfigKeyScreen
@@ -652,17 +653,23 @@ class ColorScreen(PopupScreen):
 
     def _refresh(self):
         pal = self.app.active_palette
-        lines = []
+        rows = []
         for i in range(16):
             cid = format(i, "x")
             entry = pal.get(cid, {"glyph": " ", "hex": "#000000", "name": "?"})
             hex_color = entry.get("hex", "#000000")
             glyph_display = entry.get("glyph", " ")
             name = entry.get("name", "?")
-            marker = " <" if cid == self.app.current_color else ""
-            label = f"{cid.upper()}: {name} ({glyph_display})  [{hex_color}]{cid.upper()}[/]"
-            lines.append(label + marker)
-        self.query_one("#palette", Static).update("\n".join(lines))
+            asterisk = "* " if cid == self.app.current_color else "  "
+            rows.append((
+                f"{asterisk}{cid.upper()}:",
+                name,
+                f"({glyph_display})",
+                f"[{hex_color}]{cid.upper()}[/]",
+            ))
+        self.query_one("#palette", Static).update(
+            columnate(rows, sep="  ")
+        )
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)

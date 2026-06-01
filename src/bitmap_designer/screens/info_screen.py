@@ -9,6 +9,7 @@ from textual.containers import Vertical
 from textual.widgets import Static
 
 from .popup_screen import PopupScreen
+from ..text_utils import columnate
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
@@ -167,68 +168,63 @@ def gather_info(app, screen) -> dict:
 
 
 def _info_text(data: dict) -> str:
-    lines = []
+    rows = []
 
     file_part = data["filename"]
     if data["filesize"] is not None:
         file_part += f"  ({_format_size(data['filesize'])})"
     if data["dirty"]:
         file_part += "  [accent]modified[/]"
-    lines.append(f"[bold]File:[/] {file_part}")
+    rows.append(("[bold]File:[/]", file_part))
 
-    lines.append(
-        f"[bold]Keys:[/] {data['total_keys']}"
-        f"  |  [bold]Pixel area:[/] {data['total_pixel_area']} cells"
-        f"  |  [bold]Filled:[/] {data['total_filled']} cells"
-    )
+    rows.append(("[bold]Keys:[/]", str(data["total_keys"])))
+    rows.append(("[bold]Pixel area:[/]", f"{data['total_pixel_area']} cells"))
+    rows.append(("[bold]Filled:[/]", f"{data['total_filled']} cells"))
 
-    lines.append(
-        f"[bold]Canvas:[/] {data['frame_w']}×{data['frame_h']}"
+    rows.append((
+        "[bold]Canvas:[/]",
+        f"{data['frame_w']}\u00d7{data['frame_h']}"
         f" = {data['frame_w'] * data['frame_h']} cells"
-    )
+    ))
 
     vp = data.get("design_viewport") or data.get("map_viewport")
     if vp:
         if vp["fits"]:
-            lines.append(f"[bold]Viewport:[/] fits  viewport {vp['vp_w']}×{vp['vp_h']}")
+            rows.append(("[bold]Viewport:[/]", f"fits  viewport {vp['vp_w']}\u00d7{vp['vp_h']}"))
         else:
-            lines.append(
-                f"[bold]Viewport:[/] ({vp['x1']},{vp['y1']})→({vp['x2']},{vp['y2']})"
-                f"  viewport {vp['vp_w']}×{vp['vp_h']}"
-                f"  canvas {vp['total_w']}×{vp['total_h']}"
-            )
+            rows.append((
+                "[bold]Viewport:[/]",
+                f"({vp['x1']},{vp['y1']})\u2192({vp['x2']},{vp['y2']})"
+                f"  viewport {vp['vp_w']}\u00d7{vp['vp_h']}"
+                f"  canvas {vp['total_w']}\u00d7{vp['total_h']}"
+            ))
 
-    lines.append("")
+    rows.append(("", ""))
 
     kw, kh = data["key_bounds"]
     kx, ky = data["key_location"]
-    lines.append(
-        f"[bold]Key:[/] \"{data['current_key']}\""
-        f"  |  [bold]Bounds:[/] {kw}×{kh}"
-        f"  |  [bold]Location:[/] ({kx},{ky})"
-    )
+    rows.append(("[bold]Key:[/]", f"\u201c{data['current_key']}\u201d"))
+    rows.append(("[bold]Bounds:[/]", f"{kw}\u00d7{kh}"))
+    rows.append(("[bold]Location:[/]", f"({kx},{ky})"))
 
     kt = data["key_total"]
     kf = data["key_filled"]
     if kt > 0:
         pct = kf / kt * 100
-        lines.append(
-            f"[bold]Filled:[/] {kf} / {kt}  ({pct:.1f}%)"
-            f"  |  [bold]Undo:[/] {data['undo_depth']}"
-            f"  |  [bold]Redo:[/] {data['redo_depth']}"
-        )
-    else:
-        lines.append(f"[bold]Undo:[/] {data['undo_depth']}  |  [bold]Redo:[/] {data['redo_depth']}")
+        rows.append(("[bold]Filled:[/]", f"{kf} / {kt}  ({pct:.1f}%)"))
+    rows.append(("[bold]Undo:[/]", str(data["undo_depth"])))
+    rows.append(("[bold]Redo:[/]", str(data["redo_depth"])))
 
     cx, cy = data["cursor"]
     if cx is not None:
-        lines.append(f"[bold]Cursor:[/] ({cx},{cy})  |  [bold]Color:[/] {data['color']}")
+        rows.append(("[bold]Cursor:[/]", f"({cx},{cy})"))
+        rows.append(("[bold]Color:[/]", data["color"]))
 
     zoom = data.get("zoom")
     if zoom is not None:
-        lines.append(f"[bold]Zoom:[/] {int(zoom * 100)}%")
+        rows.append(("[bold]Zoom:[/]", f"{int(zoom * 100)}%"))
 
-    return "\n".join(lines)
+    return columnate(rows)
 
 
 class InfoScreen(PopupScreen):
