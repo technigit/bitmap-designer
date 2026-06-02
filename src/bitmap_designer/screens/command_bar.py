@@ -357,6 +357,7 @@ def _cmd_config(screen, args, _force, app):
                 _clear_status(screen, "Usage: config key NAME")
                 return
             _switch_or_create_key(screen, key_name, app)
+            app.push_screen(ConfigScreen())
         else:
             _clear_status(screen, f"Unknown config parameter: {param}")
         return

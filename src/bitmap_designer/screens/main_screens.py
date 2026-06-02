@@ -27,7 +27,7 @@ class MainScreen(Screen):
     base_title = "Main Menu"
     TITLE = "Main Menu"
     CSS = """
-    #status { margin-left: 3; }
+    #status { dock: bottom; margin-left: 3; margin-top: 1; }
     """
 
     def _menu_text(self) -> str:

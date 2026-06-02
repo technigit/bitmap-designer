@@ -1,6 +1,8 @@
 # Roadmap
 
 ## Shipped
+- [x] Cursor hide/show (Tab toggle)
+- [x] Consistent 1-line status margin across all screens
 - [x] Palette management: per-file custom palettes with inheritance, hardcoded presets, palette editor, and palette resolution system
 - [x] glyphmode display mode: palette glyph replaces raw color ID in pixel grids
 - [x] `:` command bar — Vim-style command input for extended operations
@@ -37,8 +39,6 @@
 - [ ] Code generation: optimal rectangular blocks instead of per-pixel
 - [ ] Red error messages
 - [ ] JSON validation on file open
-- [ ] Consistent 1-line status margin across all screens
-- [ ] Cursor hide/show
 
 ## Future / stretch
 - [ ] Preview improvements

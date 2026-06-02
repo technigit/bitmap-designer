@@ -74,6 +74,7 @@
             - [arrows / hjkl] - move cursor // by current step (default 1)
             - [⇧+arrows / ⇧+hjkl] - move cursor // by step × 5
             - [0-9] - set step size (1 is default)
+            - [Tab] - toggle cursor hide/show
             - [g] - toggle scroll mode
             - [Escape] - exit Design mode (also exits scroll mode)
             - [wasd] - switch bitmap key in that direction (up/left/down/right)

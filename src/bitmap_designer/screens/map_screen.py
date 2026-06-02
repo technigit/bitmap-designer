@@ -110,8 +110,8 @@ class MapScreen(Screen):
     CSS = """
     Vertical { height: 1fr; }
     #grid { height: 1fr; }
-    #hints { opacity: 0.5; }
-    #status { dock: bottom; margin-left: 3; }
+    #hints { margin-top: 1; opacity: 0.5; }
+    #status { dock: bottom; margin-left: 3; margin-top: 1; }
     """
 
     _ACTIONS: dict[str, tuple[str, tuple]] = {
@@ -472,7 +472,7 @@ class MapScreen(Screen):
         hints.append(f"[P]an {'on' if self.pan_flip else 'off'}\n")
         hints.append(f"Key={self.selected_key}  ")
         hints.append(f"Zoom={int(self.zoom_scale * 100)}%  ")
-        hints.append("[Escape] back\n")
+        hints.append("[Escape] back")
         self.query_one("#hints", Static).update(hints)
 
     def _zoom_change(self, factor: float) -> None:

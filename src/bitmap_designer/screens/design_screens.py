@@ -27,7 +27,7 @@ class DesignScreen(Screen):
     CSS = """
     #grid { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
-    #status { dock: bottom; margin-left: 3; }
+    #status { dock: bottom; margin-left: 3; margin-top: 1; }
     """
 
     def __init__(self, bitmap_data: dict):
@@ -36,6 +36,7 @@ class DesignScreen(Screen):
         self.height = bitmap_data.get("bounds", {}).get("height", 10)
         self.cursor_x = 0
         self.cursor_y = 0
+        self.cursor_hidden = False
         self.pixels = bitmap_data.get("bitmap", {}).get("pixels", [])
         self._key_on_enter = self.app.current_key
         self.offset_x: int = 0
@@ -132,7 +133,7 @@ class DesignScreen(Screen):
         display_char = (
             color_entry.get("glyph", char) if self.app.glyphmode else char
         )
-        cursor = (x == self.cursor_x and y == self.cursor_y)
+        cursor = not self.cursor_hidden and x == self.cursor_x and y == self.cursor_y
 
         if char == " ":
             if cursor:
@@ -149,6 +150,7 @@ class DesignScreen(Screen):
         return f"{display_char}{display_char}"
 
     def on_screen_resume(self, _event) -> None:
+        self.cursor_hidden = False
         self.scroll_mode = False
         self.rect_mode = False
         self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
@@ -264,6 +266,8 @@ class DesignScreen(Screen):
             self._clear_boundary_status()
 
     def _cursor_move(self, base_lower: str, step: int, msgs: dict) -> None:
+        if self.cursor_hidden:
+            self.cursor_hidden = False
         if base_lower in ("left", "h"):
             nx = max(0, self.cursor_x - step)
             if nx == self.cursor_x:
@@ -299,6 +303,8 @@ class DesignScreen(Screen):
 
     def _on_key_rect_mode(self, key: str) -> None:
         k_low = key.lower()
+        if self.cursor_hidden:
+            self.cursor_hidden = False
         if k_low in ("left", "right", "up", "down", "h", "j", "k", "l"):
             parts = key.split("+")
             base = parts[-1]
@@ -436,6 +442,13 @@ class DesignScreen(Screen):
         if event.key == "ctrl+l":
             self.show_status("")
             self.app.refresh(repaint=True, layout=True)
+            return
+
+        if event.key == "tab":
+            self.cursor_hidden = not self.cursor_hidden
+            self.show_status("Cursor hidden" if self.cursor_hidden else "Cursor visible")
+            self.refresh_grid()
+            self.update_hints()
             return
 
         key = event.key
@@ -626,6 +639,7 @@ class DesignScreen(Screen):
             hints.append("[/] find key\n")
             hints.append("[M]ap  ")
             hints.append("[P]review  ")
+            hints.append(f"[Tab] {'show' if self.cursor_hidden else 'hide'} cursor  ")
             hints.append("[Escape] back")
         self.query_one("#hints", Static).update(hints)
 

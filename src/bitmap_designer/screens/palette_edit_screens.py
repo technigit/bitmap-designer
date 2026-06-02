@@ -167,7 +167,10 @@ class ConfigPaletteEditScreen(PopupScreen):
             name = entry["name"]
             inherited = cid not in custom_colors
             inherited_str = "(inherited)" if inherited else ""
-            label = f"  {cid.upper()}: {name}  glyph={glyph_display}  hex={hex_color}{inherited_str}"
+            label = (
+                f"  {cid.upper()}: {name}  glyph={glyph_display}"
+                f"  hex={hex_color}{inherited_str}"
+            )
             items.append(ListItem(Static(label)))
         await list_view.extend(items)
         list_view.index = 0
