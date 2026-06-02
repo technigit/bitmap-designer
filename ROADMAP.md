@@ -9,7 +9,6 @@
   - [x] `q` / `q!` — quit / force quit
   - [x] `w` / `w!` — save / force save
   - [x] `wq` / `wq!` — save and quit
-  - [x] `e` — exit to previous screen
   - [x] `help` — keybindings reference popup
   - [x] `scroll` / `noscroll` — toggle scroll mode
   - [x] `pan` / `nopan` — toggle pan mode
@@ -27,18 +26,20 @@
 - [x] `!` express-exit key in close and quit confirmation popups
 - [x] Map screen: zoom, pan, fit-to-selection, fit-all, find key
 - [x] Map screen: pixel display respects color pixels mode
+- [x] Code generation: optimal rectangular blocks (greedy extraction, bg fill, grouped by color)
+- [x] CodegenScreen: popup UI with scrollable code area, j/k scrolling, #status widget
 
-## In progress
-- [ ] Tab completion in command bar
-
-## Backlog (from specs.md TODO)
+## Backlog
 - [ ] ASCII art "Bitmap Designer" header
 - [ ] Open UI: interactive `~/bitmaps` creation prompt
 - [ ] Open UI: fallback to current directory when `~/bitmaps` missing
 - [ ] `~/.bitmapsrc` config file (palettes, preferences)
-- [ ] Code generation: optimal rectangular blocks instead of per-pixel
 - [ ] Red error messages
 - [ ] JSON validation on file open
+- [ ] `:e` command in command bar (missing handler)
+- [ ] Tab completion in command bar
+- [ ] Save UI: track "last visited directory" per session
+- [ ] Status message areas on close/quit confirmation screens
 
 ## Future / stretch
 - [ ] Preview improvements

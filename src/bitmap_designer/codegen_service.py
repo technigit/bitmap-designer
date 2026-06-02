@@ -53,21 +53,33 @@ class CodegenService:
 
     def generate_code(self) -> str:
         lines = []
-        for idx, bm in self.bitmaps.items():
+        keys = list(self.bitmaps.keys())
+        for n, idx in enumerate(keys):
+            bm = self.bitmaps[idx]
             x_var = bm.get("x", f"x{idx}")
             y_var = bm.get("y", f"y{idx}")
             location = bm.get("location", {"x": 0, "y": 0})
             pixels = bm.get("bitmap", {}).get("pixels", [])
+            if not pixels:
+                continue
+            height = len(pixels)
+            width = len(pixels[0])
+
             lines.append(f"// Bitmap {idx}")
             lines.append(f"var {x_var} = {location['x']};")
             lines.append(f"var {y_var} = {location['y']};")
-            for y, row in enumerate(pixels):
-                for x, char in enumerate(row):
-                    if char != " ":
-                        entry = self.palette.get(char.lower(), {})
-                        color = entry.get("hex", char)
-                        lines.append(f"ctx.fillStyle('{color}');")
-                        lines.append(f"ctx.fillRect({x_var} + {x}, {y_var} + {y}, 1, 1);")
+
+            rectangles = self._extract_rectangles(pixels, width, height)
+            for color, rects in rectangles.items():
+                entry = self.palette.get(color.lower(), {})
+                color_value = entry.get("hex", color)
+                lines.append(f"ctx.fillStyle = '{color_value}';")
+                for rx, ry, rw, rh in rects:
+                    lines.append(
+                        f"ctx.fillRect({x_var} + {rx}, {y_var} + {ry}, {rw}, {rh});"
+                    )
+            if n < len(keys) - 1:
+                lines.append("")
         return "\n".join(lines)
 
     @staticmethod
@@ -80,19 +92,120 @@ class CodegenService:
         location = bm.get("location", {"x": 0, "y": 0})
         pixel_size = bm.get("pixelSize", 2)
         pixels = bm.get("bitmap", {}).get("pixels", [])
+        if not pixels:
+            return lines
+        height = len(pixels)
+        width = len(pixels[0])
+
         lines.append(f"// Bitmap {idx}")
         lines.append(f"var {x_var} = {location['x']};")
         lines.append(f"var {y_var} = {location['y']};")
-        for y, row in enumerate(pixels):
-            for x, char in enumerate(row):
-                if char != " ":
-                    entry = palette.get(char.lower(), {})
-                    color = entry.get("hex", char)
-                    lines.append(f"ctx.fillStyle = '{color}';")
-                    rect = f"{x_var} + {x} * {pixel_size},"
-                    rect += f"{y_var} + {y} * {pixel_size}, {pixel_size}, {pixel_size}"
-                    lines.append(f"ctx.fillRect({rect});")
+
+        rectangles = CodegenService._extract_rectangles(pixels, width, height)
+        for color, rects in rectangles.items():
+            entry = palette.get(color.lower(), {})
+            color_value = entry.get("hex", color)
+            lines.append(f"ctx.fillStyle = '{color_value}';")
+            for rx, ry, rw, rh in rects:
+                lines.append(
+                    f"ctx.fillRect({x_var} + {rx} * {pixel_size}, "
+                    f"{y_var} + {ry} * {pixel_size}, "
+                    f"{rw} * {pixel_size}, {rh} * {pixel_size});"
+                )
         return lines
+
+    @staticmethod
+    def _extract_rectangles(
+        pixels: list[str], width: int, height: int
+    ) -> dict[str, list[tuple[int, int, int, int]]]:
+        covered = [[False] * width for _ in range(height)]
+        result: dict[str, list[tuple[int, int, int, int]]] = {}
+
+        color_counts = {}
+        transparent_count = 0
+        for row in pixels:
+            for char in row:
+                if char == " ":
+                    transparent_count += 1
+                else:
+                    color_counts[char] = color_counts.get(char, 0) + 1
+
+        if not color_counts:
+            return result
+
+        bg_color = max(color_counts, key=color_counts.get)
+        total = width * height
+        use_bg_fill = transparent_count == 0 and color_counts[bg_color] > total // 2
+
+        if use_bg_fill:
+            result[bg_color] = [(0, 0, width, height)]
+            for y in range(height):
+                for x in range(width):
+                    if pixels[y][x] == bg_color:
+                        covered[y][x] = True
+            colors = sorted(
+                (c for c in color_counts if c != bg_color),
+                key=lambda c: color_counts[c],
+                reverse=True,
+            )
+        else:
+            colors = sorted(
+                color_counts.keys(), key=lambda c: color_counts[c], reverse=True
+            )
+
+        for color in colors:
+            rects = []
+            while True:
+                rect = CodegenService._largest_rect_for_color(
+                    pixels, color, covered, width, height
+                )
+                if rect is None:
+                    break
+                rects.append(rect)
+                rx, ry, rw, rh = rect
+                for dy in range(ry, ry + rh):
+                    for dx in range(rx, rx + rw):
+                        covered[dy][dx] = True
+            if rects:
+                result[color] = rects
+
+        return result
+
+    @staticmethod
+    def _largest_rect_for_color(
+        pixels: list[str],
+        color: str,
+        covered: list[list[bool]],
+        width: int,
+        height: int,
+    ) -> tuple[int, int, int, int] | None:
+        heights = [0] * width
+        best_rect = None
+        best_area = 0
+
+        for y in range(height):
+            row = pixels[y]
+            for x in range(width):
+                if row[x] == color and not covered[y][x]:
+                    heights[x] += 1
+                else:
+                    heights[x] = 0
+
+            stack: list[int] = []
+            for x in range(width + 1):
+                curr_h = heights[x] if x < width else 0
+                while stack and curr_h < heights[stack[-1]]:
+                    h = heights[stack.pop()]
+                    left = stack[-1] + 1 if stack else 0
+                    w = x - left
+                    area = h * w
+                    if area > best_area:
+                        top = y - h + 1
+                        best_rect = (left, top, w, h)
+                        best_area = area
+                stack.append(x)
+
+        return best_rect
 
     @staticmethod
     def _open_browser(path: str) -> None:

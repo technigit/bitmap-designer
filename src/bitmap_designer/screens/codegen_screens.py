@@ -6,27 +6,33 @@ import pyperclip
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Static, Button
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 
 from ..codegen_service import CodegenService
+from .popup_screen import PopupScreen
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
 
 
-class CodegenScreen(Screen):
+class CodegenScreen(PopupScreen):
     """Screen to display and copy generated JavaScript code."""
     CSS = """
-    #code { margin: 0 0; }
+    #code-outer { max-height: 60vh; }
+    VerticalScroll { max-height: 50vh; }
     #hints { margin-top: 1; opacity: 0.5; }
     #status { dock: bottom; }
     """
 
     def compose(self) -> ComposeResult:
-        yield Static(self.app.title_with_file("Code Generation"), id="title")
-        with Vertical():
-            yield Static("", id="code")
-            yield Static("[Enter] copy  [Escape] close", id="hints")
+        with Vertical(id="code-outer"):
+            yield Static(self.app.title_with_file("Code Generation"), id="title")
+            yield VerticalScroll(Static("", id="code"))
+            yield Static("[Enter] copy  [Escape] close", id="hints", markup=False)
+            yield Static("", id="status")
+
+    def show_status(self, message: str) -> None:
+        self.query_one("#status", Static).update(message)
 
     def on_mount(self) -> None:
         code = CodegenService(self.app.bitmaps, palette=self.app.active_palette).generate_code()
@@ -34,14 +40,20 @@ class CodegenScreen(Screen):
 
     def on_key(self, event) -> None:
         if event.key == "ctrl+l":
-            self.app.refresh(repaint=True, layout=True)
+            self.refresh(repaint=True, layout=True)
             return
         if event.key in ("enter", "\n"):
             code = CodegenService(self.app.bitmaps, palette=self.app.active_palette).generate_code()
             pyperclip.copy(code)
-            self.app.show_status("Code copied to clipboard.")
+            self.show_status("Code copied to clipboard.")
         elif event.key == "escape":
             self.app.pop_screen()
+        elif event.key in ("j", "down"):
+            event.stop()
+            self.query_one(VerticalScroll).scroll_down()
+        elif event.key in ("k", "up"):
+            event.stop()
+            self.query_one(VerticalScroll).scroll_up()
 
 
 class ResponseScreen(Screen):
