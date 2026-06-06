@@ -42,6 +42,7 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         self.map_pan: tuple[int, int] = (0, 0)
         self.map_pan_flip: bool = False
         self.step: int = 1
+        self.cursor_timeout: int = 3  # seconds; 0 = disabled
         self.color_pixels: str = "on"
         self.glyphmode: bool = False
         self.palette_id: str | None = None
@@ -215,7 +216,15 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         self.current_key = "1"
         self.bitmaps["1"] = create_default_bitmap()
         self.build_key_adjacency()
-        self.file.set_current_file(os.path.join(DEFAULT_BITMAP_DIR, "Untitled.json"))
+        path = os.path.join(DEFAULT_BITMAP_DIR, "Untitled.json")
+        if os.path.exists(path):
+            n = 1
+            while os.path.exists(
+                os.path.join(DEFAULT_BITMAP_DIR, f"Untitled ({n}).json")
+            ):
+                n += 1
+            path = os.path.join(DEFAULT_BITMAP_DIR, f"Untitled ({n}).json")
+        self.file.set_current_file(path)
         self.dirty = False
         self._take_clean_snapshot()
         self.current_color = "1"

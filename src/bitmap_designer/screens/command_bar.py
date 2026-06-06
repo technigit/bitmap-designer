@@ -42,6 +42,7 @@ CMD_HELP_TEXT = """\
 :set color C      Set current drawing color (0-9, A-F)
 :set colorpixels [on|off|mixed]  Set pixel display mode
 :set glyphmode [on|off]        Toggle palette glyph display
+:set cursortimeout N  Auto-hide grid cursor after N seconds (0 = never)
 :info          Show project metadata
 :config        Open the configuration menu
 :config key NAME  Switch to key and open config\
@@ -75,7 +76,7 @@ def handle_cmd_key(screen, event) -> bool:
         if key in ("colon", "shift+semicolon"):
             screen.cmd_mode = True
             screen.cmd_buffer = ""
-            screen.show_status(":")
+            screen.show_status(":▌")
         else:
             consumed = False
     elif key == "escape":
@@ -89,14 +90,14 @@ def handle_cmd_key(screen, event) -> bool:
     elif key == "backspace":
         if screen.cmd_buffer:
             screen.cmd_buffer = screen.cmd_buffer[:-1]
-            screen.show_status(":" + screen.cmd_buffer)
+            screen.show_status(":" + screen.cmd_buffer + "▌")
     else:
         ch = getattr(event, 'character', None)
         if ch is None and (len(key) == 1 or key == "space"):
             ch = " " if key == "space" else key
         if ch is not None:
             screen.cmd_buffer += ch
-            screen.show_status(":" + screen.cmd_buffer)
+            screen.show_status(":" + screen.cmd_buffer + "▌")
 
     return consumed
 
@@ -173,10 +174,11 @@ def _switch_or_create_key(screen, key_name: str, app) -> None:
     _clear_status(screen, f"Switched to key {key_name}")
 
 
-def _cmd_quit(_screen, _args, force, app):
+def _cmd_quit(screen, _args, force, app):
     if force:
         app.exit()
     else:
+        _clear_status(screen, ":" + screen.cmd_buffer)
         app.push_screen(QuitScreen())
 
 
@@ -184,21 +186,23 @@ def _cmd_save(screen, args, force, _app):
     _do_save(screen, force, args)
 
 
-def _cmd_save_quit(_screen, args, force, app):
-    if _do_save(_screen, force, args):
+def _cmd_save_quit(screen, args, force, app):
+    if _do_save(screen, force, args):
         if force:
             app.exit()
         else:
+            _clear_status(screen, ":" + screen.cmd_buffer)
             app.push_screen(QuitScreen())
 
 
-def _cmd_close(_screen, _args, force, app):
+def _cmd_close(screen, _args, force, app):
     if force:
         app.mark_dirty(False)
     if not app.dirty:
         app.pop_screen()
         app.push_screen(StartupScreen())
     else:
+        _clear_status(screen, ":" + screen.cmd_buffer)
         app.push_screen(CloseScreen())
 
 
@@ -253,11 +257,13 @@ def _cmd_nopan(screen, _args, _force, _app):
         _clear_status(screen, "Unknown command")
 
 
-def _cmd_help(_screen, _args, _force, app):
+def _cmd_help(screen, _args, _force, app):
+    _clear_status(screen, ":" + screen.cmd_buffer)
     app.push_screen(HelpPopupScreen())
 
 
 def _cmd_info(screen, _args, _force, app):
+    _clear_status(screen, ":" + screen.cmd_buffer)
     app.push_screen(InfoScreen(gather_info(app, screen), app, screen))
 
 
@@ -328,6 +334,26 @@ def _set_glyphmode(screen, sub_args, app):
     _clear_status(screen, f"Glyphmode {'on' if app.glyphmode else 'off'}")
 
 
+def _set_cursortimeout(screen, sub_args, app):
+    if not sub_args:
+        _clear_status(screen, f"Cursor timeout is {app.cursor_timeout}s (0 = never)")
+        return
+    val = sub_args[0]
+    if val in ("off", "0"):
+        app.cursor_timeout = 0
+        _clear_status(screen, "Cursor auto-hide off")
+    else:
+        try:
+            n = int(val)
+            if n > 0:
+                app.cursor_timeout = n
+                _clear_status(screen, f"Cursor timeout set to {n}s")
+            else:
+                _clear_status(screen, "Usage: set cursortimeout N (positive)")
+        except ValueError:
+            _clear_status(screen, "Usage: set cursortimeout N")
+
+
 def _cmd_set(screen, args, _force, app):
     if not args:
         _clear_status(screen, "Usage: set step N | set key NAME | set color C")
@@ -340,6 +366,7 @@ def _cmd_set(screen, args, _force, app):
         "color": _set_color,
         "colorpixels": _set_colorpixels,
         "glyphmode": _set_glyphmode,
+        "cursortimeout": _set_cursortimeout,
     }
     handler = dispatch.get(sub)
     if handler:
@@ -357,12 +384,14 @@ def _cmd_config(screen, args, _force, app):
                 _clear_status(screen, "Usage: config key NAME")
                 return
             _switch_or_create_key(screen, key_name, app)
+            _clear_status(screen, ":" + screen.cmd_buffer)
             app.push_screen(ConfigScreen())
         else:
             _clear_status(screen, f"Unknown config parameter: {param}")
         return
     if hasattr(screen, 'selected_key') and screen.selected_key != app.current_key:
         app.set_current_key(screen.selected_key)
+    _clear_status(screen, ":" + screen.cmd_buffer)
     app.push_screen(ConfigScreen())
 
 

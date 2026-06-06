@@ -48,6 +48,7 @@ class DesignScreen(Screen):
         self.cmd_mode = False
         self.cmd_buffer = ""
         self._last_boundary_msg = False
+        self._cursor_timer = None
 
     @property
     def undo_stack(self):
@@ -164,6 +165,19 @@ class DesignScreen(Screen):
             self._ensure_cursor_visible()
             self.refresh_grid()
         self.update_hints()
+        self._reset_cursor_timer()
+
+    def _reset_cursor_timer(self):
+        if self.app.cursor_timeout <= 0:
+            return
+        if self._cursor_timer is not None:
+            self._cursor_timer.stop()
+        self._cursor_timer = self.set_timer(self.app.cursor_timeout, self._auto_hide_cursor)
+
+    def _auto_hide_cursor(self):
+        if not self.cursor_hidden:
+            self.cursor_hidden = True
+            self.refresh_grid()
 
     # Rebuild the grid display from pixel data.
     def refresh_grid(self):
@@ -177,37 +191,42 @@ class DesignScreen(Screen):
         scrolled_d = self.offset_y + vp_h < self.height
 
         lines = [" " + self.app.current_key]
-        lines.append(self._border_line(vp_w, scrolled_l, scrolled_r))
+        lines.append(self._border_line(vp_w, scrolled_l, scrolled_r, top=True))
         lines.extend(self._grid_lines(vp_w, vp_h, scrolled_u, scrolled_d))
-        lines.append(self._border_line(vp_w, scrolled_l, scrolled_r))
+        lines.append(self._border_line(vp_w, scrolled_l, scrolled_r, top=False))
         self.query_one("#grid").update("\n".join(lines))
 
-    def _border_line(self, vp_w: int, sl: bool, sr: bool) -> str:
-        line = "+"
+    def _border_line(self, vp_w: int, sl: bool, sr: bool, top: bool = True) -> str:
+        color = self.app.current_theme.primary or "#00ffff"
+        tl, tr = ("╔", "╗") if top else ("╚", "╝")
+        h = "═"
+        line = f"[{color}]{tl}[/]"
         if sl and sr:
-            line += "<" + "-" * max(0, vp_w * 2 - 2) + ">"
+            line += f"[white]<[/][{color}]{h * max(0, vp_w * 2 - 2)}[/][white]>[/]"
         elif sl:
-            line += "<" + "-" * max(0, vp_w * 2 - 1)
+            line += f"[white]<[/][{color}]{h * max(0, vp_w * 2 - 1)}[/]"
         elif sr:
-            line += "-" * max(0, vp_w * 2 - 1) + ">"
+            line += f"[{color}]{h * max(0, vp_w * 2 - 1)}[/][white]>[/]"
         else:
-            line += "-" * (vp_w * 2)
-        line += "+"
+            line += f"[{color}]{h * vp_w * 2}[/]"
+        line += f"[{color}]{tr}[/]"
         return line
 
     def _grid_lines(self, vp_w: int, vp_h: int,
                     su: bool, sd: bool) -> list[str]:
+        color = self.app.current_theme.primary or "#00ffff"
         rows = []
         for i in range(vp_h):
             y = self.offset_y + i
-            indicator = ("^" if (su and i == 0)
-                         else "v" if (sd and i == vp_h - 1)
-                         else "|")
-            row = indicator
+            ind_char = ("^" if (su and i == 0)
+                        else "v" if (sd and i == vp_h - 1)
+                        else "║")
+            ind_style = "white" if ind_char in ("^", "v") else color
+            row = f"[{ind_style}]{ind_char}[/]"
             for j in range(vp_w):
                 x = self.offset_x + j
                 row += self._cell_markup(x, y, rect_preview=self._in_rect_selection(x, y))
-            row += indicator
+            row += f"[{ind_style}]{ind_char}[/]"
             rows.append(row)
         return rows
 
@@ -296,6 +315,7 @@ class DesignScreen(Screen):
                 self._last_boundary_msg = True
                 return
             self.cursor_y = ny
+        self._reset_cursor_timer()
         self._clear_boundary_status()
 
     def on_resize(self) -> None:
@@ -323,6 +343,7 @@ class DesignScreen(Screen):
                 self.cursor_y = min(self.height - 1, self.cursor_y + step)
             self._ensure_cursor_visible()
             self.refresh_grid()
+            self._reset_cursor_timer()
             return
         if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
             setattr(self.app, 'step', int(key))
@@ -367,8 +388,10 @@ class DesignScreen(Screen):
             self._switch_key_dir(dirs[k])
         elif k == "space":
             self.paint_pixel()
+            self._reset_cursor_timer()
         elif k == "f":
             self.flood_fill()
+            self._reset_cursor_timer()
         elif k == "r":
             self.rect_mode = True
             self.rect_start[0] = self.cursor_x
@@ -377,6 +400,7 @@ class DesignScreen(Screen):
             self.show_status("Rectangle mode: select opposite corner, "
                              "[Enter] confirm, [Escape] cancel")
             self.refresh_grid()
+            self._reset_cursor_timer()
             return
         elif k == "c":
             self.app.push_screen(ColorScreen())
@@ -446,6 +470,12 @@ class DesignScreen(Screen):
 
         if event.key == "tab":
             self.cursor_hidden = not self.cursor_hidden
+            if self.cursor_hidden:
+                if self._cursor_timer is not None:
+                    self._cursor_timer.stop()
+                    self._cursor_timer = None
+            else:
+                self._reset_cursor_timer()
             self.show_status("Cursor hidden" if self.cursor_hidden else "Cursor visible")
             self.refresh_grid()
             self.update_hints()
@@ -479,6 +509,9 @@ class DesignScreen(Screen):
 
     # Paint the current color at the cursor position.
     def paint_pixel(self):
+        new_color = " " if self.app.current_color == "0" else self.app.current_color
+        if self._get_pixel(self.cursor_x, self.cursor_y) == new_color:
+            return
         self._save_state()
         if len(self.pixels) <= self.cursor_y:
             self.pixels.extend(

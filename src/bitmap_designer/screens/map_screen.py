@@ -316,6 +316,8 @@ class MapScreen(Screen):
         pt = pos["pixel_top"]
         pw = pos["pixel_w"]
         dim = opts.get("dim", False)
+        accent_color = self.app.current_theme.primary or "#00ffff"
+        frame_style = "dim" if dim else accent_color
 
         def render_row(row: int) -> None:
             for col in range(pw):
@@ -331,17 +333,17 @@ class MapScreen(Screen):
             if pl + i > opts["bounds"][0] or pt - 2 > opts["bounds"][1]:
                 break
             cell(pl + i, pt - 2, ch, "dim" if dim else None, True)
-        cell(pl - 1, pt - 1, "+", "dim" if dim else None, True)
+        cell(pl - 1, pt - 1, "╔" if not dim else "+", frame_style, True)
         for cx in range(pl, pl + pw):
-            cell(cx, pt - 1, "-", "dim" if dim else None, True)
-        cell(pl + pw, pt - 1, "+", "dim" if dim else None, True)
-        cell(pl - 1, pt + pos["pixel_h"], "+", "dim" if dim else None, True)
+            cell(cx, pt - 1, "═" if not dim else "-", frame_style, True)
+        cell(pl + pw, pt - 1, "╗" if not dim else "+", frame_style, True)
+        cell(pl - 1, pt + pos["pixel_h"], "╚" if not dim else "+", frame_style, True)
         for cx in range(pl, pl + pw):
-            cell(cx, pt + pos["pixel_h"], "-", "dim" if dim else None, True)
-        cell(pl + pw, pt + pos["pixel_h"], "+", "dim" if dim else None, True)
+            cell(cx, pt + pos["pixel_h"], "═" if not dim else "-", frame_style, True)
+        cell(pl + pw, pt + pos["pixel_h"], "╝" if not dim else "+", frame_style, True)
         for row in range(pos["pixel_h"]):
-            cell(pl - 1, pt + row, "|", "dim" if dim else None, True)
-            cell(pl + pw, pt + row, "|", "dim" if dim else None, True)
+            cell(pl - 1, pt + row, "║" if not dim else "|", frame_style, True)
+            cell(pl + pw, pt + row, "║" if not dim else "|", frame_style, True)
             render_row(row)
 
     def _render_grid(self, ctx: DeviceContext) -> Text:

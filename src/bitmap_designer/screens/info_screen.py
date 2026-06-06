@@ -268,7 +268,7 @@ class InfoScreen(PopupScreen):
                 self._refresh()
                 self.query_one("#status", Static).update(f"Switched to key {dest}")
             else:
-                msgs = {"right": "No key right", "left": "No key left",
+                msgs = {"right": "No key to the right", "left": "No key to the left",
                         "down": "No key below", "up": "No key above"}
                 self.query_one("#status", Static).update(msgs[dirs[k]])
             return
