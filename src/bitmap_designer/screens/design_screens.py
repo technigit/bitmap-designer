@@ -34,13 +34,11 @@ class DesignScreen(Screen):
         super().__init__()
         self.width = bitmap_data.get("bounds", {}).get("width", 10)
         self.height = bitmap_data.get("bounds", {}).get("height", 10)
-        self.cursor_x = 0
-        self.cursor_y = 0
+        self.cursor = [0, 0]
         self.cursor_hidden = False
         self.pixels = bitmap_data.get("bitmap", {}).get("pixels", [])
         self._key_on_enter = self.app.current_key
-        self.offset_x: int = 0
-        self.offset_y: int = 0
+        self._offset = [0, 0]
         self.viewport = [0, 0]
         self.scroll_mode = False
         self.rect_mode = False
@@ -66,8 +64,8 @@ class DesignScreen(Screen):
 
     # Clamp offset so viewport stays within bitmap bounds.
     def _clamp_offset(self):
-        self.offset_x = max(0, min(self.offset_x, max(0, self.width - self.viewport[0])))
-        self.offset_y = max(0, min(self.offset_y, max(0, self.height - self.viewport[1])))
+        self._offset[0] = max(0, min(self._offset[0], max(0, self.width - self.viewport[0])))
+        self._offset[1] = max(0, min(self._offset[1], max(0, self.height - self.viewport[1])))
 
     @property
     def content_fits(self) -> bool:
@@ -77,30 +75,30 @@ class DesignScreen(Screen):
     def _ensure_cursor_visible(self):
         margin = 2
         if self.viewport[0] >= self.width and self.viewport[1] >= self.height:
-            self.offset_x = 0
-            self.offset_y = 0
+            self._offset[0] = 0
+            self._offset[1] = 0
             return
-        if self.cursor_x < self.offset_x + margin:
-            self.offset_x = max(0, self.cursor_x - margin)
-        elif self.cursor_x >= self.offset_x + self.viewport[0] - margin:
-            self.offset_x = min(
+        if self.cursor[0] < self._offset[0] + margin:
+            self._offset[0] = max(0, self.cursor[0] - margin)
+        elif self.cursor[0] >= self._offset[0] + self.viewport[0] - margin:
+            self._offset[0] = min(
                 max(0, self.width - self.viewport[0]),
-                self.cursor_x - self.viewport[0] + margin + 1
+                self.cursor[0] - self.viewport[0] + margin + 1
             )
-        if self.cursor_y < self.offset_y + margin:
-            self.offset_y = max(0, self.cursor_y - margin)
-        elif self.cursor_y >= self.offset_y + self.viewport[1] - margin:
-            self.offset_y = min(
+        if self.cursor[1] < self._offset[1] + margin:
+            self._offset[1] = max(0, self.cursor[1] - margin)
+        elif self.cursor[1] >= self._offset[1] + self.viewport[1] - margin:
+            self._offset[1] = min(
                 max(0, self.height - self.viewport[1]),
-                self.cursor_y - self.viewport[1] + margin + 1
+                self.cursor[1] - self.viewport[1] + margin + 1
             )
 
     # Shift the viewport by (dx, dy) bitmap pixels. Returns True if offset changed.
     def _scroll(self, dx: int, dy: int) -> bool:
-        old_x, old_y = self.offset_x, self.offset_y
-        self.offset_x = max(0, min(self.offset_x + dx, max(0, self.width - self.viewport[0])))
-        self.offset_y = max(0, min(self.offset_y + dy, max(0, self.height - self.viewport[1])))
-        return self.offset_x != old_x or self.offset_y != old_y
+        old_x, old_y = self._offset[0], self._offset[1]
+        self._offset[0] = max(0, min(self._offset[0] + dx, max(0, self.width - self.viewport[0])))
+        self._offset[1] = max(0, min(self._offset[1] + dy, max(0, self.height - self.viewport[1])))
+        return self._offset[0] != old_x or self._offset[1] != old_y
 
     def compose(self) -> ComposeResult:
         yield Static(self.app.title_with_file(self.base_title), id="title")
@@ -111,17 +109,17 @@ class DesignScreen(Screen):
 
     def on_mount(self) -> None:
         ox, oy = self.app.scroll_offsets.get(self.app.current_key, (0, 0))
-        self.offset_x, self.offset_y = ox, oy
+        self._offset[0], self._offset[1] = ox, oy
         self.refresh_grid()
         self.update_hints()
 
     def _in_rect_selection(self, x: int, y: int) -> bool:
         if not self.rect_mode:
             return False
-        x1 = min(self.rect_start[0], self.cursor_x)
-        x2 = max(self.rect_start[0], self.cursor_x)
-        y1 = min(self.rect_start[1], self.cursor_y)
-        y2 = max(self.rect_start[1], self.cursor_y)
+        x1 = min(self.rect_start[0], self.cursor[0])
+        x2 = max(self.rect_start[0], self.cursor[0])
+        y1 = min(self.rect_start[1], self.cursor[1])
+        y2 = max(self.rect_start[1], self.cursor[1])
         return x1 <= x <= x2 and y1 <= y <= y2
 
     def _cell_markup(self, x: int, y: int, *, rect_preview: bool = False) -> str:
@@ -134,7 +132,7 @@ class DesignScreen(Screen):
         display_char = (
             color_entry.get("glyph", char) if self.app.glyphmode else char
         )
-        cursor = not self.cursor_hidden and x == self.cursor_x and y == self.cursor_y
+        cursor = not self.cursor_hidden and x == self.cursor[0] and y == self.cursor[1]
 
         if char == " ":
             if cursor:
@@ -182,13 +180,13 @@ class DesignScreen(Screen):
     # Rebuild the grid display from pixel data.
     def refresh_grid(self):
         self._recalc_viewport()
-        vp_w = min(self.viewport[0], self.width - self.offset_x)
-        vp_h = min(self.viewport[1], self.height - self.offset_y)
+        vp_w = min(self.viewport[0], self.width - self._offset[0])
+        vp_h = min(self.viewport[1], self.height - self._offset[1])
 
-        scrolled_l = self.offset_x > 0
-        scrolled_r = self.offset_x + vp_w < self.width
-        scrolled_u = self.offset_y > 0
-        scrolled_d = self.offset_y + vp_h < self.height
+        scrolled_l = self._offset[0] > 0
+        scrolled_r = self._offset[0] + vp_w < self.width
+        scrolled_u = self._offset[1] > 0
+        scrolled_d = self._offset[1] + vp_h < self.height
 
         lines = [" " + self.app.current_key]
         lines.append(self._border_line(vp_w, scrolled_l, scrolled_r, top=True))
@@ -217,14 +215,14 @@ class DesignScreen(Screen):
         color = self.app.current_theme.primary or "#00ffff"
         rows = []
         for i in range(vp_h):
-            y = self.offset_y + i
+            y = self._offset[1] + i
             ind_char = ("^" if (su and i == 0)
                         else "v" if (sd and i == vp_h - 1)
                         else "║")
             ind_style = "white" if ind_char in ("^", "v") else color
             row = f"[{ind_style}]{ind_char}[/]"
             for j in range(vp_w):
-                x = self.offset_x + j
+                x = self._offset[0] + j
                 row += self._cell_markup(x, y, rect_preview=self._in_rect_selection(x, y))
             row += f"[{ind_style}]{ind_char}[/]"
             rows.append(row)
@@ -288,33 +286,33 @@ class DesignScreen(Screen):
         if self.cursor_hidden:
             self.cursor_hidden = False
         if base_lower in ("left", "h"):
-            nx = max(0, self.cursor_x - step)
-            if nx == self.cursor_x:
+            nx = max(0, self.cursor[0] - step)
+            if nx == self.cursor[0]:
                 self.show_status(msgs[base_lower])
                 self._last_boundary_msg = True
                 return
-            self.cursor_x = nx
+            self.cursor[0] = nx
         elif base_lower in ("right", "l"):
-            nx = min(self.width - 1, self.cursor_x + step)
-            if nx == self.cursor_x:
+            nx = min(self.width - 1, self.cursor[0] + step)
+            if nx == self.cursor[0]:
                 self.show_status(msgs[base_lower])
                 self._last_boundary_msg = True
                 return
-            self.cursor_x = nx
+            self.cursor[0] = nx
         elif base_lower in ("up", "k"):
-            ny = max(0, self.cursor_y - step)
-            if ny == self.cursor_y:
+            ny = max(0, self.cursor[1] - step)
+            if ny == self.cursor[1]:
                 self.show_status(msgs[base_lower])
                 self._last_boundary_msg = True
                 return
-            self.cursor_y = ny
+            self.cursor[1] = ny
         elif base_lower in ("down", "j"):
-            ny = min(self.height - 1, self.cursor_y + step)
-            if ny == self.cursor_y:
+            ny = min(self.height - 1, self.cursor[1] + step)
+            if ny == self.cursor[1]:
                 self.show_status(msgs[base_lower])
                 self._last_boundary_msg = True
                 return
-            self.cursor_y = ny
+            self.cursor[1] = ny
         self._reset_cursor_timer()
         self._clear_boundary_status()
 
@@ -334,13 +332,13 @@ class DesignScreen(Screen):
                 mods.add("shift")
             step = self.app.step * (5 if "shift" in mods else 1)
             if base_low in ("left", "h"):
-                self.cursor_x = max(0, self.cursor_x - step)
+                self.cursor[0] = max(0, self.cursor[0] - step)
             elif base_low in ("right", "l"):
-                self.cursor_x = min(self.width - 1, self.cursor_x + step)
+                self.cursor[0] = min(self.width - 1, self.cursor[0] + step)
             elif base_low in ("up", "k"):
-                self.cursor_y = max(0, self.cursor_y - step)
+                self.cursor[1] = max(0, self.cursor[1] - step)
             elif base_low in ("down", "j"):
-                self.cursor_y = min(self.height - 1, self.cursor_y + step)
+                self.cursor[1] = min(self.height - 1, self.cursor[1] + step)
             self._ensure_cursor_visible()
             self.refresh_grid()
             self._reset_cursor_timer()
@@ -358,8 +356,8 @@ class DesignScreen(Screen):
             self.refresh_grid()
             return
         if k_low == "escape":
-            self.cursor_x = self.rect_start[0]
-            self.cursor_y = self.rect_start[1]
+            self.cursor[0] = self.rect_start[0]
+            self.cursor[1] = self.rect_start[1]
             self.rect_mode = False
             self.show_status("Rectangle cancelled")
             self.update_hints()
@@ -394,8 +392,8 @@ class DesignScreen(Screen):
             self._reset_cursor_timer()
         elif k == "r":
             self.rect_mode = True
-            self.rect_start[0] = self.cursor_x
-            self.rect_start[1] = self.cursor_y
+            self.rect_start[0] = self.cursor[0]
+            self.rect_start[1] = self.cursor[1]
             self.update_hints()
             self.show_status("Rectangle mode")
             self.refresh_grid()
@@ -438,8 +436,8 @@ class DesignScreen(Screen):
         if old_key == new_key:
             return
         self.rect_mode = False
-        self.app.cursor_positions[old_key] = (self.cursor_x, self.cursor_y)
-        self.app.scroll_offsets[old_key] = (self.offset_x, self.offset_y)
+        self.app.cursor_positions[old_key] = (self.cursor[0], self.cursor[1])
+        self.app.scroll_offsets[old_key] = (self._offset[0], self._offset[1])
         self.app.set_current_key(new_key)
         self._key_on_enter = new_key
         bm = self.app.bitmaps.get(new_key, {})
@@ -447,10 +445,10 @@ class DesignScreen(Screen):
         self.height = bm.get("bounds", {}).get("height", 10)
         self.pixels = bm.get("bitmap", {}).get("pixels", [])
         cx, cy = self.app.cursor_positions.get(new_key, (0, 0))
-        self.cursor_x = min(cx, self.width - 1)
-        self.cursor_y = min(cy, self.height - 1)
+        self.cursor[0] = min(cx, self.width - 1)
+        self.cursor[1] = min(cy, self.height - 1)
         ox, oy = self.app.scroll_offsets.get(new_key, (0, 0))
-        self.offset_x, self.offset_y = ox, oy
+        self._offset[0], self._offset[1] = ox, oy
         self.refresh_grid()
         self.update_hints()
         title = self.query_one("#title", Static)
@@ -458,69 +456,61 @@ class DesignScreen(Screen):
         self.show_status(f"Switched to key {new_key}.")
 
     def on_key(self, event) -> None:
-        if handle_cmd_key(self, event):
-            event.stop()
-            return
-
-        if event.key == "ctrl+l":
-            self.show_status("")
-            self.app.refresh(repaint=True, layout=True)
-            return
-
-        if event.key == "tab":
-            self.cursor_hidden = not self.cursor_hidden
-            if self.cursor_hidden:
-                if self._cursor_timer is not None:
-                    self._cursor_timer.stop()
-                    self._cursor_timer = None
-            else:
-                self._reset_cursor_timer()
-            self.show_status("Cursor hidden" if self.cursor_hidden else "Cursor visible")
-            self.refresh_grid()
-            self.update_hints()
-            return
-
         key = event.key
 
-        if self.rect_mode:
+        if handle_cmd_key(self, event):
+            event.stop()
+        elif key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+        elif key == "tab":
+            self._toggle_cursor_hidden()
+        elif self.rect_mode:
             self._on_key_rect_mode(key)
-            return
-
-        if key == "g":
-            if self.content_fits:
-                self.show_status("All content visible — scrolling disabled")
-                return
-            self.scroll_mode = not self.scroll_mode
-            if self.scroll_mode:
-                self.show_status("Scroll mode on")
-            else:
-                self.show_status("Scroll mode off")
-            self.update_hints()
-            return
-
-        if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
+        elif key == "g":
+            self._handle_g_key()
+        elif key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
             setattr(self.app, 'step', int(key))
             self.show_status(f"Step set to {self.app.step}")
             self.update_hints()
-            return
+        else:
+            self._on_key_action(key.lower(), event)
 
-        self._on_key_action(key.lower(), event)
+    def _toggle_cursor_hidden(self) -> None:
+        self.cursor_hidden = not self.cursor_hidden
+        if self.cursor_hidden:
+            if self._cursor_timer is not None:
+                self._cursor_timer.stop()
+                self._cursor_timer = None
+        else:
+            self._reset_cursor_timer()
+        self.show_status("Cursor hidden" if self.cursor_hidden else "Cursor visible")
+        self.refresh_grid()
+        self.update_hints()
+
+    def _handle_g_key(self) -> None:
+        if self.content_fits:
+            self.show_status("All content visible — scrolling disabled")
+        else:
+            self.scroll_mode = not self.scroll_mode
+            self.show_status("Scroll mode on" if self.scroll_mode else "Scroll mode off")
+            self.update_hints()
 
     # Paint the current color at the cursor position.
     def paint_pixel(self):
         new_color = " " if self.app.current_color == "0" else self.app.current_color
-        if self._get_pixel(self.cursor_x, self.cursor_y) == new_color:
+        if self._get_pixel(self.cursor[0], self.cursor[1]) == new_color:
             return
         self._save_state()
-        if len(self.pixels) <= self.cursor_y:
+        if len(self.pixels) <= self.cursor[1]:
             self.pixels.extend(
-                [" " * self.width for _ in range(self.cursor_y - len(self.pixels) + 1)]
+                [" " * self.width for _ in range(self.cursor[1] - len(self.pixels) + 1)]
             )
-        row = list(self.pixels[self.cursor_y])
-        if len(row) <= self.cursor_x:
-            row.extend([" "] * (self.cursor_x - len(row) + 1))
-        row[self.cursor_x] = " " if self.app.current_color == "0" else self.app.current_color
-        self.pixels[self.cursor_y] = "".join(row)
+        row = list(self.pixels[self.cursor[1]])
+        if len(row) <= self.cursor[0]:
+            row.extend([" "] * (self.cursor[0] - len(row) + 1))
+        row[self.cursor[0]] = " " if self.app.current_color == "0" else self.app.current_color
+        self.pixels[self.cursor[1]] = "".join(row)
         self.app.mark_dirty()
         self._sync_pixels()
         CodegenService(self.app.bitmaps, palette=self.app.active_palette).save_preview_html()
@@ -528,11 +518,11 @@ class DesignScreen(Screen):
     # Fill a connected region from the cursor with the current color.
     def flood_fill(self):
         self._save_state()
-        target = self._get_pixel(self.cursor_x, self.cursor_y)
+        target = self._get_pixel(self.cursor[0], self.cursor[1])
         fill_color = self.app.current_color
         if target == fill_color:
             return
-        self._flood_fill(self.cursor_x, self.cursor_y, target, fill_color)
+        self._flood_fill(self.cursor[0], self.cursor[1], target, fill_color)
         self.app.mark_dirty()
         self._sync_pixels()
         CodegenService(self.app.bitmaps, palette=self.app.active_palette).save_preview_html()
@@ -572,10 +562,10 @@ class DesignScreen(Screen):
 
     def _paint_rectangle(self):
         self._save_state()
-        x1 = min(self.rect_start[0], self.cursor_x)
-        x2 = max(self.rect_start[0], self.cursor_x)
-        y1 = min(self.rect_start[1], self.cursor_y)
-        y2 = max(self.rect_start[1], self.cursor_y)
+        x1 = min(self.rect_start[0], self.cursor[0])
+        x2 = max(self.rect_start[0], self.cursor[0])
+        y1 = min(self.rect_start[1], self.cursor[1])
+        y2 = max(self.rect_start[1], self.cursor[1])
         fill = self.app.current_color
         for y in range(y1, y2 + 1):
             for x in range(x1, x2 + 1):
@@ -587,7 +577,7 @@ class DesignScreen(Screen):
 
 
     def _save_state(self):
-        self.undo_stack.append((list(self.pixels), self.cursor_x, self.cursor_y))
+        self.undo_stack.append((list(self.pixels), self.cursor[0], self.cursor[1]))
         self.redo_stack.clear()
         self.update_hints()
 
@@ -603,7 +593,7 @@ class DesignScreen(Screen):
             return
         _, saved_cx, saved_cy = self.undo_stack[-1]
         self.redo_stack.append((list(self.pixels), saved_cx, saved_cy))
-        self.pixels, self.cursor_x, self.cursor_y = self.undo_stack.pop()
+        self.pixels, self.cursor[0], self.cursor[1] = self.undo_stack.pop()
         self._sync_pixels()
         self.app.mark_dirty()
         self.update_hints()
@@ -617,7 +607,7 @@ class DesignScreen(Screen):
             return
         _, saved_cx, saved_cy = self.redo_stack[-1]
         self.undo_stack.append((list(self.pixels), saved_cx, saved_cy))
-        self.pixels, self.cursor_x, self.cursor_y = self.redo_stack.pop()
+        self.pixels, self.cursor[0], self.cursor[1] = self.redo_stack.pop()
         self._sync_pixels()
         self.app.mark_dirty()
         self.update_hints()

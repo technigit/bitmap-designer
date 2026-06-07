@@ -18,7 +18,6 @@ from ..constants import create_default_bitmap
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
 
-BORDER = "dim"
 
 
 @dataclass
@@ -314,13 +313,11 @@ class MapScreen(Screen):
                     cell, opts: dict) -> None:
         pl = pos["pixel_left"]
         pt = pos["pixel_top"]
-        pw = pos["pixel_w"]
         dim = opts.get("dim", False)
-        accent_color = self.app.current_theme.primary or "#00ffff"
-        frame_style = "dim" if dim else accent_color
+        frame_style = "dim" if dim else (self.app.current_theme.primary or "#00ffff")
 
         def render_row(row: int) -> None:
-            for col in range(pw):
+            for col in range(pos["pixel_w"]):
                 pixel_char = self._sample_pixel(ctx, key, col, row)
                 display, px_style = self._pixel_map_char(pixel_char)
                 if px_style and dim:
@@ -334,44 +331,46 @@ class MapScreen(Screen):
                 break
             cell(pl + i, pt - 2, ch, "dim" if dim else None, True)
         cell(pl - 1, pt - 1, "╔" if not dim else "┌", frame_style, True)
-        for cx in range(pl, pl + pw):
+        for cx in range(pl, pl + pos["pixel_w"]):
             cell(cx, pt - 1, "═" if not dim else "─", frame_style, True)
-        cell(pl + pw, pt - 1, "╗" if not dim else "┐", frame_style, True)
+        cell(pl + pos["pixel_w"], pt - 1, "╗" if not dim else "┐", frame_style, True)
         cell(pl - 1, pt + pos["pixel_h"], "╚" if not dim else "└", frame_style, True)
-        for cx in range(pl, pl + pw):
+        for cx in range(pl, pl + pos["pixel_w"]):
             cell(cx, pt + pos["pixel_h"], "═" if not dim else "─", frame_style, True)
-        cell(pl + pw, pt + pos["pixel_h"], "╝" if not dim else "┘", frame_style, True)
+        cell(pl + pos["pixel_w"], pt + pos["pixel_h"], "╝" if not dim else "┘", frame_style, True)
         for row in range(pos["pixel_h"]):
             cell(pl - 1, pt + row, "║" if not dim else "│", frame_style, True)
-            cell(pl + pw, pt + row, "║" if not dim else "│", frame_style, True)
+            cell(pl + pos["pixel_w"], pt + row, "║" if not dim else "│", frame_style, True)
             render_row(row)
+
+    def _compute_scrolled(self, ctx: DeviceContext, positions: dict
+                          ) -> tuple[bool, bool, bool, bool, int, int]:
+        max_right = 0
+        max_bottom = 0
+        min_left = float("inf")
+        min_top = float("inf")
+        for pos in positions.values():
+            pl = pos["pixel_left"]
+            pt = pos["pixel_top"]
+            min_left = min(min_left, pl)
+            min_top = min(min_top, pt)
+            max_right = max(max_right, pl + pos["pixel_w"])
+            max_bottom = max(max_bottom, pt + pos["pixel_h"])
+        if min_left == float("inf"):
+            min_left = min_top = 0
+        scrolled_l = min_left < 1
+        scrolled_r = max_right > ctx.cw - 2
+        scrolled_u = min_top < 1
+        scrolled_d = max_bottom > ctx.ch - 2
+        return scrolled_l, scrolled_r, scrolled_u, scrolled_d, max_right, max_bottom
 
     def _render_grid(self, ctx: DeviceContext) -> Text:
         positions = self._compute_positions(ctx)
         grid = [[(" ", None) for _ in range(ctx.cw)]
                 for _ in range(ctx.ch)]
 
-        max_right = 0
-        max_bottom = 0
-        min_left = float("inf")
-        min_top = float("inf")
-        for pos in positions.values():
-            l = pos["pixel_left"]
-            t = pos["pixel_top"]
-            r = l + pos["pixel_w"]
-            b = t + pos["pixel_h"]
-            min_left = min(min_left, l)
-            min_top = min(min_top, t)
-            max_right = max(max_right, r)
-            max_bottom = max(max_bottom, b)
-
-        if min_left == float("inf"):
-            min_left = min_top = 0
-
-        scrolled_l = min_left < 1
-        scrolled_r = max_right > ctx.cw - 2
-        scrolled_u = min_top < 1
-        scrolled_d = max_bottom > ctx.ch - 2
+        (scrolled_l, scrolled_r, scrolled_u, scrolled_d,
+         max_right, max_bottom) = self._compute_scrolled(ctx, positions)
 
         def set_cell(col: int, row: int, char: str, style: str | None,
                      overwrite: bool) -> None:
@@ -388,45 +387,37 @@ class MapScreen(Screen):
             self._render_one(ctx, self.selected_key, positions[self.selected_key],
                              cell=set_cell, opts={"bounds": max_bounds, "dim": False})
 
-        self._draw_grid_borders(ctx, grid, scrolled_l, scrolled_r, scrolled_u, scrolled_d)
+        self._draw_grid_borders(ctx, grid, (scrolled_l, scrolled_r, scrolled_u, scrolled_d))
         self._fill_grid_empty(ctx, grid, max_right, max_bottom)
         return self._compress_grid(ctx, grid)
 
     def _draw_grid_borders(self, ctx: DeviceContext, grid: list,
-                           sl: bool, sr: bool, su: bool, sd: bool) -> None:
-        INDICATOR = "white"
-        for col in range(ctx.cw):
-            if col == 0:
-                grid[0][col] = ("┌", BORDER)
-            elif sl and col == 1:
-                grid[0][col] = ("<", INDICATOR)
-            elif sr and col == ctx.cw - 2:
-                grid[0][col] = (">", INDICATOR)
-            elif col == ctx.cw - 1:
-                grid[0][col] = ("┐", BORDER)
-            else:
-                grid[0][col] = ("─", BORDER)
-        for col in range(ctx.cw):
-            if col == 0:
-                grid[ctx.ch - 1][col] = ("└", BORDER)
-            elif sl and col == 1:
-                grid[ctx.ch - 1][col] = ("<", INDICATOR)
-            elif sr and col == ctx.cw - 2:
-                grid[ctx.ch - 1][col] = (">", INDICATOR)
-            elif col == ctx.cw - 1:
-                grid[ctx.ch - 1][col] = ("┘", BORDER)
-            else:
-                grid[ctx.ch - 1][col] = ("─", BORDER)
+                           scrolled: tuple[bool, bool, bool, bool]) -> None:
+        sl, sr, su, sd = scrolled
+        indicator_style = "white"
+        frame_style = "dim"
+        for row in (0, ctx.ch - 1):
+            tl, tr = ("┌", "┐") if row == 0 else ("└", "┘")
+            for col in range(ctx.cw):
+                if col == 0:
+                    grid[row][col] = (tl, frame_style)
+                elif col == ctx.cw - 1:
+                    grid[row][col] = (tr, frame_style)
+                elif sl and col == 1:
+                    grid[row][col] = ("<", indicator_style)
+                elif sr and col == ctx.cw - 2:
+                    grid[row][col] = (">", indicator_style)
+                else:
+                    grid[row][col] = ("─", frame_style)
         for row in range(1, ctx.ch - 1):
-            if su and row == 1:
-                grid[row][0] = ("^", INDICATOR)
-                grid[row][ctx.cw - 1] = ("^", INDICATOR)
-            elif sd and row == ctx.ch - 2:
-                grid[row][0] = ("v", INDICATOR)
-                grid[row][ctx.cw - 1] = ("v", INDICATOR)
-            else:
-                grid[row][0] = ("│", BORDER)
-                grid[row][ctx.cw - 1] = ("│", BORDER)
+            grid[row][0] = ("│", frame_style)
+            grid[row][ctx.cw - 1] = ("│", frame_style)
+        if su and ctx.ch > 2:
+            grid[1][0] = ("^", indicator_style)
+            grid[1][ctx.cw - 1] = ("^", indicator_style)
+        if sd and ctx.ch > 2:
+            grid[ctx.ch - 2][0] = ("v", indicator_style)
+            grid[ctx.ch - 2][ctx.cw - 1] = ("v", indicator_style)
 
     def _fill_grid_empty(self, ctx: DeviceContext, grid: list,
                          max_right: int, max_bottom: int) -> None:
