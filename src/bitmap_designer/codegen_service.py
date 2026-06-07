@@ -98,8 +98,8 @@ class CodegenService:
         width = len(pixels[0])
 
         lines.append(f"// Bitmap {idx}")
-        lines.append(f"var {x_var} = {location['x']};")
-        lines.append(f"var {y_var} = {location['y']};")
+        lines.append(f"var {x_var} = {location['x']} * {pixel_size};")
+        lines.append(f"var {y_var} = {location['y']} * {pixel_size};")
 
         rectangles = CodegenService._extract_rectangles(pixels, width, height)
         for color, rects in rectangles.items():

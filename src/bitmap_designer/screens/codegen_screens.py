@@ -40,7 +40,8 @@ class CodegenScreen(PopupScreen):
 
     def on_key(self, event) -> None:
         if event.key == "ctrl+l":
-            self.refresh(repaint=True, layout=True)
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
             return
         if event.key in ("enter", "\n"):
             code = CodegenService(self.app.bitmaps, palette=self.app.active_palette).generate_code()

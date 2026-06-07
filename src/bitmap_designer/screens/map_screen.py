@@ -333,17 +333,17 @@ class MapScreen(Screen):
             if pl + i > opts["bounds"][0] or pt - 2 > opts["bounds"][1]:
                 break
             cell(pl + i, pt - 2, ch, "dim" if dim else None, True)
-        cell(pl - 1, pt - 1, "╔" if not dim else "+", frame_style, True)
+        cell(pl - 1, pt - 1, "╔" if not dim else "┌", frame_style, True)
         for cx in range(pl, pl + pw):
-            cell(cx, pt - 1, "═" if not dim else "-", frame_style, True)
-        cell(pl + pw, pt - 1, "╗" if not dim else "+", frame_style, True)
-        cell(pl - 1, pt + pos["pixel_h"], "╚" if not dim else "+", frame_style, True)
+            cell(cx, pt - 1, "═" if not dim else "─", frame_style, True)
+        cell(pl + pw, pt - 1, "╗" if not dim else "┐", frame_style, True)
+        cell(pl - 1, pt + pos["pixel_h"], "╚" if not dim else "└", frame_style, True)
         for cx in range(pl, pl + pw):
-            cell(cx, pt + pos["pixel_h"], "═" if not dim else "-", frame_style, True)
-        cell(pl + pw, pt + pos["pixel_h"], "╝" if not dim else "+", frame_style, True)
+            cell(cx, pt + pos["pixel_h"], "═" if not dim else "─", frame_style, True)
+        cell(pl + pw, pt + pos["pixel_h"], "╝" if not dim else "┘", frame_style, True)
         for row in range(pos["pixel_h"]):
-            cell(pl - 1, pt + row, "║" if not dim else "|", frame_style, True)
-            cell(pl + pw, pt + row, "║" if not dim else "|", frame_style, True)
+            cell(pl - 1, pt + row, "║" if not dim else "│", frame_style, True)
+            cell(pl + pw, pt + row, "║" if not dim else "│", frame_style, True)
             render_row(row)
 
     def _render_grid(self, ctx: DeviceContext) -> Text:
@@ -353,11 +353,25 @@ class MapScreen(Screen):
 
         max_right = 0
         max_bottom = 0
+        min_left = float("inf")
+        min_top = float("inf")
         for pos in positions.values():
-            r = pos["pixel_left"] + pos["pixel_w"]
-            b = pos["pixel_top"] + pos["pixel_h"]
+            l = pos["pixel_left"]
+            t = pos["pixel_top"]
+            r = l + pos["pixel_w"]
+            b = t + pos["pixel_h"]
+            min_left = min(min_left, l)
+            min_top = min(min_top, t)
             max_right = max(max_right, r)
             max_bottom = max(max_bottom, b)
+
+        if min_left == float("inf"):
+            min_left = min_top = 0
+
+        scrolled_l = min_left < 1
+        scrolled_r = max_right > ctx.cw - 2
+        scrolled_u = min_top < 1
+        scrolled_d = max_bottom > ctx.ch - 2
 
         def set_cell(col: int, row: int, char: str, style: str | None,
                      overwrite: bool) -> None:
@@ -374,21 +388,45 @@ class MapScreen(Screen):
             self._render_one(ctx, self.selected_key, positions[self.selected_key],
                              cell=set_cell, opts={"bounds": max_bounds, "dim": False})
 
-        self._draw_grid_borders(ctx, grid)
+        self._draw_grid_borders(ctx, grid, scrolled_l, scrolled_r, scrolled_u, scrolled_d)
         self._fill_grid_empty(ctx, grid, max_right, max_bottom)
         return self._compress_grid(ctx, grid)
 
-    def _draw_grid_borders(self, ctx: DeviceContext, grid: list) -> None:
+    def _draw_grid_borders(self, ctx: DeviceContext, grid: list,
+                           sl: bool, sr: bool, su: bool, sd: bool) -> None:
+        INDICATOR = "white"
         for col in range(ctx.cw):
-            grid[0][col] = ("─", BORDER)
-            grid[ctx.ch - 1][col] = ("─", BORDER)
+            if col == 0:
+                grid[0][col] = ("┌", BORDER)
+            elif sl and col == 1:
+                grid[0][col] = ("<", INDICATOR)
+            elif sr and col == ctx.cw - 2:
+                grid[0][col] = (">", INDICATOR)
+            elif col == ctx.cw - 1:
+                grid[0][col] = ("┐", BORDER)
+            else:
+                grid[0][col] = ("─", BORDER)
+        for col in range(ctx.cw):
+            if col == 0:
+                grid[ctx.ch - 1][col] = ("└", BORDER)
+            elif sl and col == 1:
+                grid[ctx.ch - 1][col] = ("<", INDICATOR)
+            elif sr and col == ctx.cw - 2:
+                grid[ctx.ch - 1][col] = (">", INDICATOR)
+            elif col == ctx.cw - 1:
+                grid[ctx.ch - 1][col] = ("┘", BORDER)
+            else:
+                grid[ctx.ch - 1][col] = ("─", BORDER)
         for row in range(1, ctx.ch - 1):
-            grid[row][0] = ("│", BORDER)
-            grid[row][ctx.cw - 1] = ("│", BORDER)
-        grid[0][0] = ("┌", BORDER)
-        grid[0][ctx.cw - 1] = ("┐", BORDER)
-        grid[ctx.ch - 1][0] = ("└", BORDER)
-        grid[ctx.ch - 1][ctx.cw - 1] = ("┘", BORDER)
+            if su and row == 1:
+                grid[row][0] = ("^", INDICATOR)
+                grid[row][ctx.cw - 1] = ("^", INDICATOR)
+            elif sd and row == ctx.ch - 2:
+                grid[row][0] = ("v", INDICATOR)
+                grid[row][ctx.cw - 1] = ("v", INDICATOR)
+            else:
+                grid[row][0] = ("│", BORDER)
+                grid[row][ctx.cw - 1] = ("│", BORDER)
 
     def _fill_grid_empty(self, ctx: DeviceContext, grid: list,
                          max_right: int, max_bottom: int) -> None:
@@ -528,6 +566,20 @@ class MapScreen(Screen):
 
     def _reset_zoom_view(self) -> None:
         self.zoom_scale = 1.0
+        cw, ch = self.compute_canvas_size()
+        data = self.app.bitmaps.get(self.selected_key)
+        if data:
+            loc = data.get("location", {})
+            bx = loc.get("x", 0)
+            by = loc.get("y", 0)
+            bounds = data.get("bounds", {"width": 10, "height": 10})
+            bw = bounds["width"]
+            bh = bounds["height"]
+            self.pan_x = int(cw / 2 - bx - bw / 2)
+            self.pan_y = int(ch / 2 - by * self.aspect_y - (bh * self.aspect_y) / 2 + 1)
+        else:
+            self.pan_x = 2
+            self.pan_y = 3
         self._last_fit = None
         self.refresh_map()
 

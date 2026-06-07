@@ -241,6 +241,9 @@ class InfoScreen(PopupScreen):
         self.info_data = gather_info(self._app, self._screen)
         self.query_one("#content", Static).update(_info_text(self.info_data))
 
+    def show_status(self, message: str) -> None:
+        self.query_one("#status", Static).update(message)
+
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
@@ -250,6 +253,7 @@ class InfoScreen(PopupScreen):
 
     def on_key(self, event) -> None:
         if event.key == "ctrl+l":
+            self.show_status("")
             self.app.refresh(repaint=True, layout=True)
             return
         k = event.key.lower()
@@ -266,11 +270,11 @@ class InfoScreen(PopupScreen):
                     if hasattr(scr, 'refresh_map'):
                         scr.refresh_map()
                 self._refresh()
-                self.query_one("#status", Static).update(f"Switched to key {dest}")
+                self.show_status(f"Switched to key {dest}")
             else:
                 msgs = {"right": "No key to the right", "left": "No key to the left",
                         "down": "No key below", "up": "No key above"}
-                self.query_one("#status", Static).update(msgs[dirs[k]])
+                self.show_status(msgs[dirs[k]])
             return
         if event.key in ("escape", "enter", "\n"):
             self.app.pop_screen()

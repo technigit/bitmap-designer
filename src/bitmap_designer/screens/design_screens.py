@@ -397,8 +397,7 @@ class DesignScreen(Screen):
             self.rect_start[0] = self.cursor_x
             self.rect_start[1] = self.cursor_y
             self.update_hints()
-            self.show_status("Rectangle mode: select opposite corner, "
-                             "[Enter] confirm, [Escape] cancel")
+            self.show_status("Rectangle mode")
             self.refresh_grid()
             self._reset_cursor_timer()
             return
@@ -632,18 +631,7 @@ class DesignScreen(Screen):
         if self.rect_mode:
             hints.append("[arrows/hjkl] select opposite corner  ")
             hints.append(f"[1-9] step={self.app.step}\n")
-            hints.append("[Enter] confirm  [Escape] cancel  ")
-            hints.append(f"[C]olor={self.app.current_color}", style="dim")
-            hints.append("  [space] paint", style="dim")
-            hints.append("  [F]ill", style="dim")
-            hints.append("  [U]ndo", style="dim")
-            hints.append("  [^R]edo", style="dim")
-            hints.append("\n")
-            hints.append("[wasd] switch key", style="dim")
-            hints.append("  [/] find key", style="dim")
-            hints.append("  [g] scroll", style="dim")
-            hints.append("  [M]ap", style="dim")
-            hints.append("  [P]review", style="dim")
+            hints.append("[Enter] confirm  [Escape] cancel")
         else:
             hints.append(f"[C]olor={self.app.current_color}  ")
             hints.append("[space] paint  ")
