@@ -2,7 +2,7 @@
 from pathlib import Path
 import os
 
-from .palette_service import HARDCODED_PRESETS
+from .services.palette_service import HARDCODED_PRESETS
 
 ASCII_HEADER = "Bitmap Designer"
 

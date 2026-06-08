@@ -7,14 +7,14 @@ from textual.screen import Screen
 from textual.widgets import Static
 from textual.containers import Vertical
 
-from .close_screens import CloseScreen, FileChangedScreen
-from .design_screens import DesignScreen
-from .save_screens import SaveScreen
-from .manage_screens import ManageScreen
-from .config_screens import ConfigScreen
-from .codegen_screens import CodegenScreen
+from .close_screen import CloseScreen, FileChangedScreen
+from .design_screen import DesignScreen
+from .save_screen import SaveScreen
+from .manage_screen import ManageScreen
+from .config_screen import ConfigScreen
+from .codegen_screen import CodegenScreen
 
-from ..codegen_service import CodegenService
+from ..services.codegen_service import CodegenService
 
 from ..constants import create_default_bitmap
 

@@ -13,7 +13,7 @@ from .popup_screen import PopupScreen
 
 from ..constants import DEFAULT_BITMAP_DIR, HINT_ESCAPE
 
-from .startup_screens import StartupScreen
+from .startup_screen import StartupScreen
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp

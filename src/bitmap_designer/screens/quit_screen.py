@@ -8,7 +8,7 @@ from textual.containers import Vertical
 
 from .popup_screen import PopupScreen
 
-from .save_screens import QuitSaveScreen, SaveFirstScreen
+from .save_screen import QuitSaveScreen, SaveFirstScreen
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp

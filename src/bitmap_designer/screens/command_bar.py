@@ -8,12 +8,12 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import Static
 
-from .close_screens import CloseScreen
-from .config_screens import ConfigScreen
+from .close_screen import CloseScreen
+from .config_screen import ConfigScreen
 from .info_screen import InfoScreen, gather_info
 from .popup_screen import PopupScreen
-from .quit_screens import QuitScreen
-from .startup_screens import StartupScreen
+from .quit_screen import QuitScreen
+from .startup_screen import StartupScreen
 from ..constants import DEFAULT_BITMAP_DIR, create_default_bitmap
 
 if TYPE_CHECKING:

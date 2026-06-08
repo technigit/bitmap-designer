@@ -7,9 +7,9 @@ from textual.widgets import Footer, Static
 from textual.binding import Binding
 
 from .constants import DEFAULT_BITMAP_DIR, create_default_bitmap
-from .file_service import FileService
-from .history_service import HistoryService
-from .palette_service import resolve_palette, resolve_palette_with_status
+from .services.file_service import FileService
+from .services.history_service import HistoryService
+from .services.palette_service import resolve_palette, resolve_palette_with_status
 from .screens import StartupScreen, MainScreen, QuitScreen
 
 

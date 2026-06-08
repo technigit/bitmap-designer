@@ -8,7 +8,7 @@ from textual.containers import Vertical
 
 from .popup_screen import PopupScreen
 from ..constants import HINT_ESCAPE
-from ..palette_service import HARDCODED_PRESETS
+from ..services.palette_service import HARDCODED_PRESETS
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp

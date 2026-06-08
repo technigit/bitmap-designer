@@ -8,7 +8,7 @@ from textual.screen import Screen
 from textual.widgets import Static, Button
 from textual.containers import Vertical, VerticalScroll
 
-from ..codegen_service import CodegenService
+from ..services.codegen_service import CodegenService
 from .popup_screen import PopupScreen
 
 if TYPE_CHECKING:

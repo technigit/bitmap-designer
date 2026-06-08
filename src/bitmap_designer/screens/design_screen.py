@@ -9,12 +9,12 @@ from textual.widgets import Static
 from textual.containers import Vertical
 
 from .popup_screen import PopupScreen
-from ..codegen_service import CodegenService
+from ..services.codegen_service import CodegenService
 from ..constants import create_default_bitmap
 from ..text_utils import columnate
 
 from .command_bar import handle_cmd_key
-from .config_screens import ConfigKeyScreen
+from .config_screen import ConfigKeyScreen
 from .map_screen import MapScreen
 
 if TYPE_CHECKING:

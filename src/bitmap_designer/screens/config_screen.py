@@ -7,14 +7,14 @@ from textual.widgets import ListItem, ListView, Static, Input
 from textual.containers import Vertical
 
 from .popup_screen import PopupScreen
-from .palette_edit_screens import (
+from .palette_edit_screen import (
     ConfigPaletteCreateScreen,
     ConfigPaletteEditScreen,
     ConfigPaletteDeleteConfirmScreen,
 )
 
 from ..constants import HINT_ESCAPE, create_default_bitmap
-from ..palette_service import HARDCODED_PRESETS
+from ..services.palette_service import HARDCODED_PRESETS
 from ..text_utils import columnate
 
 if TYPE_CHECKING:
