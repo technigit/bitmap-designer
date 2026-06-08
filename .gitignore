@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 *.py.backup
 .DS_Store
+.coverage
+coverage/
+htmlcov/
+.pytest_cache/

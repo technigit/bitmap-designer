@@ -36,3 +36,11 @@ min-similarity-lines = 6
 
 [tool.pylint.REPORTS]
 output-format = "colorized"
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-cov>=5.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-v --cov=bitmap_designer --cov-report=term-missing"
