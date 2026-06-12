@@ -168,9 +168,23 @@
         - Error handling messages:
             - displayed on status bar
     - Code generation UI (modal window)
-        - display configuration in modal/scrollable window
-        - [Enter] - copy to clipboard
-        - [Escape] - close modal window
+        - shows generated JS code in scrollable window
+        - header with strategy and key filter:
+            - "[S]trategy: Balanced" | [S] to change global default
+            - "[A]ll  [C]urrent  [h/l page]" | filter mode
+            - active keys: "1:✓foo  2:✗bar  3:✓baz  [4-9] toggle"
+        - key interactions:
+            - [S] — set global strategy (applies to all keys unless overridden per-key)
+            - [A] — include all keys in code generation
+            - [C] — include only the current key
+            - [h] / left arrow — previous page of keys (when 10+ keys)
+            - [l] / right arrow — next page of keys
+            - [1-9] — toggle that position's key in/out of the filter
+            - [Enter] — copy to clipboard
+            - [j/k/up/down] — scroll code
+            - [Escape] — close
+        - code regenerates on every filter or strategy change
+        - filter state persists per session (resets to "all" on app restart)
     - Manage file UI (modal window)
         - provide file management options
             - [R]ename - rename file
@@ -187,6 +201,10 @@
                     - rename file
                     - Response: File renamed. [OK]
                     - return to Manage file UI
+            - [S]trategy — set per-key strategy override for current bitmap
+                - opens StrategySelectScreen scoped to the current key only
+                - saves per-key `codegenStrategy` in metadata
+                - marks file as dirty
             - [D]elete - delete file
                 - hint: [Y]es [N]o [Escape] cancel
                 - if file name already exists
@@ -334,6 +352,12 @@
 - Spacing: 2 blank lines between title and content
 - Menu/instructions: one line below content
 - Status line: at bottom of screen, $accent color, 1-line margin-top gap above; non-popup screens additionally have 3-character left indent
+- Hint key-group convention:
+  - Grouped keys written without slashes or spaces between them
+  - All-letter groups lowercase (e.g., `[fbto]`)
+  - Directional arrows use small triangles: `▴`(up) `▾`(down) `◂`(left) `▸`(right)
+  - Letters first, then `/`, then triangles when both are bound
+    (e.g., `[hl/◂▸]`, `[hjkl/▴▾◂▸]`)
 
 ### Colors
 
@@ -386,6 +410,19 @@ Hardcoded preset: default
 - from the upper left, scan from left to right, top to bottom
 - find the largest possible rectangular blocks of the same color and use fillStyle/fillRect
 - iterate with smaller rectangular blocks, etc., down to the configured pixel size until the entire area is covered
+- Codegen key filter pagination adapts to terminal width (max 9 keys/page), names truncated to 8 characters
+
+### Code Generation Strategy
+
+- **Global default**: stored as `app.global_strategy`, initially `"balanced"`.
+  Set via `[S]` in CodegenScreen. Does not mark file dirty.
+- **Per-key override**: stored in bitmap metadata as `codegenStrategy`.
+  Set via Configuration → Manage Key → [S]trategy. Marks file dirty.
+- **Resolution order**: per-key `codegenStrategy` → `global_strategy` → `"balanced"` fallback.
+- When a per-key override matches the current global default, the metadata field
+  is removed to avoid redundancy.
+- Stats (`[M]`) respect per-key overrides unless the "test all strategies" mode
+  (`generate_all_strategy_stats`) temporarily overrides them.
 
 ### JSON File Format
 // Example values — illustrative, not prescriptive

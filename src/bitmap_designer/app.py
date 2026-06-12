@@ -48,6 +48,10 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         self.palette_id: str | None = None
         self.custom_palettes: dict[str, dict] = {}
         self.active_palette: dict[str, dict] = self._init_palette()
+        self.global_strategy: str = "balanced"
+        self.codegen_filter_mode: str = "all"
+        self.codegen_filter_page: int = 0
+        self.codegen_filter_keys: set[str] = set()
 
     def _init_palette(self) -> dict[str, dict]:
         return resolve_palette(self.palette_id, self.custom_palettes or None)
@@ -169,6 +173,36 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
 
     def set_current_key(self, key: str) -> None:
         self.current_key = key
+
+    def get_codegen_strategy(self, key: str | None = None) -> str:
+        k = key if key is not None else self.current_key
+        bm = self.bitmaps.get(k, {})
+        return bm.get("codegenStrategy", self.global_strategy)
+
+    def set_global_strategy(self, strategy: str) -> None:
+        self.global_strategy = strategy
+        for k in list(self.bitmaps.keys()):
+            bm = self.bitmaps[k]
+            if bm.get("codegenStrategy") == strategy:
+                bm.pop("codegenStrategy", None)
+
+    def set_codegen_strategy(self, strategy: str, key: str | None = None) -> None:
+        k = key if key is not None else self.current_key
+        if k not in self.bitmaps:
+            self.bitmaps[k] = create_default_bitmap()
+        if strategy == self.global_strategy:
+            self.bitmaps[k].pop("codegenStrategy", None)
+        else:
+            self.bitmaps[k]["codegenStrategy"] = strategy
+        self.mark_dirty()
+
+    @property
+    def codegen_filtered_keys(self) -> set[str] | None:
+        if self.codegen_filter_mode == "all":
+            return None
+        if self.codegen_filter_mode == "current":
+            return {self.current_key}
+        return self.codegen_filter_keys
 
     def reload_file(self) -> None:
         if not self.file.current_file or not os.path.exists(self.file.current_file):

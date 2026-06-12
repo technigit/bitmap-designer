@@ -16,6 +16,7 @@ from .palette_edit_screen import (
 from ..constants import HINT_ESCAPE, create_default_bitmap
 from ..services.palette_service import HARDCODED_PRESETS
 from ..text_utils import columnate
+from .codegen_screen import StrategySelectScreen
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
@@ -107,7 +108,7 @@ class ConfigScreen(PopupScreen):
             self.app.push_screen(ConfigKeyManageScreen())
         elif key == "p":
             self.app.push_screen(ConfigPaletteScreen())
-        elif key == "escape":
+        elif key in ("escape", "enter", "\n"):
             self.app.pop_screen()
 
 
@@ -174,7 +175,7 @@ class ConfigKeyManageScreen(PopupScreen):
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
-            yield Static("[R]ename key\n[D]elete key\n\n[Escape] back", id="menu", markup=False)
+            yield Static("[R]ename key\n[S]trategy\n[D]elete key\n\n[Escape] back", id="menu", markup=False)
             yield Static("", id="info")
             yield Static("", id="status")
 
@@ -200,6 +201,7 @@ class ConfigKeyManageScreen(PopupScreen):
             f"  Y:          {bm.get('y', 'y')}",
             f"  Location:   {loc['x']} {loc['y']}",
             f"  Pixel Size: {bm.get('pixelSize', 2)}",
+            f"  Strategy:   {self.app.get_codegen_strategy()}",
         ]
         self.query_one("#info", Static).update("\n".join(lines))
 
@@ -210,9 +212,14 @@ class ConfigKeyManageScreen(PopupScreen):
             return
         if event.key.lower() == "r":
             self.app.push_screen(ConfigKeyRenameScreen())
+        elif event.key.lower() == "s":
+            self.app.push_screen(
+                StrategySelectScreen(),
+                callback=lambda strategy: self._refresh_info() if strategy else None
+            )
         elif event.key.lower() == "d":
             self.app.push_screen(ConfigKeyDeleteScreen())
-        elif event.key == "escape":
+        elif event.key in ("escape", "enter", "\n"):
             self.app.pop_screen()
 
 
@@ -299,7 +306,7 @@ class ConfigKeyDeleteScreen(PopupScreen):
             return
         if event.key.lower() == "y":
             self.delete_key()
-        elif event.key.lower() in ("n", "escape"):
+        elif event.key.lower() in ("n", "enter", "\n", "escape"):
             self.app.pop_screen()
 
     def delete_key(self):
@@ -704,7 +711,7 @@ class ConfigPaletteScreen(PopupScreen):
             yield Static(self.app.title_with_file(self.base_title), id="title")
             yield ListView(id="palette-list")
             yield Static(
-                "[j/k/up/down] navigate  [Enter] select  [C]reate  [E]dit  [D]elete  "
+                "[jk/\u25b4\u25be] navigate  [Enter] select  [C]reate  [E]dit  [D]elete  "
                 + HINT_ESCAPE,
                 id="hints", markup=False
             )

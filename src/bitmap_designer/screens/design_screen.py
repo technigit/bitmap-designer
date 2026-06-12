@@ -619,7 +619,7 @@ class DesignScreen(Screen):
     def update_hints(self):
         hints = Text()
         if self.rect_mode:
-            hints.append("[arrows/hjkl] select opposite corner  ")
+            hints.append("[hjkl/\u25b4\u25be\u25c2\u25b8] select opposite corner  ")
             hints.append(f"[1-9] step={self.app.step}\n")
             hints.append("[Enter] confirm  [Escape] cancel")
         else:
@@ -638,9 +638,9 @@ class DesignScreen(Screen):
                 hints.append("[^R]edo")
             hints.append("\n")
             if self.scroll_mode:
-                hints.append("[arrows/hjkl] scroll  [Esc] exit scroll  ")
+                hints.append("[hjkl/\u25b4\u25be\u25c2\u25b8] scroll  [Esc] exit scroll  ")
             else:
-                hints.append("[arrows/hjkl] move  ")
+                hints.append("[hjkl/\u25b4\u25be\u25c2\u25b8] move  ")
                 hints.append("[g] scroll  ", style="dim" if self.content_fits else None)
             hints.append(f"[1-9] step={self.app.step}\n")
             if len(self.app.bitmaps) <= 1:

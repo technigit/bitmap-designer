@@ -110,7 +110,7 @@ class ConfigPaletteDeleteConfirmScreen(PopupScreen):
                     self.app.set_palette(None)
                 self.app.pop_screen()
                 self.app.show_status(f"Palette '{self.palette_id}' deleted.")
-        elif k in ("n", "escape"):
+        elif k in ("n", "enter", "\n", "escape"):
             self.app.pop_screen()
 
 
@@ -134,7 +134,7 @@ class ConfigPaletteEditScreen(PopupScreen):
             yield Static(f"Palette: {self.palette_id}", id="palette-name")
             yield ListView(id="color-list")
             yield Static(
-                "[j/k/up/down] navigate  [Enter] edit slot  "
+                "[jk/\u25b4\u25be] navigate  [Enter] edit slot  "
                 + HINT_ESCAPE,
                 id="hints", markup=False
             )

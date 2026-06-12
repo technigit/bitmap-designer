@@ -50,7 +50,7 @@ class ManageScreen(PopupScreen):
             self.app.push_screen(RenameScreen())
         elif event.key.lower() == "d":
             self.app.push_screen(DeleteScreen())
-        elif event.key == "escape":
+        elif event.key in ("escape", "enter", "\n"):
             self.app.pop_screen()
 
 
@@ -151,7 +151,7 @@ class DeleteScreen(PopupScreen):
             return
         if event.key.lower() == "y":
             self.delete_file()
-        elif event.key.lower() in ("n", "escape"):
+        elif event.key.lower() in ("n", "enter", "\n", "escape"):
             self.app.pop_screen()
 
     # Delete the current file and reset application state.

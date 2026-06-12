@@ -11,7 +11,7 @@ from .config_screen import (
 from .quit_screen import QuitScreen, QuitSaveFileFirstScreen
 from .main_screen import MainScreen
 from .close_screen import CloseScreen, SaveFileFirstScreen, AreYouSureScreen
-from .codegen_screen import CodegenScreen, ResponseScreen
+from .codegen_screen import CodegenScreen, ResponseScreen, StrategySelectScreen, StrategyDetailsScreen
 from .map_screen import MapScreen, FindKeyScreen
 from .command_bar import HelpPopupScreen
 from .info_screen import InfoScreen
