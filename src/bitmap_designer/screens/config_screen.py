@@ -767,7 +767,7 @@ class ConfigGlobalPixelScreen(PopupScreen):
             try:
                 val = int(self.input.value or str(DEFAULT_PIXEL_SIZE))
                 if val >= 1:
-                    self.app.pixel_size = val
+                    self.app.set_pixel_size(val)
                     self.app.mark_dirty()
                     self.app.pop_screen()
                     self.app.show_status("Global pixel size saved.")

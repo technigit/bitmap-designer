@@ -69,7 +69,7 @@ class CodegenScreen(PopupScreen):
         page_size = self._page_size()
         n_pages = max(1, (len(all_keys) + page_size - 1) // page_size)
         page = min(self.app.codegen_filter_page, n_pages - 1)
-        self.app.codegen_filter_page = page
+        self.app.set_codegen_filter_page(page)
         start = page * page_size
         return all_keys[start:start + page_size], n_pages
 
@@ -171,15 +171,15 @@ class CodegenScreen(PopupScreen):
             else:
                 self.app.codegen_filter_keys.add(key)
         elif mode == "current":
-            self.app.codegen_filter_mode = "manual"
-            self.app.codegen_filter_keys = {self.app.current_key}
+            self.app.set_codegen_filter_mode("manual")
+            self.app.set_codegen_filter_keys({self.app.current_key})
             if key in self.app.codegen_filter_keys:
                 self.app.codegen_filter_keys.discard(key)
             else:
                 self.app.codegen_filter_keys.add(key)
         else:
-            self.app.codegen_filter_mode = "manual"
-            self.app.codegen_filter_keys = set(self.app.bitmaps.keys())
+            self.app.set_codegen_filter_mode("manual")
+            self.app.set_codegen_filter_keys(set(self.app.bitmaps.keys()))
             if key in self.app.codegen_filter_keys:
                 self.app.codegen_filter_keys.discard(key)
             else:
@@ -210,19 +210,19 @@ class CodegenScreen(PopupScreen):
         self.query_one(VerticalScroll).scroll_up()
 
     def _filter_all(self) -> None:
-        self.app.codegen_filter_mode = "all"
-        self.app.codegen_filter_page = 0
+        self.app.set_codegen_filter_mode("all")
+        self.app.set_codegen_filter_page(0)
         self._refresh_all()
 
     def _filter_current(self) -> None:
-        self.app.codegen_filter_mode = "current"
-        self.app.codegen_filter_page = 0
+        self.app.set_codegen_filter_mode("current")
+        self.app.set_codegen_filter_page(0)
         self._refresh_all()
 
     def _filter_none(self) -> None:
-        self.app.codegen_filter_mode = "manual"
-        self.app.codegen_filter_keys = set()
-        self.app.codegen_filter_page = 0
+        self.app.set_codegen_filter_mode("manual")
+        self.app.set_codegen_filter_keys(set())
+        self.app.set_codegen_filter_page(0)
         self._refresh_all()
 
     def _select_strategy(self) -> None:
@@ -241,17 +241,17 @@ class CodegenScreen(PopupScreen):
     def _page_left(self) -> None:
         n_pages = self._n_pages()
         if self.app.codegen_filter_page > 0:
-            self.app.codegen_filter_page -= 1
+            self.app.set_codegen_filter_page(self.app.codegen_filter_page - 1)
         else:
-            self.app.codegen_filter_page = n_pages - 1
+            self.app.set_codegen_filter_page(n_pages - 1)
         self._refresh_all()
 
     def _page_right(self) -> None:
         n_pages = self._n_pages()
         if self.app.codegen_filter_page < n_pages - 1:
-            self.app.codegen_filter_page += 1
+            self.app.set_codegen_filter_page(self.app.codegen_filter_page + 1)
         else:
-            self.app.codegen_filter_page = 0
+            self.app.set_codegen_filter_page(0)
         self._refresh_all()
 
     def on_key(self, event) -> None:

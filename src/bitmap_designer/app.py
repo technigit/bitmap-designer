@@ -209,6 +209,18 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
             return {self.current_key}
         return self.codegen_filter_keys
 
+    def set_codegen_filter_page(self, page: int) -> None:
+        self.codegen_filter_page = page
+
+    def set_codegen_filter_mode(self, mode: str) -> None:
+        self.codegen_filter_mode = mode
+
+    def set_codegen_filter_keys(self, keys: set[str]) -> None:
+        self.codegen_filter_keys = keys
+
+    def set_pixel_size(self, size: int) -> None:
+        self.pixel_size = size
+
     def reload_file(self) -> None:
         if not self.file.current_file or not os.path.exists(self.file.current_file):
             return
