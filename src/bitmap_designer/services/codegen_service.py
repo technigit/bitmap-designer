@@ -5,6 +5,7 @@ DEFAULT_PIXEL_SIZE = 2
 
 STRATEGIES = ("fast", "balanced", "thorough", "optimal")
 FALLBACK_DEFAULT = "balanced"
+_DIRECTIONS = ((1, 0), (-1, 0), (0, 1), (0, -1))
 
 
 class CodegenService:
@@ -12,7 +13,11 @@ class CodegenService:
 
     PREVIEW_PATH = "/tmp/bitmap-preview.html"
 
-    def __init__(self, bitmaps: dict, show_status=None, palette: dict[str, dict] | None = None, pixel_size: int = DEFAULT_PIXEL_SIZE):
+    def __init__(
+        self, bitmaps: dict, show_status=None,
+        palette: dict[str, dict] | None = None,
+        pixel_size: int = DEFAULT_PIXEL_SIZE,
+    ):
         self.bitmaps = bitmaps
         self.show_status = show_status or (lambda msg: None)
         self.palette = palette or {}
@@ -58,7 +63,10 @@ class CodegenService:
 </html>"""
 
     @staticmethod
-    def _bitmap_to_code_lines(idx: str, bm: dict, palette: dict[str, dict], pixel_size: int = DEFAULT_PIXEL_SIZE) -> list[str]:
+    def _bitmap_to_code_lines(
+        idx: str, bm: dict, palette: dict[str, dict],
+        pixel_size: int = DEFAULT_PIXEL_SIZE,
+    ) -> list[str]:
         lines = []
         x_var = bm.get("x", f"x{idx}")
         y_var = bm.get("y", f"y{idx}")
@@ -72,11 +80,10 @@ class CodegenService:
         lines.append(f"var {x_var} = {location['x'] * pixel_size};")
         lines.append(f"var {y_var} = {location['y'] * pixel_size};")
 
-        strategy = bm.get("codegenStrategy", FALLBACK_DEFAULT)
-        rects_by_color = CodegenService._extract_rectangles(
-            pixels, len(pixels[0]), len(pixels), strategy
-        )
-        for color, rects in rects_by_color.items():
+        for color, rects in CodegenService._extract_rectangles(
+            pixels, len(pixels[0]), len(pixels),
+            bm.get("codegenStrategy", FALLBACK_DEFAULT),
+        ).items():
             lines.append(f"ctx.fillStyle = '{palette.get(color.lower(), {}).get('hex', color)}';")
             for rx, ry, rw, rh in rects:
                 lines.append(
@@ -88,7 +95,8 @@ class CodegenService:
 
     def generate_code(self, keys: list[str] | None = None) -> str:
         lines = []
-        bm_iter = [(k, self.bitmaps[k]) for k in (keys if keys is not None else list(self.bitmaps.keys())) if k in self.bitmaps]
+        keys_list = keys if keys is not None else list(self.bitmaps.keys())
+        bm_iter = [(k, self.bitmaps[k]) for k in keys_list if k in self.bitmaps]
         for n, (idx, bm) in enumerate(bm_iter):
             lines.extend(self._bitmap_to_code_lines(idx, bm, self.palette, self.pixel_size))
             if n < len(bm_iter) - 1:
@@ -129,41 +137,58 @@ class CodegenService:
         return lines
 
     @staticmethod
+    def _compute_single_bitmap_stats(
+        bm: dict
+    ) -> dict | None:
+        pixels = bm.get("bitmap", {}).get("pixels", [])
+        if not pixels:
+            return None
+        width = len(pixels[0])
+        height = len(pixels)
+        strategy = bm.get("codegenStrategy", FALLBACK_DEFAULT)
+        rects_by_color = CodegenService._extract_rectangles(pixels, width, height, strategy)
+        rect_count = sum(len(v) for v in rects_by_color.values())
+        _color_counts, transparent_count = CodegenService._count_pixel_colors(pixels)
+        non_transparent = width * height - transparent_count
+        cells_per_rect = round(non_transparent / rect_count, 1) if rect_count else 0
+        score = (
+            round((non_transparent - rect_count) / non_transparent * 100, 1)
+            if non_transparent else 0
+        )
+        return {
+            "rects": rect_count,
+            "non_transparent_cells": non_transparent,
+            "cells_per_rect": cells_per_rect,
+            "score": score,
+        }
+
+    @staticmethod
     def generate_code_stats(
         bitmaps: dict, palette: dict[str, dict], keys: list[str] | None = None
     ) -> dict:
+        del palette  # kept for caller API compatibility
         per_bitmap = {}
         total_rects = 0
         total_non_transparent = 0
-        bm_iter = [(k, bitmaps[k]) for k in (keys if keys is not None else list(bitmaps.keys())) if k in bitmaps]
+        keys_list = keys if keys is not None else list(bitmaps.keys())
+        bm_iter = [(k, bitmaps[k]) for k in keys_list if k in bitmaps]
         for idx, bm in bm_iter:
-            pixels = bm.get("bitmap", {}).get("pixels", [])
-            if not pixels:
+            stats = CodegenService._compute_single_bitmap_stats(bm)
+            if stats is None:
                 continue
-            width = len(pixels[0])
-            height = len(pixels)
-            strategy = bm.get("codegenStrategy", FALLBACK_DEFAULT)
-            rects_by_color = CodegenService._extract_rectangles(pixels, width, height, strategy)
-            rect_count = sum(len(v) for v in rects_by_color.values())
-            color_counts, transparent_count = CodegenService._count_pixel_colors(pixels)
-            non_transparent = width * height - transparent_count
-            cells_per_rect = round(non_transparent / rect_count, 1) if rect_count else 0
-            score = round((non_transparent - rect_count) / non_transparent * 100, 1) if non_transparent else 0
-            per_bitmap[idx] = {
-                "rects": rect_count,
-                "non_transparent_cells": non_transparent,
-                "cells_per_rect": cells_per_rect,
-                "score": score,
-            }
-            total_rects += rect_count
-            total_non_transparent += non_transparent
+            per_bitmap[idx] = stats
+            total_rects += stats["rects"]
+            total_non_transparent += stats["non_transparent_cells"]
         overall_cells_per_rect = round(total_non_transparent / total_rects, 1) if total_rects else 0
         return {
             "per_bitmap": per_bitmap,
             "total_rects": total_rects,
             "total_cells": total_non_transparent,
             "overall_cells_per_rect": overall_cells_per_rect,
-            "overall_score": round((total_non_transparent - total_rects) / total_non_transparent * 100, 1) if total_non_transparent else 0,
+            "overall_score": (
+                round((total_non_transparent - total_rects) / total_non_transparent * 100, 1)
+                if total_non_transparent else 0
+            ),
         }
 
     @staticmethod
@@ -171,7 +196,8 @@ class CodegenService:
         bitmaps: dict, palette: dict[str, dict], keys: list[str] | None = None
     ) -> dict[str, dict]:
         results = {}
-        bm_iter = [(k, bitmaps[k]) for k in (keys if keys is not None else list(bitmaps.keys())) if k in bitmaps]
+        keys_list = keys if keys is not None else list(bitmaps.keys())
+        bm_iter = [(k, bitmaps[k]) for k in keys_list if k in bitmaps]
         for strategy in STRATEGIES:
             modified = {}
             for idx, bm in bm_iter:
@@ -283,13 +309,13 @@ class CodegenService:
             changed = False
             used = [False] * len(rects)
             merged = []
-            for i in range(len(rects)):
+            for i, rect in enumerate(rects):
                 if used[i]:
                     continue
                 for j in range(i + 1, len(rects)):
                     if used[j]:
                         continue
-                    m = CodegenService._try_merge(rects[i], rects[j])
+                    m = CodegenService._try_merge(rect, rects[j])
                     if m is not None:
                         rects[i] = m
                         used[j] = True
@@ -311,6 +337,55 @@ class CodegenService:
         return None
 
     @staticmethod
+    def _detect_sweep_runs(
+        pixels: list[str],
+        color: str,
+        covered: list[list[bool]],
+        y: int,
+        width: int,
+    ) -> list[tuple[int, int]]:
+        runs: list[tuple[int, int]] = []
+        x = 0
+        while x < width:
+            if pixels[y][x] == color and not covered[y][x]:
+                start = x
+                while x < width and pixels[y][x] == color and not covered[y][x]:
+                    x += 1
+                runs.append((start, x - start))
+            else:
+                x += 1
+        return runs
+
+    @staticmethod
+    def _process_sweep_row(
+        active: list[tuple[int, int, int, int]],
+        rects: list[tuple[int, int, int, int]],
+        runs: list[tuple[int, int]],
+        y: int,
+    ) -> tuple[list[tuple[int, int, int, int]], list[tuple[int, int, int, int]]]:
+        new_active: list[tuple[int, int, int, int]] = []
+        used = [False] * len(runs)
+
+        for ax, ay, aw, ah in active:
+            matched = False
+            for ri, (rx, rw) in enumerate(runs):
+                if used[ri]:
+                    continue
+                if ax == rx and aw == rw:
+                    new_active.append((ax, ay, aw, ah + 1))
+                    used[ri] = True
+                    matched = True
+                    break
+            if not matched:
+                rects.append((ax, ay, aw, ah))
+
+        for ri, (rx, rw) in enumerate(runs):
+            if not used[ri]:
+                new_active.append((rx, y, rw, 1))
+
+        return new_active, rects
+
+    @staticmethod
     def _sweep_extract_color(
         pixels: list[str],
         color: str,
@@ -322,38 +397,8 @@ class CodegenService:
         active: list[tuple[int, int, int, int]] = []
 
         for y in range(height):
-            runs: list[tuple[int, int]] = []
-            x = 0
-            while x < width:
-                if pixels[y][x] == color and not covered[y][x]:
-                    start = x
-                    while x < width and pixels[y][x] == color and not covered[y][x]:
-                        x += 1
-                    runs.append((start, x - start))
-                else:
-                    x += 1
-
-            new_active: list[tuple[int, int, int, int]] = []
-            used = [False] * len(runs)
-
-            for ax, ay, aw, ah in active:
-                matched = False
-                for ri, (rx, rw) in enumerate(runs):
-                    if used[ri]:
-                        continue
-                    if ax == rx and aw == rw:
-                        new_active.append((ax, ay, aw, ah + 1))
-                        used[ri] = True
-                        matched = True
-                        break
-                if not matched:
-                    rects.append((ax, ay, aw, ah))
-
-            for ri, (rx, rw) in enumerate(runs):
-                if not used[ri]:
-                    new_active.append((rx, y, rw, 1))
-
-            active = new_active
+            runs = CodegenService._detect_sweep_runs(pixels, color, covered, y, width)
+            active, rects = CodegenService._process_sweep_row(active, rects, runs, y)
 
         rects.extend(active)
         return rects
@@ -396,6 +441,33 @@ class CodegenService:
 
 
     @staticmethod
+    def _flood_fill(
+        pixels: list[str],
+        covered: list[list[bool]],
+        visited: list[list[bool]],
+        x: int,
+        y: int,
+        *,
+        color: str,
+    ) -> list[tuple[int, int]]:
+        width = len(pixels[0])
+        height = len(pixels)
+        component = [(x, y)]
+        stack = [(x, y)]
+        visited[y][x] = True
+        while stack:
+            cx, cy = stack.pop()
+            for dx, dy in _DIRECTIONS:
+                if (0 <= cx + dx < width and 0 <= cy + dy < height
+                    and pixels[cy + dy][cx + dx] == color
+                    and not covered[cy + dy][cx + dx]
+                    and not visited[cy + dy][cx + dx]):
+                    visited[cy + dy][cx + dx] = True
+                    stack.append((cx + dx, cy + dy))
+                    component.append((cx + dx, cy + dy))
+        return component
+
+    @staticmethod
     def _find_connected_components(
         pixels: list[str],
         color: str,
@@ -408,24 +480,75 @@ class CodegenService:
         for y in range(height):
             for x in range(width):
                 if pixels[y][x] == color and not covered[y][x] and not visited[y][x]:
-                    component = []
-                    stack = [(x, y)]
-                    visited[y][x] = True
-                    while stack:
-                        cx, cy = stack.pop()
-                        component.append((cx, cy))
-                        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                            nx, ny = cx + dx, cy + dy
-                            if 0 <= nx < width and 0 <= ny < height:
-                                if (
-                                    pixels[ny][nx] == color
-                                    and not covered[ny][nx]
-                                    and not visited[ny][nx]
-                                ):
-                                    visited[ny][nx] = True
-                                    stack.append((nx, ny))
-                    components.append(component)
+                    comp = CodegenService._flood_fill(
+                        pixels, covered, visited, x, y, color=color
+                    )
+                    components.append(comp)
         return components
+
+    @staticmethod
+    def _extract_component_sub_pixels(
+        pixels: list[str],
+        covered: list[list[bool]],
+        color: str,
+        component: list[tuple[int, int]],
+        bounds: tuple[int, int, int, int],
+    ) -> list[str]:
+        min_x, min_y, cw, ch = bounds
+        comp_set = set(component)
+        sub_pixels = []
+        for cy in range(min_y, min_y + ch):
+            row = []
+            for cx in range(min_x, min_x + cw):
+                if pixels[cy][cx] == color and not covered[cy][cx] and (cx, cy) in comp_set:
+                    row.append(color)
+                else:
+                    row.append(" ")
+            sub_pixels.append("".join(row))
+        return sub_pixels
+
+    @staticmethod
+    def _pick_best_rects(
+        sub_pixels: list[str], cw: int, ch: int
+    ) -> dict[str, list[tuple[int, int, int, int]]]:
+        hist_rects = CodegenService._extract_rectangles_histogram(sub_pixels, cw, ch)
+        sweep_rects = CodegenService._extract_rectangles_sweep(sub_pixels, cw, ch)
+        hist_count = sum(len(v) for v in hist_rects.values())
+        sweep_count = sum(len(v) for v in sweep_rects.values())
+        return hist_rects if hist_count <= sweep_count else sweep_rects
+
+    @staticmethod
+    def _translate_rects(
+        rects_by_color: dict[str, list[tuple[int, int, int, int]]],
+        min_x: int,
+        min_y: int,
+    ) -> list[tuple[int, int, int, int]]:
+        translated = []
+        for _col, sub_rects in rects_by_color.items():
+            for rx, ry, rw, rh in sub_rects:
+                translated.append((rx + min_x, ry + min_y, rw, rh))
+        return translated
+
+    @staticmethod
+    def _process_color_component(
+        pixels: list[str],
+        covered: list[list[bool]],
+        color: str,
+        component: list[tuple[int, int]],
+    ) -> list[tuple[int, int, int, int]]:
+        if not component:
+            return []
+        min_x = min(p[0] for p in component)
+        max_x = max(p[0] for p in component)
+        min_y = min(p[1] for p in component)
+        max_y = max(p[1] for p in component)
+        cw = max_x - min_x + 1
+        ch = max_y - min_y + 1
+        sub_pixels = CodegenService._extract_component_sub_pixels(
+            pixels, covered, color, component, (min_x, min_y, cw, ch)
+        )
+        best_rects = CodegenService._pick_best_rects(sub_pixels, cw, ch)
+        return CodegenService._translate_rects(best_rects, min_x, min_y)
 
     @staticmethod
     def _extract_rectangles_thorough(
@@ -457,40 +580,9 @@ class CodegenService:
                 pixels, color, covered, width, height
             )
             for comp in components:
-                if not comp:
-                    continue
-                min_x = min(p[0] for p in comp)
-                max_x = max(p[0] for p in comp)
-                min_y = min(p[1] for p in comp)
-                max_y = max(p[1] for p in comp)
-                cw = max_x - min_x + 1
-                ch = max_y - min_y + 1
-
-                comp_set = set(comp)
-                sub_pixels = []
-                for cy in range(min_y, max_y + 1):
-                    row = []
-                    for cx in range(min_x, min_x + cw):
-                        if pixels[cy][cx] == color and not covered[cy][cx] and (cx, cy) in comp_set:
-                            row.append(color)
-                        else:
-                            row.append(" ")
-                    sub_pixels.append("".join(row))
-
-                hist_rects = CodegenService._extract_rectangles_histogram(
-                    sub_pixels, cw, ch
+                translated = CodegenService._process_color_component(
+                    pixels, covered, color, comp
                 )
-                sweep_rects = CodegenService._extract_rectangles_sweep(
-                    sub_pixels, cw, ch
-                )
-                hist_count = sum(len(v) for v in hist_rects.values())
-                sweep_count = sum(len(v) for v in sweep_rects.values())
-                comp_rects = hist_rects if hist_count <= sweep_count else sweep_rects
-
-                translated = []
-                for _col, sub_rects in comp_rects.items():
-                    for rx, ry, rw, rh in sub_rects:
-                        translated.append((rx + min_x, ry + min_y, rw, rh))
                 if translated:
                     result.setdefault(color, []).extend(translated)
 

@@ -4,10 +4,6 @@ from typing import TYPE_CHECKING
 import re
 import pyperclip
 
-
-def _natural_key(s: str):
-    return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", s)]
-
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Static, Button
@@ -15,6 +11,11 @@ from textual.containers import Vertical, VerticalScroll
 
 from ..services.codegen_service import CodegenService, STRATEGIES, FALLBACK_DEFAULT
 from .popup_screen import PopupScreen
+
+
+def _natural_key(s: str):
+    return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", s)]
+
 
 if TYPE_CHECKING:
     from ..app import BitmapDesignerApp
@@ -33,6 +34,10 @@ class CodegenScreen(PopupScreen):
     #status { dock: bottom; }
     """
 
+    def __init__(self):
+        super().__init__()
+        self._maximized = False
+
     def compose(self) -> ComposeResult:
         with Vertical(id="code-outer"):
             yield Static(self.app.title_with_file(self.base_title), id="title")
@@ -47,7 +52,6 @@ class CodegenScreen(PopupScreen):
         self.query_one("#status", Static).update(message)
 
     def on_mount(self) -> None:
-        self._maximized = False
         self._refresh_all()
 
     def on_screen_resume(self, _event) -> None:
@@ -142,8 +146,14 @@ class CodegenScreen(PopupScreen):
         self._generate_code()
 
     def _generate_code(self) -> None:
-        active_filter = None if self.app.codegen_filtered_keys is None else list(self.app.codegen_filtered_keys)
-        code = CodegenService(self.app.bitmaps, palette=self.app.active_palette, pixel_size=self.app.pixel_size).generate_code(keys=active_filter)
+        active_filter = (
+            None if self.app.codegen_filtered_keys is None
+            else list(self.app.codegen_filtered_keys)
+        )
+        code = CodegenService(
+            self.app.bitmaps, palette=self.app.active_palette,
+            pixel_size=self.app.pixel_size,
+        ).generate_code(keys=active_filter)
         self.query_one("#code").update(code or "No bitmap data.")
         n_keys = len(active_filter) if active_filter is not None else len(self.app.bitmaps)
         total = len(self.app.bitmaps)
@@ -176,63 +186,110 @@ class CodegenScreen(PopupScreen):
                 self.app.codegen_filter_keys.add(key)
         self._refresh_all()
 
+    def _copy_code(self) -> None:
+        active_filter = (
+            None if self.app.codegen_filtered_keys is None
+            else list(self.app.codegen_filtered_keys)
+        )
+        code = CodegenService(
+            self.app.bitmaps, palette=self.app.active_palette,
+            pixel_size=self.app.pixel_size,
+        ).generate_code(keys=active_filter)
+        pyperclip.copy(code)
+        self.show_status("Code copied to clipboard.")
+
+    def _close(self) -> None:
+        self.app.pop_screen()
+
+    def _scroll_down(self, event) -> None:
+        event.stop()
+        self.query_one(VerticalScroll).scroll_down()
+
+    def _scroll_up(self, event) -> None:
+        event.stop()
+        self.query_one(VerticalScroll).scroll_up()
+
+    def _filter_all(self) -> None:
+        self.app.codegen_filter_mode = "all"
+        self.app.codegen_filter_page = 0
+        self._refresh_all()
+
+    def _filter_current(self) -> None:
+        self.app.codegen_filter_mode = "current"
+        self.app.codegen_filter_page = 0
+        self._refresh_all()
+
+    def _filter_none(self) -> None:
+        self.app.codegen_filter_mode = "manual"
+        self.app.codegen_filter_keys = set()
+        self.app.codegen_filter_page = 0
+        self._refresh_all()
+
+    def _select_strategy(self) -> None:
+        self.app.push_screen(StrategySelectScreen(), callback=self._on_strategy_chosen)
+
+    def _toggle_maximize(self) -> None:
+        self._maximized = not self._maximized
+        self._apply_maximize()
+        self._refresh_all()
+
+    def _n_pages(self) -> int:
+        all_keys = sorted(self.app.bitmaps.keys(), key=_natural_key)
+        ps = self._page_size()
+        return max(1, (len(all_keys) + ps - 1) // ps)
+
+    def _page_left(self) -> None:
+        n_pages = self._n_pages()
+        if self.app.codegen_filter_page > 0:
+            self.app.codegen_filter_page -= 1
+        else:
+            self.app.codegen_filter_page = n_pages - 1
+        self._refresh_all()
+
+    def _page_right(self) -> None:
+        n_pages = self._n_pages()
+        if self.app.codegen_filter_page < n_pages - 1:
+            self.app.codegen_filter_page += 1
+        else:
+            self.app.codegen_filter_page = 0
+        self._refresh_all()
+
     def on_key(self, event) -> None:
         if event.key == "ctrl+l":
             self.show_status("")
             self.app.refresh(repaint=True, layout=True)
             return
-        if event.key in ("enter", "\n"):
-            active_filter = None if self.app.codegen_filtered_keys is None else list(self.app.codegen_filtered_keys)
-            code = CodegenService(self.app.bitmaps, palette=self.app.active_palette, pixel_size=self.app.pixel_size).generate_code(keys=active_filter)
-            pyperclip.copy(code)
-            self.show_status("Code copied to clipboard.")
-        elif event.key == "escape":
-            self.app.pop_screen()
-        elif event.key in ("j", "down"):
-            event.stop()
-            self.query_one(VerticalScroll).scroll_down()
-        elif event.key in ("k", "up"):
-            event.stop()
-            self.query_one(VerticalScroll).scroll_up()
-        elif event.key.lower() == "a":
-            self.app.codegen_filter_mode = "all"
-            self.app.codegen_filter_page = 0
-            self._refresh_all()
-        elif event.key.lower() == "c":
-            self.app.codegen_filter_mode = "current"
-            self.app.codegen_filter_page = 0
-            self._refresh_all()
-        elif event.key.lower() == "n":
-            self.app.codegen_filter_mode = "manual"
-            self.app.codegen_filter_keys = set()
-            self.app.codegen_filter_page = 0
-            self._refresh_all()
-        elif event.key.lower() == "s":
-            self.app.push_screen(StrategySelectScreen(), callback=self._on_strategy_chosen)
-        elif event.key.lower() == "m":
-            self._maximized = not self._maximized
-            self._apply_maximize()
-            self._refresh_all()
-        elif event.key in ("h", "left"):
-            all_keys = sorted(self.app.bitmaps.keys(), key=_natural_key)
-            ps = self._page_size()
-            n_pages = max(1, (len(all_keys) + ps - 1) // ps)
-            if self.app.codegen_filter_page > 0:
-                self.app.codegen_filter_page -= 1
+        k = event.key
+        if k in ("enter", "\n"):
+            k = "enter"
+        elif len(k) == 1:
+            k = k.lower()
+        _dispatch = {
+            "enter": self._copy_code,
+            "escape": self._close,
+            "j": self._scroll_down,
+            "k": self._scroll_up,
+            "down": self._scroll_down,
+            "up": self._scroll_up,
+            "a": self._filter_all,
+            "c": self._filter_current,
+            "n": self._filter_none,
+            "s": self._select_strategy,
+            "m": self._toggle_maximize,
+            "h": self._page_left,
+            "l": self._page_right,
+            "left": self._page_left,
+            "right": self._page_right,
+        }
+        handler = _dispatch.get(k)
+        if handler:
+            if k in ("j", "k", "down", "up"):
+                handler(event)
             else:
-                self.app.codegen_filter_page = n_pages - 1
-            self._refresh_all()
-        elif event.key in ("l", "right"):
-            all_keys = sorted(self.app.bitmaps.keys(), key=_natural_key)
-            ps = self._page_size()
-            n_pages = max(1, (len(all_keys) + ps - 1) // ps)
-            if self.app.codegen_filter_page < n_pages - 1:
-                self.app.codegen_filter_page += 1
-            else:
-                self.app.codegen_filter_page = 0
-            self._refresh_all()
-        elif event.key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
-            self._toggle_key_at_page_pos(int(event.key) - 1)
+                handler()
+            return
+        if k in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
+            self._toggle_key_at_page_pos(int(k) - 1)
 
     def _on_strategy_chosen(self, strategy: str | None) -> None:
         if strategy:
@@ -263,7 +320,10 @@ class StrategySelectScreen(PopupScreen):
         with Vertical(id="strategy-outer"):
             yield Static(self.app.title_with_file(self.base_title), id="title")
             yield Static("", id="menu", markup=False)
-            yield Static("[?] details  [S]tats  [Enter] save  [Escape] cancel", id="hints", markup=False)
+            yield Static(
+                "[?] details  [S]tats  [Enter] save  [Escape] cancel",
+                id="hints", markup=False,
+            )
             yield Static("", id="status")
 
     def on_mount(self) -> None:
@@ -350,6 +410,7 @@ class StrategyDetailsScreen(PopupScreen):
             self.app.pop_screen()
 
 class StatsPopupScreen(PopupScreen):
+    """Screen to display code generation statistics per strategy and per bitmap."""
     base_title = "Code Generation Statistics"
     CSS = """
     #stats-outer { max-height: 60vh; }
@@ -370,7 +431,10 @@ class StatsPopupScreen(PopupScreen):
             yield Static("", id="stats-header", markup=False)
             yield VerticalScroll(Static("", id="stats-rows", markup=False))
             yield Static("", id="stats-footer", markup=False)
-            yield Static("[fbto] select  [D] detail  [G] by bitmap  [Escape] close", id="hints", markup=False)
+            yield Static(
+                "[fbto] select  [D] detail  [G] by bitmap  [Escape] close",
+                id="hints", markup=False,
+            )
             yield Static("", id="status")
 
     def on_mount(self) -> None:
@@ -379,120 +443,138 @@ class StatsPopupScreen(PopupScreen):
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
 
+    def _bitmap_detail_rows(self, all_stats, bm_key) -> list[str]:
+        best_for_bm = max(
+            all_stats[s].get("per_bitmap", {}).get(bm_key, {}).get("score", 0.0)
+            for s in STRATEGIES
+        )
+        rows = []
+        for strategy in STRATEGIES:
+            per_bm = all_stats[strategy].get("per_bitmap", {})
+            if bm_key not in per_bm:
+                continue
+            bm_stats = per_bm[bm_key]
+            bs = bm_stats["score"]
+            bs_s = f"{bs:.1f}%" if bs != int(bs) else f"{int(bs)}%"
+            cpr = bm_stats["cells_per_rect"]
+            cpr_s = f"{cpr:.1f}" if cpr != int(cpr) else str(int(cpr))
+            marker = "*" if bs == best_for_bm else " "
+            rows.append(
+                f"    {marker} {strategy.capitalize():<12}"
+                f" {bm_stats['rects']:>6}  {cpr_s:>10}  {bs_s:>6}"
+            )
+        return rows
+
+    def _bitmap_summary_row(self, all_stats, bm_key) -> str:
+        best_for_bm = max(
+            all_stats[s].get("per_bitmap", {}).get(bm_key, {}).get("score", 0.0)
+            for s in STRATEGIES
+        )
+        best_strats = [
+            s for s in STRATEGIES
+            if all_stats[s].get("per_bitmap", {}).get(bm_key, {}).get("score", 0.0)
+            == best_for_bm
+        ]
+        best_strat = best_strats[0]
+        best_stats = all_stats[best_strat].get("per_bitmap", {}).get(bm_key, {})
+        bs = best_stats["score"]
+        bs_s = f"{bs:.1f}%" if bs != int(bs) else f"{int(bs)}%"
+        cpr = best_stats["cells_per_rect"]
+        cpr_s = f"{cpr:.1f}" if cpr != int(cpr) else str(int(cpr))
+        return (
+            f"    * {best_strat.capitalize():<12}"
+            f" {best_stats['rects']:>6}  {cpr_s:>10}  {bs_s:>6}"
+        )
+
+    def _build_bitmap_grouped_view(self, all_stats) -> tuple:
+        header = (
+            f"  {'Bitmap':<16} {'Rects':>6}  {'Cells/rect':>10}  {'Score':>6}\n"
+            f"  {'-'*16} {'-'*6}  {'-'*10}  {'-'*6}"
+        )
+        all_bm_keys: set[str] = set()
+        for strategy in STRATEGIES:
+            all_bm_keys.update(all_stats[strategy].get("per_bitmap", {}).keys())
+        bm_best_score: dict[str, float] = {}
+        for bm_key in all_bm_keys:
+            best = 0.0
+            for strategy in STRATEGIES:
+                per_bm = all_stats[strategy].get("per_bitmap", {})
+                if bm_key in per_bm:
+                    s_val = per_bm[bm_key].get("score", 0.0)
+                    best = max(best, s_val)
+            bm_best_score[bm_key] = best
+        sorted_bitmaps = sorted(all_bm_keys, key=lambda k: bm_best_score[k], reverse=True)
+
+        rows = []
+        for idx, bm_key in enumerate(sorted_bitmaps):
+            if idx > 0:
+                rows.append("")
+            rows.append(f"  {bm_key}")
+            if self._show_detail:
+                rows.extend(self._bitmap_detail_rows(all_stats, bm_key))
+            else:
+                rows.append(self._bitmap_summary_row(all_stats, bm_key))
+        return header, rows, "[fbto] select  [D] detail  [G]rouping by bitmap  [Escape] close"
+
+    def _strategy_detail_rows(self, strategy_stats) -> list[str]:
+        rows = []
+        per_bitmap = strategy_stats.get("per_bitmap", {})
+        for bm_key, bm_stats in per_bitmap.items():
+            bs = bm_stats["score"]
+            bs_s = f"{bs:.1f}%" if bs != int(bs) else f"{int(bs)}%"
+            cpr = bm_stats["cells_per_rect"]
+            cpr_s = f"{cpr:.1f}" if cpr != int(cpr) else str(int(cpr))
+            rows.append(
+                f"      {bm_key:<12.12}"
+                f" {bm_stats['rects']:>6}  {cpr_s:>10}  {bs_s:>6}"
+            )
+        return rows
+
+    def _build_strategy_grouped_view(self, all_stats) -> tuple:
+        header = (
+            f"  {'Strategy':<16} {'Rects':>6}  {'Cells/rect':>10}  {'Score':>6}\n"
+            f"  {'-'*16} {'-'*6}  {'-'*10}  {'-'*6}"
+        )
+        sorted_strategies = sorted(
+            STRATEGIES,
+            key=lambda s: all_stats[s].get("overall_score", 0),
+            reverse=True,
+        )
+        best_score = max(
+            all_stats[s].get("overall_score", 0) for s in STRATEGIES
+        )
+        rows = []
+        for idx, strategy in enumerate(sorted_strategies):
+            if idx > 0:
+                rows.append("")
+            s_data = all_stats[strategy]
+            score = s_data.get("overall_score", 0)
+            rects = s_data.get("total_rects", 0)
+            score_s = f"{score:.1f}%" if score != int(score) else f"{int(score)}%"
+            marker = "*" if score == best_score else " "
+            rows.append(
+                f"  {marker} {strategy.capitalize():<14}"
+                f" {rects:>6}  {s_data['overall_cells_per_rect']:>10}  {score_s:>6}"
+            )
+            if self._show_detail:
+                rows.extend(self._strategy_detail_rows(s_data))
+        return header, rows, "[fbto] select  [D] detail  [G]rouping by strategy  [Escape] close"
+
     def _refresh(self) -> None:
         try:
             keys_list = list(self._keys) if self._keys is not None else None
             all_stats = CodegenService.generate_all_strategy_stats(
                 self.app.bitmaps, palette=self.app.active_palette, keys=keys_list
             )
-
-            if self._group_by_bitmap:
-                header = (
-                    f"  {'Bitmap':<16} {'Rects':>6}  {'Cells/rect':>10}  {'Score':>6}\n"
-                    f"  {'-'*16} {'-'*6}  {'-'*10}  {'-'*6}"
-                )
-                all_bm_keys: set[str] = set()
-                for strategy in STRATEGIES:
-                    all_bm_keys.update(all_stats[strategy].get("per_bitmap", {}).keys())
-                bm_best_score: dict[str, float] = {}
-                for bm_key in all_bm_keys:
-                    best = 0.0
-                    for strategy in STRATEGIES:
-                        per_bm = all_stats[strategy].get("per_bitmap", {})
-                        if bm_key in per_bm:
-                            s_val = per_bm[bm_key].get("score", 0.0)
-                            if s_val > best:
-                                best = s_val
-                    bm_best_score[bm_key] = best
-                sorted_bitmaps = sorted(all_bm_keys, key=lambda k: bm_best_score[k], reverse=True)
-
-                rows = []
-                for idx, bm_key in enumerate(sorted_bitmaps):
-                    if idx > 0:
-                        rows.append("")
-                    rows.append(f"  {bm_key}")
-                    if self._show_detail:
-                        best_for_bm = max(
-                            all_stats[s].get("per_bitmap", {}).get(bm_key, {}).get("score", 0.0)
-                            for s in STRATEGIES
-                        )
-                        for strategy in STRATEGIES:
-                            per_bm = all_stats[strategy].get("per_bitmap", {})
-                            if bm_key not in per_bm:
-                                continue
-                            bm_stats = per_bm[bm_key]
-                            bs = bm_stats["score"]
-                            bs_s = f"{bs:.1f}%" if bs != int(bs) else f"{int(bs)}%"
-                            cpr = bm_stats["cells_per_rect"]
-                            cpr_s = f"{cpr:.1f}" if cpr != int(cpr) else str(int(cpr))
-                            marker = "*" if bs == best_for_bm else " "
-                            rows.append(
-                                f"    {marker} {strategy.capitalize():<12} {bm_stats['rects']:>6}  {cpr_s:>10}  {bs_s:>6}"
-                            )
-                    else:
-                        best_for_bm = max(
-                            all_stats[s].get("per_bitmap", {}).get(bm_key, {}).get("score", 0.0)
-                            for s in STRATEGIES
-                        )
-                        best_strats = [
-                            s for s in STRATEGIES
-                            if all_stats[s].get("per_bitmap", {}).get(bm_key, {}).get("score", 0.0) == best_for_bm
-                        ]
-                        best_strat = best_strats[0]
-                        best_stats = all_stats[best_strat].get("per_bitmap", {}).get(bm_key, {})
-                        bs = best_stats["score"]
-                        bs_s = f"{bs:.1f}%" if bs != int(bs) else f"{int(bs)}%"
-                        cpr = best_stats["cells_per_rect"]
-                        cpr_s = f"{cpr:.1f}" if cpr != int(cpr) else str(int(cpr))
-                        rows.append(
-                            f"    * {best_strat.capitalize():<12} {best_stats['rects']:>6}  {cpr_s:>10}  {bs_s:>6}"
-                        )
-                self.query_one("#hints", Static).update(
-                    "[fbto] select  [D] detail  [G]rouping by bitmap  [Escape] close"
-                )
-            else:
-                header = (
-                    f"  {'Strategy':<16} {'Rects':>6}  {'Cells/rect':>10}  {'Score':>6}\n"
-                    f"  {'-'*16} {'-'*6}  {'-'*10}  {'-'*6}"
-                )
-                sorted_strategies = sorted(
-                    STRATEGIES,
-                    key=lambda s: all_stats[s].get("overall_score", 0),
-                    reverse=True,
-                )
-                best_score = max(
-                    all_stats[s].get("overall_score", 0) for s in STRATEGIES
-                )
-
-                rows = []
-                for idx, strategy in enumerate(sorted_strategies):
-                    if idx > 0:
-                        rows.append("")
-                    s = all_stats[strategy]
-                    score = s.get("overall_score", 0)
-                    rects = s.get("total_rects", 0)
-                    score_s = f"{score:.1f}%" if score != int(score) else f"{int(score)}%"
-                    marker = "*" if score == best_score else " "
-                    rows.append(
-                        f"  {marker} {strategy.capitalize():<14} {rects:>6}  {s['overall_cells_per_rect']:>10}  {score_s:>6}"
-                    )
-                    if self._show_detail:
-                        per_bitmap = s.get("per_bitmap", {})
-                        for bm_key, bm_stats in per_bitmap.items():
-                            bs = bm_stats["score"]
-                            bs_s = f"{bs:.1f}%" if bs != int(bs) else f"{int(bs)}%"
-                            cpr = bm_stats["cells_per_rect"]
-                            cpr_s = f"{cpr:.1f}" if cpr != int(cpr) else str(int(cpr))
-                            rows.append(
-                                f"      {bm_key:<12.12} {bm_stats['rects']:>6}  {cpr_s:>10}  {bs_s:>6}"
-                            )
-                self.query_one("#hints", Static).update(
-                    "[fbto] select  [D] detail  [G]rouping by strategy  [Escape] close"
-                )
-
+            header, rows, hints_text = (
+                self._build_bitmap_grouped_view(all_stats)
+                if self._group_by_bitmap
+                else self._build_strategy_grouped_view(all_stats)
+            )
             self.query_one("#stats-header", Static).update(header)
             self.query_one("#stats-rows", Static).update("\n".join(rows))
-        except Exception as e:
+            self.query_one("#hints", Static).update(hints_text)
+        except (KeyError, AttributeError, ZeroDivisionError, TypeError) as e:
             self.show_status(f"Error: {e}")
 
     def on_key(self, event) -> None:

@@ -185,7 +185,10 @@ class ConfigKeyManageScreen(PopupScreen):
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
-            yield Static("[R]ename key\n[S]trategy\n[D]elete key\n\n[Escape] back", id="menu", markup=False)
+            yield Static(
+                "[R]ename key\n[S]trategy\n[D]elete key\n\n[Escape] back",
+                id="menu", markup=False,
+            )
             yield Static("", id="info")
             yield Static("", id="status")
 
@@ -684,9 +687,15 @@ class ConfigPixelScreen(PopupScreen):
             yield Static(self.app.title_with_file(self.base_title), id="title")
             bm = self.app.bitmaps.get(str(self.app.current_key), {})
             current = bm.get("pixelSize", self.app.pixel_size)
-            self.input = PixelSizeInput(value=str(current), placeholder=str(self.app.pixel_size), id="pixel")
+            self.input = PixelSizeInput(
+                value=str(current), placeholder=str(self.app.pixel_size),
+                id="pixel",
+            )
             yield self.input
-            yield Static("[Enter] save (override)  [D]efault (inherit)  [Escape] cancel", id="hints", markup=False)
+            yield Static(
+                "[Enter] save (override)  [D]efault (inherit)  [Escape] cancel",
+                id="hints", markup=False,
+            )
             yield Static("", id="status")  # Status line
 
     def show_status(self, message: str) -> None:
