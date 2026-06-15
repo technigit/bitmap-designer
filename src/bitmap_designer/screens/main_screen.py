@@ -1,4 +1,5 @@
 """Main menu and close flow screens."""
+
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
@@ -19,11 +20,12 @@ from ..services.codegen_service import CodegenService
 from ..constants import create_default_bitmap
 
 if TYPE_CHECKING:
-    from ..app import BitmapDesignerApp
+    pass
 
 
 class MainScreen(Screen):
     """Main menu screen hub linking to design, preview, save, codegen, and config."""
+
     base_title = "Main Menu"
     TITLE = "Main Menu"
     CSS = """
@@ -70,14 +72,13 @@ class MainScreen(Screen):
             return
         key_lower = key.lower()
         if key_lower == "d":
-            bitmap = self.app.bitmaps.get(
-                self.app.current_key,
-                create_default_bitmap()
-            )
+            bitmap = self.app.bitmaps.get(self.app.current_key, create_default_bitmap())
             self.app.push_screen(DesignScreen(bitmap))
         elif key_lower == "p":
             svc = CodegenService(
-                self.app.bitmaps, self.app.show_status, palette=self.app.active_palette,
+                self.app.bitmaps,
+                self.app.show_status,
+                palette=self.app.active_palette,
                 pixel_size=self.app.pixel_size,
             )
             svc.preview()

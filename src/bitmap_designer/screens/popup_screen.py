@@ -1,9 +1,11 @@
 """Centered modal popup base class for dialog screens."""
+
 from textual.screen import ModalScreen
 
 
 class PopupScreen(ModalScreen):
     """A centered modal popup that dims the underlying screen."""
+
     DEFAULT_CSS = """
     PopupScreen {
         align: center middle;

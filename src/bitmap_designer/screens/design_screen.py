@@ -1,4 +1,5 @@
 """Bitmap design and color selection screens."""
+
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
@@ -18,11 +19,12 @@ from .config_screen import ConfigKeyScreen
 from .map_screen import MapScreen
 
 if TYPE_CHECKING:
-    from ..app import BitmapDesignerApp
+    pass
 
 
 class DesignScreen(Screen):
     """Grid-based bitmap editor with cursor movement, paint, fill, undo/redo."""
+
     base_title = "Design Mode"
     CSS = """
     #grid { margin: 0 0; }
@@ -64,8 +66,12 @@ class DesignScreen(Screen):
 
     # Clamp offset so viewport stays within bitmap bounds.
     def _clamp_offset(self):
-        self._offset[0] = max(0, min(self._offset[0], max(0, self.width - self.viewport[0])))
-        self._offset[1] = max(0, min(self._offset[1], max(0, self.height - self.viewport[1])))
+        self._offset[0] = max(
+            0, min(self._offset[0], max(0, self.width - self.viewport[0]))
+        )
+        self._offset[1] = max(
+            0, min(self._offset[1], max(0, self.height - self.viewport[1]))
+        )
 
     @property
     def content_fits(self) -> bool:
@@ -83,21 +89,25 @@ class DesignScreen(Screen):
         elif self.cursor[0] >= self._offset[0] + self.viewport[0] - margin:
             self._offset[0] = min(
                 max(0, self.width - self.viewport[0]),
-                self.cursor[0] - self.viewport[0] + margin + 1
+                self.cursor[0] - self.viewport[0] + margin + 1,
             )
         if self.cursor[1] < self._offset[1] + margin:
             self._offset[1] = max(0, self.cursor[1] - margin)
         elif self.cursor[1] >= self._offset[1] + self.viewport[1] - margin:
             self._offset[1] = min(
                 max(0, self.height - self.viewport[1]),
-                self.cursor[1] - self.viewport[1] + margin + 1
+                self.cursor[1] - self.viewport[1] + margin + 1,
             )
 
     # Shift the viewport by (dx, dy) bitmap pixels. Returns True if offset changed.
     def _scroll(self, dx: int, dy: int) -> bool:
         old_x, old_y = self._offset[0], self._offset[1]
-        self._offset[0] = max(0, min(self._offset[0] + dx, max(0, self.width - self.viewport[0])))
-        self._offset[1] = max(0, min(self._offset[1] + dy, max(0, self.height - self.viewport[1])))
+        self._offset[0] = max(
+            0, min(self._offset[0] + dx, max(0, self.width - self.viewport[0]))
+        )
+        self._offset[1] = max(
+            0, min(self._offset[1] + dy, max(0, self.height - self.viewport[1]))
+        )
         return self._offset[0] != old_x or self._offset[1] != old_y
 
     def compose(self) -> ComposeResult:
@@ -129,9 +139,7 @@ class DesignScreen(Screen):
             char = self._get_pixel(x, y)
         color_entry = self.app.active_palette.get(char, {})
         hex_color = color_entry.get("hex", "")
-        display_char = (
-            color_entry.get("glyph", char) if self.app.glyphmode else char
-        )
+        display_char = color_entry.get("glyph", char) if self.app.glyphmode else char
         cursor = not self.cursor_hidden and x == self.cursor[0] and y == self.cursor[1]
 
         if char == " ":
@@ -152,7 +160,9 @@ class DesignScreen(Screen):
         self.cursor_hidden = False
         self.scroll_mode = False
         self.rect_mode = False
-        self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
+        self.query_one("#title", Static).update(
+            self.app.title_with_file(self.base_title)
+        )
         if self.app.current_key != self._key_on_enter:
             self.switch_to_key(self.app.current_key)
         else:
@@ -170,7 +180,9 @@ class DesignScreen(Screen):
             return
         if self._cursor_timer is not None:
             self._cursor_timer.stop()
-        self._cursor_timer = self.set_timer(self.app.cursor_timeout, self._auto_hide_cursor)
+        self._cursor_timer = self.set_timer(
+            self.app.cursor_timeout, self._auto_hide_cursor
+        )
 
     def _auto_hide_cursor(self):
         if not self.cursor_hidden:
@@ -210,20 +222,21 @@ class DesignScreen(Screen):
         line += f"[{color}]{tr}[/]"
         return line
 
-    def _grid_lines(self, vp_w: int, vp_h: int,
-                    su: bool, sd: bool) -> list[str]:
+    def _grid_lines(self, vp_w: int, vp_h: int, su: bool, sd: bool) -> list[str]:
         color = self.app.current_theme.primary or "#00ffff"
         rows = []
         for i in range(vp_h):
             y = self._offset[1] + i
-            ind_char = ("^" if (su and i == 0)
-                        else "v" if (sd and i == vp_h - 1)
-                        else "║")
+            ind_char = (
+                "^" if (su and i == 0) else "v" if (sd and i == vp_h - 1) else "║"
+            )
             ind_style = "white" if ind_char in ("^", "v") else color
             row = f"[{ind_style}]{ind_char}[/]"
             for j in range(vp_w):
                 x = self._offset[0] + j
-                row += self._cell_markup(x, y, rect_preview=self._in_rect_selection(x, y))
+                row += self._cell_markup(
+                    x, y, rect_preview=self._in_rect_selection(x, y)
+                )
             row += f"[{ind_style}]{ind_char}[/]"
             rows.append(row)
         return rows
@@ -270,10 +283,14 @@ class DesignScreen(Screen):
 
     def _scroll_move(self, base_lower: str, step: int, msgs: dict) -> None:
         deltas = {
-            "left": (-step, 0), "h": (-step, 0),
-            "right": (step, 0), "l": (step, 0),
-            "up": (0, -step), "k": (0, -step),
-            "down": (0, step), "j": (0, step),
+            "left": (-step, 0),
+            "h": (-step, 0),
+            "right": (step, 0),
+            "l": (step, 0),
+            "up": (0, -step),
+            "k": (0, -step),
+            "down": (0, step),
+            "j": (0, step),
         }
         dx, dy = deltas[base_lower]
         if not self._scroll(dx, dy):
@@ -344,7 +361,7 @@ class DesignScreen(Screen):
             self._reset_cursor_timer()
             return
         if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
-            setattr(self.app, 'step', int(key))
+            setattr(self.app, "step", int(key))
             self.show_status(f"Step set to {self.app.step}")
             self.update_hints()
             return
@@ -470,7 +487,7 @@ class DesignScreen(Screen):
         elif key == "g":
             self._handle_g_key()
         elif key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
-            setattr(self.app, 'step', int(key))
+            setattr(self.app, "step", int(key))
             self.show_status(f"Step set to {self.app.step}")
             self.update_hints()
         else:
@@ -493,7 +510,9 @@ class DesignScreen(Screen):
             self.show_status("All content visible — scrolling disabled")
         else:
             self.scroll_mode = not self.scroll_mode
-            self.show_status("Scroll mode on" if self.scroll_mode else "Scroll mode off")
+            self.show_status(
+                "Scroll mode on" if self.scroll_mode else "Scroll mode off"
+            )
             self.update_hints()
 
     # Paint the current color at the cursor position.
@@ -509,11 +528,15 @@ class DesignScreen(Screen):
         row = list(self.pixels[self.cursor[1]])
         if len(row) <= self.cursor[0]:
             row.extend([" "] * (self.cursor[0] - len(row) + 1))
-        row[self.cursor[0]] = " " if self.app.current_color == "0" else self.app.current_color
+        row[self.cursor[0]] = (
+            " " if self.app.current_color == "0" else self.app.current_color
+        )
         self.pixels[self.cursor[1]] = "".join(row)
         self.app.mark_dirty()
         self._sync_pixels()
-        CodegenService(self.app.bitmaps, palette=self.app.active_palette).save_preview_html()
+        CodegenService(
+            self.app.bitmaps, palette=self.app.active_palette
+        ).save_preview_html()
 
     # Fill a connected region from the cursor with the current color.
     def flood_fill(self):
@@ -525,7 +548,9 @@ class DesignScreen(Screen):
         self._flood_fill(self.cursor[0], self.cursor[1], target, fill_color)
         self.app.mark_dirty()
         self._sync_pixels()
-        CodegenService(self.app.bitmaps, palette=self.app.active_palette).save_preview_html()
+        CodegenService(
+            self.app.bitmaps, palette=self.app.active_palette
+        ).save_preview_html()
 
     def _get_pixel(self, x: int, y: int) -> str:
         if y < len(self.pixels) and x < len(self.pixels[y]):
@@ -572,9 +597,9 @@ class DesignScreen(Screen):
                 self._set_pixel(x, y, fill)
         self.app.mark_dirty()
         self._sync_pixels()
-        CodegenService(self.app.bitmaps, palette=self.app.active_palette).save_preview_html()
-
-
+        CodegenService(
+            self.app.bitmaps, palette=self.app.active_palette
+        ).save_preview_html()
 
     def _save_state(self):
         self.undo_stack.append((list(self.pixels), self.cursor[0], self.cursor[1]))
@@ -638,7 +663,9 @@ class DesignScreen(Screen):
                 hints.append("[^R]edo")
             hints.append("\n")
             if self.scroll_mode:
-                hints.append("[hjkl/\u25b4\u25be\u25c2\u25b8] scroll  [Esc] exit scroll  ")
+                hints.append(
+                    "[hjkl/\u25b4\u25be\u25c2\u25b8] scroll  [Esc] exit scroll  "
+                )
             else:
                 hints.append("[hjkl/\u25b4\u25be\u25c2\u25b8] move  ")
                 hints.append("[g] scroll  ", style="dim" if self.content_fits else None)
@@ -657,6 +684,7 @@ class DesignScreen(Screen):
 
 class ColorScreen(PopupScreen):
     """Color palette selection screen (0-F)."""
+
     CSS = """
     #palette { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
@@ -686,15 +714,15 @@ class ColorScreen(PopupScreen):
             glyph_display = entry.get("glyph", " ")
             name = entry.get("name", "?")
             asterisk = "* " if cid == self.app.current_color else "  "
-            rows.append((
-                f"{asterisk}{cid.upper()}:",
-                name,
-                f"({glyph_display})",
-                f"[{hex_color}]{cid.upper()}[/]",
-            ))
-        self.query_one("#palette", Static).update(
-            columnate(rows, sep="  ")
-        )
+            rows.append(
+                (
+                    f"{asterisk}{cid.upper()}:",
+                    name,
+                    f"({glyph_display})",
+                    f"[{hex_color}]{cid.upper()}[/]",
+                )
+            )
+        self.query_one("#palette", Static).update(columnate(rows, sep="  "))
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)

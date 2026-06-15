@@ -1,4 +1,5 @@
 """Code generation and generic response screens."""
+
 from __future__ import annotations
 from typing import TYPE_CHECKING
 import re
@@ -18,11 +19,12 @@ def _natural_key(s: str):
 
 
 if TYPE_CHECKING:
-    from ..app import BitmapDesignerApp
+    pass
 
 
 class CodegenScreen(PopupScreen):
     """Screen to display and copy generated JavaScript code with key filtering."""
+
     base_title = "Code Generation"
     CSS = """
     #code-outer { max-height: 60vh; }
@@ -58,9 +60,9 @@ class CodegenScreen(PopupScreen):
         self._refresh_all()
 
     def _page_size(self) -> int:
-        margin = 3       # "  " indent
-        page_info = 15   # " [Page N/M]" est.
-        slot = 13        # "1:✓abcdef… " max entry width
+        margin = 3  # "  " indent
+        page_info = 15  # " [Page N/M]" est.
+        slot = 13  # "1:✓abcdef… " max entry width
         available = self.size.width - margin - page_info
         return max(1, min(9, available // slot))
 
@@ -71,7 +73,7 @@ class CodegenScreen(PopupScreen):
         page = min(self.app.codegen_filter_page, n_pages - 1)
         self.app.set_codegen_filter_page(page)
         start = page * page_size
-        return all_keys[start:start + page_size], n_pages
+        return all_keys[start : start + page_size], n_pages
 
     def _keys_bar_text(self) -> str:
         all_sorted = sorted(self.app.bitmaps.keys(), key=_natural_key)
@@ -84,8 +86,8 @@ class CodegenScreen(PopupScreen):
             in_filter = active_set is None or key in active_set
             marker = "\u2713" if in_filter else "\u2717"
             label = key if len(key) <= 8 else key[:7] + "\u2026"
-            parts.append(f"{i+1}:{marker}{label}")
-        page_info = f"  [Page {self.app.codegen_filter_page+1}/{n_pages}]"
+            parts.append(f"{i + 1}:{marker}{label}")
+        page_info = f"  [Page {self.app.codegen_filter_page + 1}/{n_pages}]"
         return "  " + "  ".join(parts) + page_info
 
     def _mode_bar_text(self) -> str:
@@ -147,15 +149,19 @@ class CodegenScreen(PopupScreen):
 
     def _generate_code(self) -> None:
         active_filter = (
-            None if self.app.codegen_filtered_keys is None
+            None
+            if self.app.codegen_filtered_keys is None
             else list(self.app.codegen_filtered_keys)
         )
         code = CodegenService(
-            self.app.bitmaps, palette=self.app.active_palette,
+            self.app.bitmaps,
+            palette=self.app.active_palette,
             pixel_size=self.app.pixel_size,
         ).generate_code(keys=active_filter)
         self.query_one("#code").update(code or "No bitmap data.")
-        n_keys = len(active_filter) if active_filter is not None else len(self.app.bitmaps)
+        n_keys = (
+            len(active_filter) if active_filter is not None else len(self.app.bitmaps)
+        )
         total = len(self.app.bitmaps)
         self.show_status(f"Code generated for {n_keys} of {total} keys")
 
@@ -188,11 +194,13 @@ class CodegenScreen(PopupScreen):
 
     def _copy_code(self) -> None:
         active_filter = (
-            None if self.app.codegen_filtered_keys is None
+            None
+            if self.app.codegen_filtered_keys is None
             else list(self.app.codegen_filtered_keys)
         )
         code = CodegenService(
-            self.app.bitmaps, palette=self.app.active_palette,
+            self.app.bitmaps,
+            palette=self.app.active_palette,
             pixel_size=self.app.pixel_size,
         ).generate_code(keys=active_filter)
         pyperclip.copy(code)
@@ -299,6 +307,7 @@ class CodegenScreen(PopupScreen):
 
 class StrategySelectScreen(PopupScreen):
     """Screen to select the code generation strategy."""
+
     base_title = "Code Generation Strategy"
     CSS = """
     #strategy-outer { max-height: 60vh; }
@@ -309,11 +318,13 @@ class StrategySelectScreen(PopupScreen):
 
     def _strategy_text(self) -> str:
         current = self.app.get_codegen_strategy()
-        lines = [f"  Bitmap \"{self.app.current_key}\":"]
+        lines = [f'  Bitmap "{self.app.current_key}":']
         for s in STRATEGIES:
             marker = "◄" if s == current else " "
             default_mark = "  (default)" if s == FALLBACK_DEFAULT else ""
-            lines.append(f"  [{s[0].upper()}] {s.capitalize():10s} {marker}{default_mark}")
+            lines.append(
+                f"  [{s[0].upper()}] {s.capitalize():10s} {marker}{default_mark}"
+            )
         return "\n".join(lines)
 
     def compose(self) -> ComposeResult:
@@ -322,7 +333,8 @@ class StrategySelectScreen(PopupScreen):
             yield Static("", id="menu", markup=False)
             yield Static(
                 "[?] details  [S]tats  [Enter] save  [Escape] cancel",
-                id="hints", markup=False,
+                id="hints",
+                markup=False,
             )
             yield Static("", id="status")
 
@@ -377,7 +389,9 @@ class StrategySelectScreen(PopupScreen):
 
 class StrategyDetailsScreen(PopupScreen):
     """Screen showing strategy descriptions."""
+
     base_title = "Strategy Details"
+
     def compose(self) -> ComposeResult:
         details = (
             "Fast — Histogram maximal-rectangle algorithm with post-merge."
@@ -409,8 +423,10 @@ class StrategyDetailsScreen(PopupScreen):
         if event.key in ("enter", "\n", "escape"):
             self.app.pop_screen()
 
+
 class StatsPopupScreen(PopupScreen):
     """Screen to display code generation statistics per strategy and per bitmap."""
+
     base_title = "Code Generation Statistics"
     CSS = """
     #stats-outer { max-height: 60vh; }
@@ -433,7 +449,8 @@ class StatsPopupScreen(PopupScreen):
             yield Static("", id="stats-footer", markup=False)
             yield Static(
                 "[fbto] select  [D] detail  [G] by bitmap  [Escape] close",
-                id="hints", markup=False,
+                id="hints",
+                markup=False,
             )
             yield Static("", id="status")
 
@@ -471,7 +488,8 @@ class StatsPopupScreen(PopupScreen):
             for s in STRATEGIES
         )
         best_strats = [
-            s for s in STRATEGIES
+            s
+            for s in STRATEGIES
             if all_stats[s].get("per_bitmap", {}).get(bm_key, {}).get("score", 0.0)
             == best_for_bm
         ]
@@ -489,7 +507,7 @@ class StatsPopupScreen(PopupScreen):
     def _build_bitmap_grouped_view(self, all_stats) -> tuple:
         header = (
             f"  {'Bitmap':<16} {'Rects':>6}  {'Cells/rect':>10}  {'Score':>6}\n"
-            f"  {'-'*16} {'-'*6}  {'-'*10}  {'-'*6}"
+            f"  {'-' * 16} {'-' * 6}  {'-' * 10}  {'-' * 6}"
         )
         all_bm_keys: set[str] = set()
         for strategy in STRATEGIES:
@@ -503,7 +521,9 @@ class StatsPopupScreen(PopupScreen):
                     s_val = per_bm[bm_key].get("score", 0.0)
                     best = max(best, s_val)
             bm_best_score[bm_key] = best
-        sorted_bitmaps = sorted(all_bm_keys, key=lambda k: bm_best_score[k], reverse=True)
+        sorted_bitmaps = sorted(
+            all_bm_keys, key=lambda k: bm_best_score[k], reverse=True
+        )
 
         rows = []
         for idx, bm_key in enumerate(sorted_bitmaps):
@@ -514,7 +534,11 @@ class StatsPopupScreen(PopupScreen):
                 rows.extend(self._bitmap_detail_rows(all_stats, bm_key))
             else:
                 rows.append(self._bitmap_summary_row(all_stats, bm_key))
-        return header, rows, "[fbto] select  [D] detail  [G]rouping by bitmap  [Escape] close"
+        return (
+            header,
+            rows,
+            "[fbto] select  [D] detail  [G]rouping by bitmap  [Escape] close",
+        )
 
     def _strategy_detail_rows(self, strategy_stats) -> list[str]:
         rows = []
@@ -525,24 +549,21 @@ class StatsPopupScreen(PopupScreen):
             cpr = bm_stats["cells_per_rect"]
             cpr_s = f"{cpr:.1f}" if cpr != int(cpr) else str(int(cpr))
             rows.append(
-                f"      {bm_key:<12.12}"
-                f" {bm_stats['rects']:>6}  {cpr_s:>10}  {bs_s:>6}"
+                f"      {bm_key:<12.12} {bm_stats['rects']:>6}  {cpr_s:>10}  {bs_s:>6}"
             )
         return rows
 
     def _build_strategy_grouped_view(self, all_stats) -> tuple:
         header = (
             f"  {'Strategy':<16} {'Rects':>6}  {'Cells/rect':>10}  {'Score':>6}\n"
-            f"  {'-'*16} {'-'*6}  {'-'*10}  {'-'*6}"
+            f"  {'-' * 16} {'-' * 6}  {'-' * 10}  {'-' * 6}"
         )
         sorted_strategies = sorted(
             STRATEGIES,
             key=lambda s: all_stats[s].get("overall_score", 0),
             reverse=True,
         )
-        best_score = max(
-            all_stats[s].get("overall_score", 0) for s in STRATEGIES
-        )
+        best_score = max(all_stats[s].get("overall_score", 0) for s in STRATEGIES)
         rows = []
         for idx, strategy in enumerate(sorted_strategies):
             if idx > 0:
@@ -558,7 +579,11 @@ class StatsPopupScreen(PopupScreen):
             )
             if self._show_detail:
                 rows.extend(self._strategy_detail_rows(s_data))
-        return header, rows, "[fbto] select  [D] detail  [G]rouping by strategy  [Escape] close"
+        return (
+            header,
+            rows,
+            "[fbto] select  [D] detail  [G]rouping by strategy  [Escape] close",
+        )
 
     def _refresh(self) -> None:
         try:

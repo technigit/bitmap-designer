@@ -1,4 +1,5 @@
 """Close flow confirmation screens."""
+
 from __future__ import annotations
 import os
 
@@ -25,7 +26,8 @@ class CloseScreen(PopupScreen):
             yield Static("Really close? (y/N)", id="prompt")
             yield Static(
                 "[!] force close (without saving)  [Escape] cancel",
-                id="hints", markup=False
+                id="hints",
+                markup=False,
             )
 
     def on_key(self, event) -> None:
@@ -45,6 +47,7 @@ class CloseScreen(PopupScreen):
 
 class SaveFileFirstScreen(SaveFirstScreen):
     """Screen asking whether to save before closing."""
+
     TITLE = "Close - Save"
 
     def compose(self) -> ComposeResult:
@@ -53,7 +56,8 @@ class SaveFileFirstScreen(SaveFirstScreen):
             yield Static("Save file first? (Y/n)", id="prompt")
             yield Static(
                 "[!] force close (without saving)  [Escape] cancel",
-                id="hints", markup=False
+                id="hints",
+                markup=False,
             )
 
     def on_key(self, event):
@@ -85,7 +89,8 @@ class AreYouSureScreen(PopupScreen):
             yield Static("Are you sure? (y/N)", id="prompt")
             yield Static(
                 "[!] force close (without saving)  [Escape] cancel",
-                id="hints", markup=False
+                id="hints",
+                markup=False,
             )
 
     def on_key(self, event) -> None:
@@ -107,6 +112,7 @@ class AreYouSureScreen(PopupScreen):
 
 class FileChangedScreen(PopupScreen):
     """Warning screen when the file has been externally edited."""
+
     CSS = """
     #hints { margin-top: 1; opacity: 0.5; }
     """
@@ -120,7 +126,7 @@ class FileChangedScreen(PopupScreen):
             yield Static("Warning", id="title")
             yield Static(
                 f"File '{os.path.basename(self.filepath)}' has been externally edited.",
-                id="warning"
+                id="warning",
             )
             yield Static("[O]K (ignore), [R]eload", id="hints", markup=False)
             yield Static("", id="status")

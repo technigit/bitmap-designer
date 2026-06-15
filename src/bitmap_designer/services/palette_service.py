@@ -91,7 +91,9 @@ def _resolve(
 
     def walk(pid: str, seen: set[str]) -> dict[str, dict]:
         if pid in seen:
-            messages.append(f"Cycle detected in palette '{pid}', falling back to default")
+            messages.append(
+                f"Cycle detected in palette '{pid}', falling back to default"
+            )
             return _get_root_colors()
         seen.add(pid)
         pdef = get_def(pid)

@@ -1,4 +1,5 @@
 """Per-key undo/redo history, session-scoped."""
+
 from __future__ import annotations
 
 

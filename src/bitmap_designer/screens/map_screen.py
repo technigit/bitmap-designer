@@ -1,4 +1,5 @@
 """Spatial overview screen showing all bitmap keys on a virtual canvas."""
+
 from __future__ import annotations
 import math
 from dataclasses import dataclass
@@ -16,13 +17,13 @@ from .popup_screen import PopupScreen
 from ..constants import create_default_bitmap
 
 if TYPE_CHECKING:
-    from ..app import BitmapDesignerApp
-
+    pass
 
 
 @dataclass
 class DeviceContext:
     """Render-time state snapshot: canvas dimensions, zoom, pan, aspect."""
+
     cw: int
     ch: int
     zoom_scale: float
@@ -33,6 +34,7 @@ class DeviceContext:
 
 class FindKeyScreen(PopupScreen):
     """Screen to find and select a bitmap key by name."""
+
     base_title = "Find Key"
     CSS = """
     Input { margin: 0 0; }
@@ -50,11 +52,13 @@ class FindKeyScreen(PopupScreen):
             self.input = Input(
                 value=self.app.current_key,
                 placeholder="Type key name...",
-                id="find-input"
+                id="find-input",
             )
             yield self.input
             yield Static("", id="matches")
-            yield Static("[Enter] select/create  [Escape] cancel", id="hints", markup=False)
+            yield Static(
+                "[Enter] select/create  [Escape] cancel", id="hints", markup=False
+            )
             yield Static("", id="status")
 
     def on_screen_resume(self, _event) -> None:
@@ -96,15 +100,20 @@ class FindKeyScreen(PopupScreen):
 
 
 PAN_KEYS = {
-    "left": (-1, 0), "h": (-1, 0),
-    "right": (1, 0), "l": (1, 0),
-    "up": (0, -1), "k": (0, -1),
-    "down": (0, 1), "j": (0, 1),
+    "left": (-1, 0),
+    "h": (-1, 0),
+    "right": (1, 0),
+    "l": (1, 0),
+    "up": (0, -1),
+    "k": (0, -1),
+    "down": (0, 1),
+    "j": (0, 1),
 }
 
 
 class MapScreen(Screen):
     """Overview map of all bitmaps arranged by spatial location."""
+
     base_title = "Map Mode"
     CSS = """
     Vertical { height: 1fr; }
@@ -161,7 +170,9 @@ class MapScreen(Screen):
     def on_screen_resume(self, _event) -> None:
         self.step = self.app.step
         self.selected_key = self.app.current_key
-        self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
+        self.query_one("#title", Static).update(
+            self.app.title_with_file(self.base_title)
+        )
         self.refresh_map()
 
     async def _on_resize(self, event: ResizeEvent) -> None:
@@ -229,8 +240,12 @@ class MapScreen(Screen):
         sy = target_h / ((bh + 3) * self.aspect_y) if bh > 0 else 1
         self.zoom_scale = max(0.1, min(sx, sy))
         self.pan_x = int(cw / 2 - bx * self.zoom_scale - (bw * self.zoom_scale) / 2)
-        self.pan_y = int(ch / 2 - by * self.zoom_scale * self.aspect_y
-                         - (bh * self.zoom_scale * self.aspect_y) / 2 + 1)
+        self.pan_y = int(
+            ch / 2
+            - by * self.zoom_scale * self.aspect_y
+            - (bh * self.zoom_scale * self.aspect_y) / 2
+            + 1
+        )
         self.selected_key = key
         self.refresh_map()
 
@@ -248,9 +263,14 @@ class MapScreen(Screen):
             pixel_w = max(1, int(bw * ctx.zoom_scale))
             pixel_h = max(1, int(bh * ctx.zoom_scale * ctx.aspect_y))
             positions[key] = {
-                "bx": bx, "by": by, "bw": bw, "bh": bh,
-                "pixel_left": pixel_left, "pixel_top": pixel_top,
-                "pixel_w": pixel_w, "pixel_h": pixel_h,
+                "bx": bx,
+                "by": by,
+                "bw": bw,
+                "bh": bh,
+                "pixel_left": pixel_left,
+                "pixel_top": pixel_top,
+                "pixel_w": pixel_w,
+                "pixel_h": pixel_h,
             }
         return positions
 
@@ -265,8 +285,9 @@ class MapScreen(Screen):
         pixels = data.get("bitmap", {}).get("pixels", [])
         return bx, by, bw, bh, pixels
 
-    def _count_pixels(self, pixels: list, px: tuple[int, int],
-                      py: tuple[int, int]) -> dict:
+    def _count_pixels(
+        self, pixels: list, px: tuple[int, int], py: tuple[int, int]
+    ) -> dict:
         counts = {}
         for row_idx in range(py[0], py[1] + 1):
             if row_idx >= len(pixels):
@@ -280,20 +301,26 @@ class MapScreen(Screen):
                     counts[ch] = counts.get(ch, 0) + 1
         return counts
 
-    def _sample_pixel(self, ctx: DeviceContext, key: str,
-                      disp_col: int, disp_row: int) -> str:
+    def _sample_pixel(
+        self, ctx: DeviceContext, key: str, disp_col: int, disp_row: int
+    ) -> str:
         bx, by, bw, bh, pixels = self._get_bitmap_attrs(key)
         scale_y = ctx.zoom_scale * ctx.aspect_y
-        px = (max(0, int(math.floor(bx + disp_col / ctx.zoom_scale)) - bx),
-              min(bw - 1, int(math.ceil(bx + (disp_col + 1) / ctx.zoom_scale)) - 1 - bx))
-        py = (max(0, int(math.floor(by + disp_row / scale_y)) - by),
-              min(bh - 1, int(math.ceil(by + (disp_row + 1) / scale_y)) - 1 - by))
+        px = (
+            max(0, int(math.floor(bx + disp_col / ctx.zoom_scale)) - bx),
+            min(bw - 1, int(math.ceil(bx + (disp_col + 1) / ctx.zoom_scale)) - 1 - bx),
+        )
+        py = (
+            max(0, int(math.floor(by + disp_row / scale_y)) - by),
+            min(bh - 1, int(math.ceil(by + (disp_row + 1) / scale_y)) - 1 - by),
+        )
         counts = self._count_pixels(pixels, px, py)
         if not counts:
             return " "
         max_c = max(counts.values())
-        return max((c for c, n in counts.items() if n == max_c),
-                   key=lambda c: int(c, 16))
+        return max(
+            (c for c, n in counts.items() if n == max_c), key=lambda c: int(c, 16)
+        )
 
     def _pixel_map_char(self, pixel_char: str) -> tuple[str, str | None]:
         if pixel_char == " ":
@@ -309,8 +336,9 @@ class MapScreen(Screen):
             return display_char, hex_color
         return display_char, None
 
-    def _render_one(self, ctx: DeviceContext, key: str, pos: dict, *,
-                    cell, opts: dict) -> None:
+    def _render_one(
+        self, ctx: DeviceContext, key: str, pos: dict, *, cell, opts: dict
+    ) -> None:
         pl = pos["pixel_left"]
         pt = pos["pixel_top"]
         dim = opts.get("dim", False)
@@ -337,14 +365,27 @@ class MapScreen(Screen):
         cell(pl - 1, pt + pos["pixel_h"], "╚" if not dim else "└", frame_style, True)
         for cx in range(pl, pl + pos["pixel_w"]):
             cell(cx, pt + pos["pixel_h"], "═" if not dim else "─", frame_style, True)
-        cell(pl + pos["pixel_w"], pt + pos["pixel_h"], "╝" if not dim else "┘", frame_style, True)
+        cell(
+            pl + pos["pixel_w"],
+            pt + pos["pixel_h"],
+            "╝" if not dim else "┘",
+            frame_style,
+            True,
+        )
         for row in range(pos["pixel_h"]):
             cell(pl - 1, pt + row, "║" if not dim else "│", frame_style, True)
-            cell(pl + pos["pixel_w"], pt + row, "║" if not dim else "│", frame_style, True)
+            cell(
+                pl + pos["pixel_w"],
+                pt + row,
+                "║" if not dim else "│",
+                frame_style,
+                True,
+            )
             render_row(row)
 
-    def _compute_scrolled(self, ctx: DeviceContext, positions: dict
-                          ) -> tuple[bool, bool, bool, bool, int, int]:
+    def _compute_scrolled(
+        self, ctx: DeviceContext, positions: dict
+    ) -> tuple[bool, bool, bool, bool, int, int]:
         max_right = 0
         max_bottom = 0
         min_left = float("inf")
@@ -366,14 +407,15 @@ class MapScreen(Screen):
 
     def _render_grid(self, ctx: DeviceContext) -> Text:
         positions = self._compute_positions(ctx)
-        grid = [[(" ", None) for _ in range(ctx.cw)]
-                for _ in range(ctx.ch)]
+        grid = [[(" ", None) for _ in range(ctx.cw)] for _ in range(ctx.ch)]
 
-        (scrolled_l, scrolled_r, scrolled_u, scrolled_d,
-         max_right, max_bottom) = self._compute_scrolled(ctx, positions)
+        (scrolled_l, scrolled_r, scrolled_u, scrolled_d, max_right, max_bottom) = (
+            self._compute_scrolled(ctx, positions)
+        )
 
-        def set_cell(col: int, row: int, char: str, style: str | None,
-                     overwrite: bool) -> None:
+        def set_cell(
+            col: int, row: int, char: str, style: str | None, overwrite: bool
+        ) -> None:
             if 0 <= row < ctx.ch and 0 <= col < ctx.cw:
                 if overwrite or grid[row][col][0] == " ":
                     grid[row][col] = (char, style)
@@ -381,18 +423,31 @@ class MapScreen(Screen):
         max_bounds = (max_right, max_bottom)
         for key, pos in positions.items():
             if key != self.selected_key:
-                self._render_one(ctx, key, pos,
-                                 cell=set_cell, opts={"bounds": max_bounds, "dim": True})
+                self._render_one(
+                    ctx,
+                    key,
+                    pos,
+                    cell=set_cell,
+                    opts={"bounds": max_bounds, "dim": True},
+                )
         if self.selected_key in positions:
-            self._render_one(ctx, self.selected_key, positions[self.selected_key],
-                             cell=set_cell, opts={"bounds": max_bounds, "dim": False})
+            self._render_one(
+                ctx,
+                self.selected_key,
+                positions[self.selected_key],
+                cell=set_cell,
+                opts={"bounds": max_bounds, "dim": False},
+            )
 
-        self._draw_grid_borders(ctx, grid, (scrolled_l, scrolled_r, scrolled_u, scrolled_d))
+        self._draw_grid_borders(
+            ctx, grid, (scrolled_l, scrolled_r, scrolled_u, scrolled_d)
+        )
         self._fill_grid_empty(ctx, grid, max_right, max_bottom)
         return self._compress_grid(ctx, grid)
 
-    def _draw_grid_borders(self, ctx: DeviceContext, grid: list,
-                           scrolled: tuple[bool, bool, bool, bool]) -> None:
+    def _draw_grid_borders(
+        self, ctx: DeviceContext, grid: list, scrolled: tuple[bool, bool, bool, bool]
+    ) -> None:
         sl, sr, su, sd = scrolled
         indicator_style = "white"
         frame_style = "dim"
@@ -419,8 +474,9 @@ class MapScreen(Screen):
             grid[ctx.ch - 2][0] = ("v", indicator_style)
             grid[ctx.ch - 2][ctx.cw - 1] = ("v", indicator_style)
 
-    def _fill_grid_empty(self, ctx: DeviceContext, grid: list,
-                         max_right: int, max_bottom: int) -> None:
+    def _fill_grid_empty(
+        self, ctx: DeviceContext, grid: list, max_right: int, max_bottom: int
+    ) -> None:
         for row in range(ctx.ch):
             for col in range(ctx.cw):
                 if grid[row][col][0] != " ":
@@ -452,9 +508,10 @@ class MapScreen(Screen):
     def _pan_available(self) -> bool:
         cw, ch = self.compute_canvas_size()
         _, _, vw, vh = self._compute_virtual_bounds()
-        return (vw * self.zoom_scale > cw - 2 or
-                vh * self.zoom_scale * self.aspect_y > ch - 2)
-
+        return (
+            vw * self.zoom_scale > cw - 2
+            or vh * self.zoom_scale * self.aspect_y > ch - 2
+        )
 
     def _pan(self, dx: int, dy: int) -> None:
         self._last_fit = None
@@ -468,9 +525,14 @@ class MapScreen(Screen):
 
     def refresh_map(self) -> None:
         cw, ch = self.compute_canvas_size()
-        ctx = DeviceContext(cw=cw, ch=ch, zoom_scale=self.zoom_scale,
-                            aspect_y=self.aspect_y, pan_x=self.pan_x,
-                            pan_y=self.pan_y)
+        ctx = DeviceContext(
+            cw=cw,
+            ch=ch,
+            zoom_scale=self.zoom_scale,
+            aspect_y=self.aspect_y,
+            pan_x=self.pan_x,
+            pan_y=self.pan_y,
+        )
         self.query_one("#grid", Static).update(self._render_grid(ctx))
         self.update_hints()
         self._store_map_state()
@@ -497,8 +559,9 @@ class MapScreen(Screen):
         hints.append(f"[hjkl/\u25b4\u25be\u25c2\u25b8] {pan_label}  ")
         hints.append(f"[1-9] step={self.app.step}\n")
         reset_pan_style = None if self.pan_x != 2 or self.pan_y != 3 else "dim"
-        hints.append(f"[R]eset {'pan' if self.pan_flip else 'scroll'}",
-                     style=reset_pan_style)
+        hints.append(
+            f"[R]eset {'pan' if self.pan_flip else 'scroll'}", style=reset_pan_style
+        )
         hints.append("  ")
         hints.append(f"[P]an {'on' if self.pan_flip else 'off'}\n")
         hints.append(f"Key={self.selected_key}  ")
@@ -516,14 +579,20 @@ class MapScreen(Screen):
         bw = bounds_["width"]
         bh = bounds_["height"]
         cx = bx * self.zoom_scale + self.pan_x + (bw * self.zoom_scale) / 2
-        cy = (by * self.zoom_scale * self.aspect_y + self.pan_y
-              + (bh * self.zoom_scale * self.aspect_y) / 2)
+        cy = (
+            by * self.zoom_scale * self.aspect_y
+            + self.pan_y
+            + (bh * self.zoom_scale * self.aspect_y) / 2
+        )
         new_s = self.zoom_scale * factor
         new_s = max(0.1, min(new_s, 20.0))
         self.zoom_scale = new_s
         ncx = bx * self.zoom_scale + self.pan_x + (bw * self.zoom_scale) / 2
-        ncy = (by * self.zoom_scale * self.aspect_y + self.pan_y
-               + (bh * self.zoom_scale * self.aspect_y) / 2)
+        ncy = (
+            by * self.zoom_scale * self.aspect_y
+            + self.pan_y
+            + (bh * self.zoom_scale * self.aspect_y) / 2
+        )
         self.pan_x += int(cx - ncx)
         self.pan_y += int(cy - ncy)
         self.refresh_map()

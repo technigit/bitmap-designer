@@ -1,4 +1,5 @@
 """Configuration screens for bitmap settings."""
+
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
@@ -21,11 +22,12 @@ from ..text_utils import columnate
 from .codegen_screen import StrategySelectScreen
 
 if TYPE_CHECKING:
-    from ..app import BitmapDesignerApp
+    pass
 
 
 class ConfigScreen(PopupScreen):
     """Configuration menu screen."""
+
     base_title = "Configuration"
     CSS = """
     #menu { margin-top: 1; }
@@ -42,11 +44,15 @@ class ConfigScreen(PopupScreen):
 
     def on_mount(self) -> None:
         self._refresh_values()
-        self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
+        self.query_one("#title", Static).update(
+            self.app.title_with_file(self.base_title)
+        )
 
     def on_screen_resume(self, _event) -> None:
         self._refresh_values()
-        self.query_one("#title", Static).update(self.app.title_with_file(self.base_title))
+        self.query_one("#title", Static).update(
+            self.app.title_with_file(self.base_title)
+        )
 
     def _refresh_values(self):
         idx = str(self.app.current_key)
@@ -54,8 +60,7 @@ class ConfigScreen(PopupScreen):
         bounds = bm.get("bounds", {"width": 10, "height": 10})
         loc = bm.get("location", {"x": 0, "y": 0})
         keys_list = " ".join(
-            f"{k}*" if k == idx else k
-            for k in sorted(self.app.bitmaps)
+            f"{k}*" if k == idx else k for k in sorted(self.app.bitmaps)
         )
 
         labels_design = ["[K]ey", "[B]ounds", "[L]ocation"]
@@ -78,7 +83,9 @@ class ConfigScreen(PopupScreen):
         ]
 
         palette_name = self.app.palette_id or (
-            next(iter(self.app.custom_palettes)) if self.app.custom_palettes else "default"
+            next(iter(self.app.custom_palettes))
+            if self.app.custom_palettes
+            else "default"
         )
         rows = list(zip(labels_design, values_design))
         rows.append(("", ""))
@@ -124,6 +131,7 @@ class ConfigScreen(PopupScreen):
 
 class ConfigKeyScreen(PopupScreen):
     """Screen to change the current bitmap key."""
+
     base_title = "Bitmap Key"
     CSS = """
     Input { margin: 0 0; }
@@ -174,6 +182,7 @@ class ConfigKeyScreen(PopupScreen):
 
 class ConfigKeyManageScreen(PopupScreen):
     """Screen for bitmap key management operations."""
+
     base_title = "Manage Key"
     CSS = """
     #menu { margin-top: 1; }
@@ -187,7 +196,8 @@ class ConfigKeyManageScreen(PopupScreen):
             yield Static(self.app.title_with_file(self.base_title), id="title")
             yield Static(
                 "[R]ename key\n[S]trategy\n[D]elete key\n\n[Escape] back",
-                id="menu", markup=False,
+                id="menu",
+                markup=False,
             )
             yield Static("", id="info")
             yield Static("", id="status")
@@ -229,7 +239,7 @@ class ConfigKeyManageScreen(PopupScreen):
         elif event.key.lower() == "s":
             self.app.push_screen(
                 StrategySelectScreen(),
-                callback=lambda strategy: self._refresh_info() if strategy else None
+                callback=lambda strategy: self._refresh_info() if strategy else None,
             )
         elif event.key.lower() == "d":
             self.app.push_screen(ConfigKeyDeleteScreen())
@@ -239,6 +249,7 @@ class ConfigKeyManageScreen(PopupScreen):
 
 class ConfigKeyRenameScreen(PopupScreen):
     """Screen to rename the current bitmap key."""
+
     base_title = "Rename Key"
     CSS = """
     Input { margin: 0 0; }
@@ -253,7 +264,9 @@ class ConfigKeyRenameScreen(PopupScreen):
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
-            self.input = Input(value=self.app.current_key, placeholder="New key", id="key")
+            self.input = Input(
+                value=self.app.current_key, placeholder="New key", id="key"
+            )
             yield self.input
             yield Static("[Enter] rename  [Escape] cancel", id="hints", markup=False)
             yield Static("", id="status")
@@ -294,6 +307,7 @@ class ConfigKeyRenameScreen(PopupScreen):
 
 class ConfigKeyDeleteScreen(PopupScreen):
     """Screen to confirm and delete the current bitmap key."""
+
     base_title = "Delete Key"
     CSS = """
     #hints { margin-top: 1; opacity: 0.5; }
@@ -304,8 +318,7 @@ class ConfigKeyDeleteScreen(PopupScreen):
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
             yield Static(
-                f"Delete key '{self.app.current_key}' and all its data?",
-                id="prompt"
+                f"Delete key '{self.app.current_key}' and all its data?", id="prompt"
             )
             yield Static("[Y]es  [N]o  " + HINT_ESCAPE, id="hints", markup=False)
             yield Static("", id="status")
@@ -353,7 +366,9 @@ def _encroached_keys(
     for other_key, other_bm in app.bitmaps.items():
         if other_key == key:
             continue
-        if app.rects_overlap(loc, new_bounds, app.get_location(other_bm), other_bm["bounds"]):
+        if app.rects_overlap(
+            loc, new_bounds, app.get_location(other_bm), other_bm["bounds"]
+        ):
             encroached.append(other_key)
     return encroached
 
@@ -372,7 +387,7 @@ class EncroachConfirmScreen(PopupScreen):
             yield Static(
                 f"Resizing will overlap key(s): {keys_str}. "
                 f"They will be moved. Continue?",
-                id="prompt"
+                id="prompt",
             )
             yield Static("[Y]es  [N]o", id="hints", markup=False)
 
@@ -388,6 +403,7 @@ class EncroachConfirmScreen(PopupScreen):
 
 class ConfigBoundsScreen(PopupScreen):
     """Screen to set bitmap width and height."""
+
     base_title = "Bitmap Bounds"
     CSS = """
     Input { margin: 0 0; }
@@ -406,7 +422,9 @@ class ConfigBoundsScreen(PopupScreen):
         bh = b.get("height", 10)
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
-            self.input = Input(value=f"{bw} {bh}", placeholder="width height", id="bounds")
+            self.input = Input(
+                value=f"{bw} {bh}", placeholder="width height", id="bounds"
+            )
             yield self.input
             yield Static("[Enter] set  [Escape] cancel", id="hints", markup=False)
             yield Static("", id="status")  # Status line for messages
@@ -443,8 +461,7 @@ class ConfigBoundsScreen(PopupScreen):
                         if encroached:
                             self._pending_bounds = (w, h)
                             self.app.push_screen(
-                                EncroachConfirmScreen(encroached),
-                                self._on_encroach
+                                EncroachConfirmScreen(encroached), self._on_encroach
                             )
                         else:
                             self._save_bounds(w, h)
@@ -459,6 +476,7 @@ class ConfigBoundsScreen(PopupScreen):
 
 class ConfigContextScreen(PopupScreen):
     """Screen to set the canvas context variable name."""
+
     base_title = "Context variable"
     CSS = """
     Input { margin: 0 0; }
@@ -502,6 +520,7 @@ class ConfigContextScreen(PopupScreen):
 
 class ConfigXScreen(PopupScreen):
     """Screen to set the X variable name."""
+
     base_title = "X variable"
     CSS = """
     Input { margin:0 0; }
@@ -545,6 +564,7 @@ class ConfigXScreen(PopupScreen):
 
 class ConfigYScreen(PopupScreen):
     """Screen to set the Y variable name."""
+
     base_title = "Y variable"
     CSS = """
     Input { margin:0 0; }
@@ -588,6 +608,7 @@ class ConfigYScreen(PopupScreen):
 
 class ConfigLocationScreen(PopupScreen):
     """Screen to set the bitmap origin coordinates."""
+
     base_title = "Location (x y)"
     CSS = """
     Input { margin:0 0; }
@@ -605,7 +626,9 @@ class ConfigLocationScreen(PopupScreen):
             yield Static(self.app.title_with_file(self.base_title), id="title")
             bm = self.app.bitmaps.get(str(self.app.current_key), {})
             loc = bm.get("location", {"x": 0, "y": 0})
-            self.input = Input(value=f"{loc['x']} {loc['y']}", placeholder="x y", id="location")
+            self.input = Input(
+                value=f"{loc['x']} {loc['y']}", placeholder="x y", id="location"
+            )
             yield self.input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
             yield Static("", id="status")  # Status line
@@ -640,12 +663,13 @@ class ConfigLocationScreen(PopupScreen):
                     idx = str(self.app.current_key)
                     bm = self.app.bitmaps.get(idx, create_default_bitmap())
                     new_bounds = bm["bounds"]
-                    encroached = _encroached_keys(self.app, idx, new_bounds, loc_override=(x, y))
+                    encroached = _encroached_keys(
+                        self.app, idx, new_bounds, loc_override=(x, y)
+                    )
                     if encroached:
                         self._pending_location = (x, y)
                         self.app.push_screen(
-                            EncroachConfirmScreen(encroached),
-                            self._on_encroach
+                            EncroachConfirmScreen(encroached), self._on_encroach
                         )
                     else:
                         self._save_location(x, y)
@@ -671,6 +695,7 @@ class PixelSizeInput(Input):
 
 class ConfigPixelScreen(PopupScreen):
     """Screen to set the pixel size for rendering."""
+
     base_title = "Pixel Size"
     CSS = """
     Input { margin:0 0; }
@@ -688,13 +713,15 @@ class ConfigPixelScreen(PopupScreen):
             bm = self.app.bitmaps.get(str(self.app.current_key), {})
             current = bm.get("pixelSize", self.app.pixel_size)
             self.input = PixelSizeInput(
-                value=str(current), placeholder=str(self.app.pixel_size),
+                value=str(current),
+                placeholder=str(self.app.pixel_size),
                 id="pixel",
             )
             yield self.input
             yield Static(
                 "[Enter] save (override)  [D]efault (inherit)  [Escape] cancel",
-                id="hints", markup=False,
+                id="hints",
+                markup=False,
             )
             yield Static("", id="status")  # Status line
 
@@ -733,6 +760,7 @@ class ConfigPixelScreen(PopupScreen):
 
 class ConfigGlobalPixelScreen(PopupScreen):
     """Screen to set the global default pixel size."""
+
     base_title = "Global Pixel Size"
     CSS = """
     Input { margin:0 0; }
@@ -748,7 +776,9 @@ class ConfigGlobalPixelScreen(PopupScreen):
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
             current = self.app.pixel_size
-            self.input = Input(value=str(current), placeholder=str(DEFAULT_PIXEL_SIZE), id="pixel")
+            self.input = Input(
+                value=str(current), placeholder=str(DEFAULT_PIXEL_SIZE), id="pixel"
+            )
             yield self.input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
             yield Static("", id="status")
@@ -777,6 +807,7 @@ class ConfigGlobalPixelScreen(PopupScreen):
 
 class ConfigPaletteScreen(PopupScreen):
     """Palette management: list, select, create, edit, delete."""
+
     base_title = "Palette"
     CSS = """
     #palette-outer { max-height: 60vh; }
@@ -796,7 +827,8 @@ class ConfigPaletteScreen(PopupScreen):
             yield Static(
                 "[jk/\u25b4\u25be] navigate  [Enter] select  [C]reate  [E]dit  [D]elete  "
                 + HINT_ESCAPE,
-                id="hints", markup=False
+                id="hints",
+                markup=False,
             )
             yield Static("", id="status")
 
@@ -888,9 +920,7 @@ class ConfigPaletteScreen(PopupScreen):
     def _on_delete(self) -> None:
         pid = self._selected_id()
         if pid and pid in self.app.custom_palettes:
-            self.app.push_screen(
-                ConfigPaletteDeleteConfirmScreen(pid)
-            )
+            self.app.push_screen(ConfigPaletteDeleteConfirmScreen(pid))
         elif pid and pid in HARDCODED_PRESETS:
             self.show_status("Cannot delete a built-in palette.")
         else:

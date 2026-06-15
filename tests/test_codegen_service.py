@@ -1,4 +1,8 @@
-from bitmap_designer.services.codegen_service import CodegenService, STRATEGIES, FALLBACK_DEFAULT
+from bitmap_designer.services.codegen_service import (
+    CodegenService,
+    STRATEGIES,
+    FALLBACK_DEFAULT,
+)
 
 
 class TestCodegenService:
@@ -479,4 +483,6 @@ class TestCodegenService:
             thor_rects = CodegenService._extract_rectangles(pixels, w, h, "thorough")
             fast_count = sum(len(v) for v in fast_rects.values())
             thor_count = sum(len(v) for v in thor_rects.values())
-            assert thor_count <= fast_count, f"thorough ({thor_count}) > fast ({fast_count}) for {pixels}"
+            assert thor_count <= fast_count, (
+                f"thorough ({thor_count}) > fast ({fast_count}) for {pixels}"
+            )

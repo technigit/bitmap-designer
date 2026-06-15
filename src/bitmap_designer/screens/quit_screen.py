@@ -1,4 +1,5 @@
 """Quit flow screens."""
+
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
@@ -11,7 +12,7 @@ from .popup_screen import PopupScreen
 from .save_screen import QuitSaveScreen, SaveFirstScreen
 
 if TYPE_CHECKING:
-    from ..app import BitmapDesignerApp
+    pass
 
 
 class QuitScreen(PopupScreen):
@@ -27,7 +28,8 @@ class QuitScreen(PopupScreen):
             yield Static("Really quit? (y/N)", id="prompt")
             yield Static(
                 "[!] force quit (without saving)  [Escape] cancel",
-                id="hints", markup=False
+                id="hints",
+                markup=False,
             )
 
     def on_key(self, event) -> None:
@@ -45,6 +47,7 @@ class QuitScreen(PopupScreen):
 
 class QuitSaveFileFirstScreen(SaveFirstScreen):
     """Screen asking whether to save before quitting."""
+
     TITLE = "Quit - Save"
 
     def compose(self) -> ComposeResult:
@@ -53,7 +56,8 @@ class QuitSaveFileFirstScreen(SaveFirstScreen):
             yield Static("Save file first? (Y/n)", id="prompt")
             yield Static(
                 "[!] force quit (without saving)  [Escape] cancel",
-                id="hints", markup=False
+                id="hints",
+                markup=False,
             )
 
     def on_key(self, event):

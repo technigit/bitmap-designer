@@ -1,4 +1,5 @@
 """Vim-style : command bar for Design and Map screens."""
+
 from __future__ import annotations
 import json
 import os
@@ -17,7 +18,7 @@ from .startup_screen import StartupScreen
 from ..constants import DEFAULT_BITMAP_DIR, create_default_bitmap
 
 if TYPE_CHECKING:
-    from ..app import BitmapDesignerApp
+    pass
 
 CMD_HELP_TEXT = """\
 [bold]Command Bar[/bold]
@@ -51,6 +52,7 @@ CMD_HELP_TEXT = """\
 
 class HelpPopupScreen(PopupScreen):
     """Popup showing command bar keybinding reference."""
+
     base_title = "Command Help"
 
     def compose(self) -> ComposeResult:
@@ -72,7 +74,7 @@ def handle_cmd_key(screen, event) -> bool:
     key = event.key
     consumed = True
 
-    if not getattr(screen, 'cmd_mode', False):
+    if not getattr(screen, "cmd_mode", False):
         if key in ("colon", "shift+semicolon"):
             screen.cmd_mode = True
             screen.cmd_buffer = ""
@@ -92,7 +94,7 @@ def handle_cmd_key(screen, event) -> bool:
             screen.cmd_buffer = screen.cmd_buffer[:-1]
             screen.show_status(":" + screen.cmd_buffer + "▌")
     else:
-        ch = getattr(event, 'character', None)
+        ch = getattr(event, "character", None)
         if ch is None and (len(key) == 1 or key == "space"):
             ch = " " if key == "space" else key
         if ch is not None:
@@ -130,7 +132,9 @@ def _do_save(screen, force: bool, args: list[str]) -> bool:
             filename += ".json"
         filepath = os.path.join(DEFAULT_BITMAP_DIR, filename)
         if os.path.exists(filepath) and filepath != app.file.current_file and not force:
-            _clear_status(screen, f"File '{filename}' already exists (add ! to overwrite)")
+            _clear_status(
+                screen, f"File '{filename}' already exists (add ! to overwrite)"
+            )
             return False
         _write_bitmap(app, filepath)
         app.file.set_current_file(filepath)
@@ -143,7 +147,9 @@ def _do_save(screen, force: bool, args: list[str]) -> bool:
         return False
 
     if app.file.check_external_change() and not force:
-        _clear_status(screen, "Warning: File modified since reading (add ! to overwrite)")
+        _clear_status(
+            screen, "Warning: File modified since reading (add ! to overwrite)"
+        )
         return False
 
     _write_bitmap(app, app.file.current_file)
@@ -166,9 +172,9 @@ def _switch_or_create_key(screen, key_name: str, app) -> None:
         app.build_key_adjacency()
         app.mark_dirty()
     app.set_current_key(key_name)
-    if hasattr(screen, 'switch_to_key'):
+    if hasattr(screen, "switch_to_key"):
         screen.switch_to_key(key_name)
-    elif hasattr(screen, 'selected_key'):
+    elif hasattr(screen, "selected_key"):
         screen.selected_key = key_name
         screen.refresh_map()
     _clear_status(screen, f"Switched to key {key_name}")
@@ -221,17 +227,17 @@ def _mode_cmd(screen, attr, on_msg, off_msg=None):
 
 
 def _cmd_scroll(screen, _args, _force, _app):
-    if hasattr(screen, 'scroll_mode'):
-        if hasattr(screen, 'content_fits') and screen.content_fits:
+    if hasattr(screen, "scroll_mode"):
+        if hasattr(screen, "content_fits") and screen.content_fits:
             _clear_status(screen, "All content visible — scrolling disabled")
         else:
-            _mode_cmd(screen, 'scroll_mode', "Scroll mode on", "Scroll mode off")
+            _mode_cmd(screen, "scroll_mode", "Scroll mode on", "Scroll mode off")
     else:
         _clear_status(screen, "Unknown command")
 
 
 def _cmd_noscroll(screen, _args, _force, _app):
-    if hasattr(screen, 'scroll_mode'):
+    if hasattr(screen, "scroll_mode"):
         screen.scroll_mode = False
         screen.update_hints()
         _clear_status(screen, "Scroll mode off")
@@ -240,7 +246,7 @@ def _cmd_noscroll(screen, _args, _force, _app):
 
 
 def _cmd_pan(screen, _args, _force, _app):
-    if hasattr(screen, 'pan_flip'):
+    if hasattr(screen, "pan_flip"):
         screen.pan_flip = True
         screen.update_hints()
         _clear_status(screen, "Pan mode on")
@@ -249,7 +255,7 @@ def _cmd_pan(screen, _args, _force, _app):
 
 
 def _cmd_nopan(screen, _args, _force, _app):
-    if hasattr(screen, 'pan_flip'):
+    if hasattr(screen, "pan_flip"):
         screen.pan_flip = False
         screen.update_hints()
         _clear_status(screen, "Pan mode off")
@@ -275,7 +281,7 @@ def _set_step(screen, sub_args, app):
         n = int(sub_args[0])
         if 1 <= n <= 9:
             app.step = n
-            if hasattr(screen, 'step'):
+            if hasattr(screen, "step"):
                 screen.step = n
             screen.update_hints()
             _clear_status(screen, f"Step set to {n}")
@@ -308,9 +314,9 @@ def _set_colorpixels(screen, sub_args, app):
     else:
         cycle = {"on": "off", "off": "mixed", "mixed": "on"}
         app.color_pixels = cycle[app.color_pixels]
-    if hasattr(screen, 'refresh_grid'):
+    if hasattr(screen, "refresh_grid"):
         screen.refresh_grid()
-    if hasattr(screen, 'refresh_map'):
+    if hasattr(screen, "refresh_map"):
         screen.refresh_map()
     screen.update_hints()
     _clear_status(screen, f"Color pixels {app.color_pixels}")
@@ -326,9 +332,9 @@ def _set_glyphmode(screen, sub_args, app):
             return
     else:
         app.glyphmode = not app.glyphmode
-    if hasattr(screen, 'refresh_grid'):
+    if hasattr(screen, "refresh_grid"):
         screen.refresh_grid()
-    if hasattr(screen, 'refresh_map'):
+    if hasattr(screen, "refresh_map"):
         screen.refresh_map()
     screen.update_hints()
     _clear_status(screen, f"Glyphmode {'on' if app.glyphmode else 'off'}")
@@ -389,7 +395,7 @@ def _cmd_config(screen, args, _force, app):
         else:
             _clear_status(screen, f"Unknown config parameter: {param}")
         return
-    if hasattr(screen, 'selected_key') and screen.selected_key != app.current_key:
+    if hasattr(screen, "selected_key") and screen.selected_key != app.current_key:
         app.set_current_key(screen.selected_key)
     _clear_status(screen, ":" + screen.cmd_buffer)
     app.push_screen(ConfigScreen())

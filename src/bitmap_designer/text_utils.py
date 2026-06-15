@@ -1,4 +1,5 @@
 """Text formatting utilities for columnar display."""
+
 from __future__ import annotations
 import re
 

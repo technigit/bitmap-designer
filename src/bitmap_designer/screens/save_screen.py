@@ -1,4 +1,5 @@
 """Save screens for main, quit, and close flows."""
+
 from __future__ import annotations
 import os
 import json
@@ -17,7 +18,7 @@ from ..services import DEFAULT_PIXEL_SIZE
 from .startup_screen import StartupScreen
 
 if TYPE_CHECKING:
-    from ..app import BitmapDesignerApp
+    pass
 
 
 def _build_save_data(app) -> dict:
@@ -36,6 +37,7 @@ def _build_save_data(app) -> dict:
 
 class SaveScreen(PopupScreen):
     """Screen to save the current bitmap file."""
+
     CSS = """
     Input { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
@@ -50,7 +52,9 @@ class SaveScreen(PopupScreen):
         with Vertical():
             yield Static("Save File", id="title")
             yield Static(f"Directory: {DEFAULT_BITMAP_DIR}", id="dir")
-            self.filename_input = Input(value=self.filename, placeholder="Filename", id="filename")
+            self.filename_input = Input(
+                value=self.filename, placeholder="Filename", id="filename"
+            )
             yield self.filename_input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
             yield Static("", id="status")
@@ -114,6 +118,7 @@ class SaveScreen(PopupScreen):
 
 class QuitSaveScreen(PopupScreen):
     """Save dialog shown during the quit flow."""
+
     CSS = """
     Input { margin: 1 0; }
     #hints { opacity: 0.5; }
@@ -128,7 +133,9 @@ class QuitSaveScreen(PopupScreen):
         with Vertical():
             yield Static("Save File", id="title")
             yield Static(f"Directory: {DEFAULT_BITMAP_DIR}", id="dir")
-            self.filename_input = Input(value=self.filename, placeholder="Filename", id="filename")
+            self.filename_input = Input(
+                value=self.filename, placeholder="Filename", id="filename"
+            )
             yield self.filename_input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
             yield Static("", id="status")
@@ -191,6 +198,7 @@ class QuitSaveScreen(PopupScreen):
 
 class SaveScreenForClose(PopupScreen):
     """Save dialog shown when closing a file."""
+
     CSS = """
     Input { margin: 1 0; }
     #hints { opacity: 0.5; }
@@ -205,7 +213,9 @@ class SaveScreenForClose(PopupScreen):
         with Vertical():
             yield Static("Save File", id="title")
             yield Static(f"Directory: {DEFAULT_BITMAP_DIR}", id="dir")
-            self.filename_input = Input(value=self.filename, placeholder="Filename", id="filename")
+            self.filename_input = Input(
+                value=self.filename, placeholder="Filename", id="filename"
+            )
             yield self.filename_input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
             yield Static("", id="status")
@@ -269,6 +279,7 @@ class SaveScreenForClose(PopupScreen):
 
 class SaveFirstScreen(PopupScreen):
     """Base for 'Save file first?' prompts in close/quit flows."""
+
     TITLE = ""
 
     def compose(self) -> ComposeResult:

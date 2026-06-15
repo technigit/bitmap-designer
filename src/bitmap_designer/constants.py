@@ -1,4 +1,5 @@
 """Constants for the bitmap designer application."""
+
 from pathlib import Path
 import os
 
@@ -11,6 +12,7 @@ HINT_ESCAPE = "[Escape] cancel"
 HOME_DIR = str(Path.home())
 DEFAULT_BITMAP_DIR = os.path.join(HOME_DIR, "bitmaps")
 
+
 def create_default_bitmap() -> dict:
     return {
         "bounds": {"width": 10, "height": 10},
@@ -20,6 +22,7 @@ def create_default_bitmap() -> dict:
         "location": {"x": 0, "y": 0},
         "bitmap": {"pixels": []},
     }
+
 
 # Backward-compat flat hex map derived from the default preset.
 COLOR_MAP: dict[str, str] = {

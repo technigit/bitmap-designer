@@ -1,4 +1,5 @@
 """Main application class and entry point."""
+
 import copy
 import json
 import os
@@ -16,6 +17,7 @@ from .screens import StartupScreen, MainScreen, QuitScreen
 
 class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,too-many-public-methods
     """Textual App subclass orchestrating all screens and application state."""
+
     CSS = """
     #title { text-align: center; text-style: bold; margin-top: 1; margin-bottom: 2; }
     #hints { margin-top: 1; opacity: 0.5; }
@@ -24,7 +26,6 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
     """
     BINDINGS = [
         Binding("q", "quit", "Quit", show=False),
-
     ]
 
     def __init__(self):
@@ -74,8 +75,9 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         return loc.get("x", 0), loc.get("y", 0)
 
     @staticmethod
-    def rects_overlap(a_loc: tuple[int, int], a_bounds: dict,
-                       b_loc: tuple[int, int], b_bounds: dict) -> bool:
+    def rects_overlap(
+        a_loc: tuple[int, int], a_bounds: dict, b_loc: tuple[int, int], b_bounds: dict
+    ) -> bool:
         ax1, ay1 = a_loc
         ax2 = ax1 + a_bounds["width"]
         ay2 = ay1 + a_bounds["height"]
@@ -97,23 +99,35 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
                 dx = ox - bx
                 dy = oy - by
                 dsq = dx * dx + dy * dy
-                if dx > 0 and (best_dist["right"] is None or dsq < best_dist["right"]
-                               or (dsq == best_dist["right"] and oy < best_tie["right"])):
+                if dx > 0 and (
+                    best_dist["right"] is None
+                    or dsq < best_dist["right"]
+                    or (dsq == best_dist["right"] and oy < best_tie["right"])
+                ):
                     best["right"] = ok
                     best_dist["right"] = dsq
                     best_tie["right"] = oy
-                if dx < 0 and (best_dist["left"] is None or dsq < best_dist["left"]
-                               or (dsq == best_dist["left"] and oy < best_tie["left"])):
+                if dx < 0 and (
+                    best_dist["left"] is None
+                    or dsq < best_dist["left"]
+                    or (dsq == best_dist["left"] and oy < best_tie["left"])
+                ):
                     best["left"] = ok
                     best_dist["left"] = dsq
                     best_tie["left"] = oy
-                if dy > 0 and (best_dist["down"] is None or dsq < best_dist["down"]
-                               or (dsq == best_dist["down"] and ox < best_tie["down"])):
+                if dy > 0 and (
+                    best_dist["down"] is None
+                    or dsq < best_dist["down"]
+                    or (dsq == best_dist["down"] and ox < best_tie["down"])
+                ):
                     best["down"] = ok
                     best_dist["down"] = dsq
                     best_tie["down"] = ox
-                if dy < 0 and (best_dist["up"] is None or dsq < best_dist["up"]
-                               or (dsq == best_dist["up"] and ox < best_tie["up"])):
+                if dy < 0 and (
+                    best_dist["up"] is None
+                    or dsq < best_dist["up"]
+                    or (dsq == best_dist["up"] and ox < best_tie["up"])
+                ):
                     best["up"] = ok
                     best_dist["up"] = dsq
                     best_tie["up"] = ox
@@ -159,7 +173,7 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         try:
             screen = self.screen
             title = screen.query_one("#title", Static)
-            if hasattr(screen, 'base_title'):
+            if hasattr(screen, "base_title"):
                 title.update(self.title_with_file(screen.base_title))
         except Exception:  # pylint: disable=W0718
             pass
@@ -256,7 +270,7 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
     def show_status(self, message: str) -> None:
         try:
             screen = self.screen
-            if hasattr(screen, 'show_status'):
+            if hasattr(screen, "show_status"):
                 screen.show_status(message)
         except Exception:  # pylint: disable=W0718
             pass
@@ -329,8 +343,7 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
                     occupied.add((loc[0] + dx, loc[1] + dy))
         x, y = 0, 0
         while any(
-            (x + dx, y + dy) in occupied
-            for dx in range(width) for dy in range(height)
+            (x + dx, y + dy) in occupied for dx in range(width) for dy in range(height)
         ):
             x += step
             if x > 200:

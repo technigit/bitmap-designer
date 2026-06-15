@@ -1,4 +1,5 @@
 """Metadata info screen — :info command popup."""
+
 from __future__ import annotations
 import math
 import os
@@ -12,7 +13,7 @@ from .popup_screen import PopupScreen
 from ..text_utils import columnate
 
 if TYPE_CHECKING:
-    from ..app import BitmapDesignerApp
+    pass
 
 
 def _format_size(size: int) -> str:
@@ -81,38 +82,51 @@ def _canvas_frame(app) -> dict:
         has_bitmaps = True
     if has_bitmaps:
         return {
-            "frame_x1": int(min_x), "frame_y1": int(min_y),
-            "frame_x2": int(max_x), "frame_y2": int(max_y),
-            "frame_w": int(max_x - min_x), "frame_h": int(max_y - min_y),
+            "frame_x1": int(min_x),
+            "frame_y1": int(min_y),
+            "frame_x2": int(max_x),
+            "frame_y2": int(max_y),
+            "frame_w": int(max_x - min_x),
+            "frame_h": int(max_y - min_y),
         }
-    return {"frame_x1": 0, "frame_y1": 0, "frame_x2": 0, "frame_y2": 0,
-            "frame_w": 0, "frame_h": 0}
+    return {
+        "frame_x1": 0,
+        "frame_y1": 0,
+        "frame_x2": 0,
+        "frame_y2": 0,
+        "frame_w": 0,
+        "frame_h": 0,
+    }
 
 
 def _design_viewport(screen) -> dict | None:
-    if not hasattr(screen, 'offset_x'):
+    if not hasattr(screen, "offset_x"):
         return None
     ox = screen.offset_x
     oy = screen.offset_y
-    vp = getattr(screen, 'viewport', None)
+    vp = getattr(screen, "viewport", None)
     if vp is not None:
         vw, vh = vp[0], vp[1]
     else:
-        vw = getattr(screen, 'viewport_w', 0)
-        vh = getattr(screen, 'viewport_h', 0)
-    bw = getattr(screen, 'width', 0)
-    bh = getattr(screen, 'height', 0)
+        vw = getattr(screen, "viewport_w", 0)
+        vh = getattr(screen, "viewport_h", 0)
+    bw = getattr(screen, "width", 0)
+    bh = getattr(screen, "height", 0)
     return {
-        "x1": ox, "y1": oy,
-        "x2": min(ox + vw, bw), "y2": min(oy + vh, bh),
-        "total_w": bw, "total_h": bh,
-        "vp_w": vw, "vp_h": vh,
+        "x1": ox,
+        "y1": oy,
+        "x2": min(ox + vw, bw),
+        "y2": min(oy + vh, bh),
+        "total_w": bw,
+        "total_h": bh,
+        "vp_w": vw,
+        "vp_h": vh,
         "fits": vw >= bw and vh >= bh,
     }
 
 
 def _map_viewport(screen, frame) -> dict | None:
-    if not hasattr(screen, 'zoom_scale'):
+    if not hasattr(screen, "zoom_scale"):
         return None
     cw, ch = screen.compute_canvas_size()
     zoom = screen.zoom_scale
@@ -124,12 +138,21 @@ def _map_viewport(screen, frame) -> dict | None:
     x2 = math.ceil((cw - 1 - px) / zoom)
     y2 = math.ceil((ch - 1 - py) / (zoom * aspect))
 
-    fits = (x1 <= frame["frame_x1"] and y1 <= frame["frame_y1"]
-            and x2 >= frame["frame_x2"] and y2 >= frame["frame_y2"])
+    fits = (
+        x1 <= frame["frame_x1"]
+        and y1 <= frame["frame_y1"]
+        and x2 >= frame["frame_x2"]
+        and y2 >= frame["frame_y2"]
+    )
     return {
-        "x1": x1, "y1": y1, "x2": x2, "y2": y2,
-        "total_w": frame["frame_w"], "total_h": frame["frame_h"],
-        "vp_w": cw, "vp_h": ch,
+        "x1": x1,
+        "y1": y1,
+        "x2": x2,
+        "y2": y2,
+        "total_w": frame["frame_w"],
+        "total_h": frame["frame_h"],
+        "vp_w": cw,
+        "vp_h": ch,
         "fits": fits,
     }
 
@@ -142,16 +165,19 @@ def _history_info(app, current_key: str) -> dict:
 
 def _mode_info(screen, app) -> dict:
     return {
-        "cursor": (getattr(screen, 'cursor_x', None), getattr(screen, 'cursor_y', None)),
+        "cursor": (
+            getattr(screen, "cursor_x", None),
+            getattr(screen, "cursor_y", None),
+        ),
         "color": app.current_color,
-        "zoom": getattr(screen, 'zoom_scale', None),
+        "zoom": getattr(screen, "zoom_scale", None),
     }
 
 
 def gather_info(app, screen) -> dict:
     current_key = (
-        getattr(screen, '_key_on_enter', None)
-        or getattr(screen, 'selected_key', None)
+        getattr(screen, "_key_on_enter", None)
+        or getattr(screen, "selected_key", None)
         or app.current_key
     )
     data = {}
@@ -181,23 +207,29 @@ def _info_text(data: dict) -> str:
     rows.append(("[bold]Pixel area:[/]", f"{data['total_pixel_area']} cells"))
     rows.append(("[bold]Filled:[/]", f"{data['total_filled']} cells"))
 
-    rows.append((
-        "[bold]Canvas:[/]",
-        f"{data['frame_w']}\u00d7{data['frame_h']}"
-        f" = {data['frame_w'] * data['frame_h']} cells"
-    ))
+    rows.append(
+        (
+            "[bold]Canvas:[/]",
+            f"{data['frame_w']}\u00d7{data['frame_h']}"
+            f" = {data['frame_w'] * data['frame_h']} cells",
+        )
+    )
 
     vp = data.get("design_viewport") or data.get("map_viewport")
     if vp:
         if vp["fits"]:
-            rows.append(("[bold]Viewport:[/]", f"fits  viewport {vp['vp_w']}\u00d7{vp['vp_h']}"))
+            rows.append(
+                ("[bold]Viewport:[/]", f"fits  viewport {vp['vp_w']}\u00d7{vp['vp_h']}")
+            )
         else:
-            rows.append((
-                "[bold]Viewport:[/]",
-                f"({vp['x1']},{vp['y1']})\u2192({vp['x2']},{vp['y2']})"
-                f"  viewport {vp['vp_w']}\u00d7{vp['vp_h']}"
-                f"  canvas {vp['total_w']}\u00d7{vp['total_h']}"
-            ))
+            rows.append(
+                (
+                    "[bold]Viewport:[/]",
+                    f"({vp['x1']},{vp['y1']})\u2192({vp['x2']},{vp['y2']})"
+                    f"  viewport {vp['vp_w']}\u00d7{vp['vp_h']}"
+                    f"  canvas {vp['total_w']}\u00d7{vp['total_h']}",
+                )
+            )
 
     rows.append(("", ""))
 
@@ -229,6 +261,7 @@ def _info_text(data: dict) -> str:
 
 class InfoScreen(PopupScreen):
     """Popup showing metadata about the current bitmap project."""
+
     base_title = "Info"
 
     def __init__(self, data: dict, app, screen):
@@ -263,17 +296,21 @@ class InfoScreen(PopupScreen):
             if dest:
                 self._app.set_current_key(dest)
                 scr = self._screen
-                if hasattr(scr, 'switch_to_key'):
+                if hasattr(scr, "switch_to_key"):
                     scr.switch_to_key(dest)
-                elif hasattr(scr, 'selected_key'):
+                elif hasattr(scr, "selected_key"):
                     scr.selected_key = dest
-                    if hasattr(scr, 'refresh_map'):
+                    if hasattr(scr, "refresh_map"):
                         scr.refresh_map()
                 self._refresh()
                 self.show_status(f"Switched to key {dest}")
             else:
-                msgs = {"right": "No key to the right", "left": "No key to the left",
-                        "down": "No key below", "up": "No key above"}
+                msgs = {
+                    "right": "No key to the right",
+                    "left": "No key to the left",
+                    "down": "No key below",
+                    "up": "No key above",
+                }
                 self.show_status(msgs[dirs[k]])
             return
         if event.key in ("escape", "enter", "\n"):

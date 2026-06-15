@@ -1,4 +1,5 @@
 """File management screens (rename, delete)."""
+
 from __future__ import annotations
 import os
 import json
@@ -16,23 +17,19 @@ from ..constants import DEFAULT_BITMAP_DIR, HINT_ESCAPE
 from .startup_screen import StartupScreen
 
 if TYPE_CHECKING:
-    from ..app import BitmapDesignerApp
+    pass
 
 
 class ManageScreen(PopupScreen):
     """Menu screen for file management operations."""
+
     base_title = "Manage File"
     TITLE = "Manage File"
 
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Static(self.app.title_with_file(self.TITLE), id="title")
-            yield Static(
-                "[R]ename file\n"
-                "[D]elete file",
-                id="menu",
-                markup=False
-            )
+            yield Static("[R]ename file\n[D]elete file", id="menu", markup=False)
             yield Static("", id="status")
 
     def show_status(self, message: str) -> None:
@@ -56,6 +53,7 @@ class ManageScreen(PopupScreen):
 
 class RenameScreen(PopupScreen):
     """Screen to rename the current file."""
+
     CSS = """
     #hints { margin-top: 1; opacity: 0.5; }
     """
@@ -69,11 +67,7 @@ class RenameScreen(PopupScreen):
         current = os.path.basename(self.app.file.current_file or "Untitled.json")
         with Vertical():
             yield Static("Rename File", id="title")
-            self.input = Input(
-                value=current,
-                placeholder="New filename",
-                id="filename"
-            )
+            self.input = Input(value=current, placeholder="New filename", id="filename")
             yield self.input
             yield Static("[Enter] rename  [Escape] cancel", id="hints", markup=False)
             yield Static("", id="status")
@@ -130,6 +124,7 @@ class RenameScreen(PopupScreen):
 
 class DeleteScreen(PopupScreen):
     """Screen to confirm and delete the current file."""
+
     CSS = """
     #hints { margin-top: 1; opacity: 0.5; }
     """
@@ -156,7 +151,9 @@ class DeleteScreen(PopupScreen):
 
     # Delete the current file and reset application state.
     def delete_file(self):
-        if not self.app.file.current_file or not os.path.exists(self.app.file.current_file):
+        if not self.app.file.current_file or not os.path.exists(
+            self.app.file.current_file
+        ):
             self.app.show_status("No file to delete.")
             return
         try:

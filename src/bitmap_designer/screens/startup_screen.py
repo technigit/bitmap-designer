@@ -1,4 +1,5 @@
 """Startup and file-open screens."""
+
 from __future__ import annotations
 import os
 import re
@@ -14,7 +15,7 @@ from .popup_screen import PopupScreen
 from ..constants import ASCII_HEADER, DEFAULT_BITMAP_DIR
 
 if TYPE_CHECKING:
-    from ..app import BitmapDesignerApp
+    pass
 
 
 def _natural_key(s: str) -> list:
@@ -24,6 +25,7 @@ def _natural_key(s: str) -> list:
 
 class StartupScreen(Screen):
     """Startup screen with New/Open/Quit menu."""
+
     CSS = """
     #menu { margin-top: 1; }
     """
@@ -50,6 +52,7 @@ class StartupScreen(Screen):
 
 class OpenScreen(PopupScreen):
     """Screen to list and open .json bitmap files."""
+
     CSS = """
     #open-screen-vertical { max-height: 60vh; }
     #file_list { max-height: 50vh; }
@@ -77,9 +80,11 @@ class OpenScreen(PopupScreen):
 
     async def refresh_files(self):
         if not os.path.exists(self.current_dir):
-            msg = "Create ~/bitmaps directory first." \
-                if self.current_dir == DEFAULT_BITMAP_DIR \
+            msg = (
+                "Create ~/bitmaps directory first."
+                if self.current_dir == DEFAULT_BITMAP_DIR
                 else f"Directory not found: {self.current_dir}"
+            )
             list_view = self.query_one("#file_list", ListView)
             await list_view.clear()
             await list_view.append(ListItem(Static(msg)))
@@ -92,8 +97,10 @@ class OpenScreen(PopupScreen):
             if os.path.isdir(path) or entry.endswith(".json"):
                 self.files.append((entry, os.path.isdir(path)))
         self.files.sort(key=lambda e: _natural_key(e[0]))
-        self.files.sort(key=lambda e: os.path.getmtime(os.path.join(self.current_dir, e[0])),
-                        reverse=True)
+        self.files.sort(
+            key=lambda e: os.path.getmtime(os.path.join(self.current_dir, e[0])),
+            reverse=True,
+        )
         self._update_title()
         await self._update_list()
 

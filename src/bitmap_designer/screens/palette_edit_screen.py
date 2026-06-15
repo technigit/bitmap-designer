@@ -1,4 +1,5 @@
 """Palette editing screens: create, delete, edit color slots."""
+
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
@@ -11,11 +12,12 @@ from ..constants import HINT_ESCAPE
 from ..services.palette_service import HARDCODED_PRESETS
 
 if TYPE_CHECKING:
-    from ..app import BitmapDesignerApp
+    pass
 
 
 class ConfigPaletteCreateScreen(PopupScreen):
     """Prompt for new palette ID, creates with template from current palette."""
+
     base_title = "Create Palette"
     CSS = """
     Input { margin: 0 0; }
@@ -76,6 +78,7 @@ class ConfigPaletteCreateScreen(PopupScreen):
 
 class ConfigPaletteDeleteConfirmScreen(PopupScreen):
     """Confirm deletion of a custom palette."""
+
     base_title = "Delete Palette"
 
     def __init__(self, palette_id: str):
@@ -85,10 +88,7 @@ class ConfigPaletteDeleteConfirmScreen(PopupScreen):
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
-            yield Static(
-                f"Delete palette '{self.palette_id}'?",
-                id="prompt"
-            )
+            yield Static(f"Delete palette '{self.palette_id}'?", id="prompt")
             yield Static("[Y]es  [N]o  " + HINT_ESCAPE, id="hints", markup=False)
             yield Static("", id="status")
 
@@ -116,6 +116,7 @@ class ConfigPaletteDeleteConfirmScreen(PopupScreen):
 
 class ConfigPaletteEditScreen(PopupScreen):
     """Edit color slots of a custom palette."""
+
     base_title = "Edit Palette"
     CSS = """
     #palette-edit-outer { max-height: 60vh; }
@@ -134,9 +135,9 @@ class ConfigPaletteEditScreen(PopupScreen):
             yield Static(f"Palette: {self.palette_id}", id="palette-name")
             yield ListView(id="color-list")
             yield Static(
-                "[jk/\u25b4\u25be] navigate  [Enter] edit slot  "
-                + HINT_ESCAPE,
-                id="hints", markup=False
+                "[jk/\u25b4\u25be] navigate  [Enter] edit slot  " + HINT_ESCAPE,
+                id="hints",
+                markup=False,
             )
             yield Static("", id="status")
 
@@ -199,9 +200,7 @@ class ConfigPaletteEditScreen(PopupScreen):
         if cid == "0":
             self.show_status("Color 0 is reserved transparent.")
             return
-        self.app.push_screen(
-            ConfigPaletteColorEditScreen(self.palette_id, cid)
-        )
+        self.app.push_screen(ConfigPaletteColorEditScreen(self.palette_id, cid))
 
 
 class ConfigPaletteColorEditScreen(PopupScreen):
@@ -216,17 +215,11 @@ class ConfigPaletteColorEditScreen(PopupScreen):
 
     def compose(self) -> ComposeResult:
         with Vertical():
-            yield Static(
-                f"Edit color {self.color_id.upper()}",
-                id="title"
-            )
+            yield Static(f"Edit color {self.color_id.upper()}", id="title")
             yield Static("", id="prompt")
             self.input = Input(value="", id="slot-input")
             yield self.input
-            yield Static(
-                "[Enter] next  [Escape] cancel",
-                id="hints", markup=False
-            )
+            yield Static("[Enter] next  [Escape] cancel", id="hints", markup=False)
             yield Static("", id="status")
 
     def show_status(self, message: str) -> None:
@@ -240,9 +233,9 @@ class ConfigPaletteColorEditScreen(PopupScreen):
         self.query_one("#prompt", Static).update(
             f"Enter {fields[self._field]} (leave blank to skip):"
         )
-        current_colors = self.app.custom_palettes.get(
-            self.palette_id, {}
-        ).get("colors", {})
+        current_colors = self.app.custom_palettes.get(self.palette_id, {}).get(
+            "colors", {}
+        )
         current = current_colors.get(self.color_id, {})
         current_val = {
             "hex": current.get("hex", ""),
