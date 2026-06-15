@@ -66,7 +66,7 @@
         - current key name shown as a label above the grid, left-aligned to the pixel content area
         - cursor shows the color character (0-F) with reverse video
         - two text characters = 1 bitmap pixel in UI (for square appearance)
-        - Note: pixelSize config only affects preview/output, not the text UI
+        - Note: pixelSize config affects preview, code generation output, not the text UI
         - all transparent by default
         - page title shows current filename: "Design Mode - filename.json"
             - when dirty, appends " (modified)"
@@ -228,7 +228,7 @@
         - shows current values in a right-aligned column, 2-character margin from longest label
         - values displayed in two groups separated by a blank line:
             - Design settings: Key, Bounds, Location
-            - Code settings: Context, Pixel Size, X, Y
+            - Code settings: Context, Pixel Size, X, Y, Global Pixel Size
         - values refresh on return from any sub-screen
         - [K]ey - bitmap key
             - enter a key (short string, no spaces)
@@ -296,11 +296,18 @@
                 - Only explicitly set values saved to JSON (partial palette)
                 - [Enter] — save
                 - [Escape] — cancel
-        - Pixel [S]ize - pixel size
-            - prompt for the bitmap pixel size (default 2x2 canvas pixels)
-            - [Enter] - save the configuration
+        - Pixel [S]ize - per-bitmap pixel size (default 2)
+            - shows current value, with `(global)` or `(override)` suffix
+            - [Enter] — save the value as an explicit override for this bitmap
                 - Response: Configuration saved.  [OK]
-            - [Escape] - cancel/revert the configuration
+            - [D]efault — remove the override, inherit global pixel size
+                - Response: Pixel size reset to global default.
+            - [Escape] — cancel/revert the configuration
+        - [G]lobal Pixel Size - global default for all bitmaps
+            - shows current global default value
+            - stored at the top level of the file as `"pixelSize"` (omitted when == 2)
+            - [Enter] — save the new global default; all bitmaps without explicit `pixelSize` inherit this value
+            - [Escape] — cancel/revert
     - Close UI (Escape from Main UI, or :close from command bar)
         - if no changes were made (file not dirty)
             - return to the Startup UI (no prompts)
@@ -446,7 +453,6 @@ Hardcoded preset: default
                 "x": "x1",
                 "y": "y1",
                 "location": {"x": 0, "y": 0},
-                "pixelSize": 2,
                 "bitmap": {
                     "pixels": [
                         "^^^^^^^^^^",
@@ -468,7 +474,6 @@ Hardcoded preset: default
                 "x": "x42",
                 "y": "y42",
                 "location": {"x": 0, "y": 100},
-                "pixelSize": 2,
                 "bitmap": {
                     "pixels": [
                         ".....@@@@@",
@@ -506,6 +511,14 @@ Palette fields:
     - `"hex"` (string): HTML hex color (e.g. `"#FF0000"`).
     - `"name"` (string): Human-readable name.
 
+Top-level fields:
+
+- `"pixelSize"` (integer, optional, default 2): Global pixel size multiplier
+  for code generation output. When omitted or set to 2, the field is not
+  written to the file. Individual bitmaps can override this by specifying
+  their own `"pixelSize"` in the bitmap object. Codegen pre-computes
+  scaled values using the resolved pixelSize.
+
 Bitmap fields (unchanged):
 
 - group data by bitmap key
@@ -515,7 +528,7 @@ Bitmap fields (unchanged):
 - the bitmap should be saved as ASCII art
     - each character represents a canvas pixel: color codes 1-F are single characters, transparent (color code 0) is stored as a space character
     - In text UI: 2 characters = 1 pixel (for square appearance)
-    - pixelSize config only affects preview/output, not text UI
+    - pixelSize config affects preview, code generation output, not text UI
 
 ### Example Output Snippet
 // Illustrative example — actual output depends on bitmap configuration
@@ -571,7 +584,7 @@ Bitmap fields (unchanged):
 - I want the bitmap data to be stored with .json extension.
 - I want the bitmap data to be human-readable.
 - I want to store multiple bitmap sets in the same file.
-- I want each bitmap set to contain configuration metadata, such as bitmap key, bounds, context variable name, location, and pixel size).
+- I want each bitmap set to contain configuration metadata, such as bitmap key, bounds, context variable name, location, pixel size), and a global pixel size default.
 - I want to be able to open a .json file and work with it.
 - I want to save global configurations in ~/.bitmapsrc.
 - I want to specify/define color palette(s) in ~/.bitmapsrc.

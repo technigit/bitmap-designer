@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from textual.app import ComposeResult
+from textual import events
 from textual.widgets import ListItem, ListView, Static, Input
 from textual.containers import Vertical
 
@@ -14,6 +15,7 @@ from .palette_edit_screen import (
 )
 
 from ..constants import HINT_ESCAPE, create_default_bitmap
+from ..services import DEFAULT_PIXEL_SIZE
 from ..services.palette_service import HARDCODED_PRESETS
 from ..text_utils import columnate
 from .codegen_screen import StrategySelectScreen
@@ -63,9 +65,14 @@ class ConfigScreen(PopupScreen):
             f"{loc['x']} {loc['y']}",
         ]
         labels_code = ["[C]ontext", "Pixel [S]ize", "Variable [X]", "Variable [Y]"]
+        ps = bm.get("pixelSize")
+        if ps is not None:
+            ps_display = f"{ps} (override)"
+        else:
+            ps_display = f"{self.app.pixel_size} (global)"
         values_code = [
             bm.get("context", "ctx"),
-            str(bm.get("pixelSize", 2)),
+            ps_display,
             bm.get("x", f"x{idx}"),
             bm.get("y", f"y{idx}"),
         ]
@@ -78,6 +85,7 @@ class ConfigScreen(PopupScreen):
         rows.extend(zip(labels_code, values_code))
         lines = columnate(rows)
         lines += f"\n\n[P]alette: {palette_name}"
+        lines += f"\n\n[G]lobal pixel size: {self.app.pixel_size}"
         lines += "\n\n[M]anage key\n\n[Escape] back"
         self.query_one("#menu", Static).update(lines)
 
@@ -104,6 +112,8 @@ class ConfigScreen(PopupScreen):
             self.app.push_screen(ConfigLocationScreen())
         elif key == "s":
             self.app.push_screen(ConfigPixelScreen())
+        elif key == "g":
+            self.app.push_screen(ConfigGlobalPixelScreen())
         elif key == "m":
             self.app.push_screen(ConfigKeyManageScreen())
         elif key == "p":
@@ -200,7 +210,8 @@ class ConfigKeyManageScreen(PopupScreen):
             f"  X:          {bm.get('x', 'x')}",
             f"  Y:          {bm.get('y', 'y')}",
             f"  Location:   {loc['x']} {loc['y']}",
-            f"  Pixel Size: {bm.get('pixelSize', 2)}",
+            f"  Pixel Size: {bm.get('pixelSize', self.app.pixel_size)}"
+            f"{'' if 'pixelSize' in bm else ' (global)'}",
             f"  Strategy:   {self.app.get_codegen_strategy()}",
         ]
         self.query_one("#info", Static).update("\n".join(lines))
@@ -644,6 +655,17 @@ class ConfigLocationScreen(PopupScreen):
             self._save_location(x, y)
 
 
+class PixelSizeInput(Input):
+    """Input that passes 'd' keypress through for default/inherit action."""
+
+    async def _on_key(self, event: events.Key) -> None:
+        if event.is_printable and event.character and event.character.lower() == "d":
+            self.screen.action_clear_pixel_size()
+            event.stop()
+            return
+        await super()._on_key(event)
+
+
 class ConfigPixelScreen(PopupScreen):
     """Screen to set the pixel size for rendering."""
     base_title = "Pixel Size"
@@ -661,11 +683,66 @@ class ConfigPixelScreen(PopupScreen):
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
             bm = self.app.bitmaps.get(str(self.app.current_key), {})
-            current = bm.get("pixelSize", 2)
-            self.input = Input(value=str(current), placeholder="2", id="pixel")
+            current = bm.get("pixelSize", self.app.pixel_size)
+            self.input = PixelSizeInput(value=str(current), placeholder=str(self.app.pixel_size), id="pixel")
+            yield self.input
+            yield Static("[Enter] save (override)  [D]efault (inherit)  [Escape] cancel", id="hints", markup=False)
+            yield Static("", id="status")  # Status line
+
+    def show_status(self, message: str) -> None:
+        self.query_one("#status", Static).update(message)
+
+    def action_clear_pixel_size(self) -> None:
+        idx = str(self.app.current_key)
+        if idx in self.app.bitmaps and "pixelSize" in self.app.bitmaps[idx]:
+            del self.app.bitmaps[idx]["pixelSize"]
+            self.app.mark_dirty()
+        self.app.pop_screen()
+        self.app.show_status("Pixel size reset to global default.")
+
+    def on_key(self, event) -> None:
+        if event.key == "ctrl+l":
+            self.show_status("")
+            self.app.refresh(repaint=True, layout=True)
+            return
+        if event.key == "escape":
+            self.app.pop_screen()
+        elif event.key in ("enter", "\n"):
+            try:
+                val = int(self.input.value or str(self.app.pixel_size))
+                if val >= 1:
+                    idx = str(self.app.current_key)
+                    if idx not in self.app.bitmaps:
+                        self.app.bitmaps[idx] = create_default_bitmap()
+                    self.app.bitmaps[idx]["pixelSize"] = val
+                    self.app.mark_dirty()
+                    self.app.pop_screen()
+                    self.app.show_status("Pixel size saved.")
+            except ValueError:
+                self.app.show_status("Please enter a positive integer.")
+
+
+class ConfigGlobalPixelScreen(PopupScreen):
+    """Screen to set the global default pixel size."""
+    base_title = "Global Pixel Size"
+    CSS = """
+    Input { margin:0 0; }
+    #hints { margin-top: 1; opacity: 0.5; }
+
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.input = None
+
+    def compose(self) -> ComposeResult:
+        with Vertical():
+            yield Static(self.app.title_with_file(self.base_title), id="title")
+            current = self.app.pixel_size
+            self.input = Input(value=str(current), placeholder=str(DEFAULT_PIXEL_SIZE), id="pixel")
             yield self.input
             yield Static("[Enter] save  [Escape] cancel", id="hints", markup=False)
-            yield Static("", id="status")  # Status line
+            yield Static("", id="status")
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
@@ -679,15 +756,12 @@ class ConfigPixelScreen(PopupScreen):
             self.app.pop_screen()
         elif event.key in ("enter", "\n"):
             try:
-                val = int(self.input.value or "2")
+                val = int(self.input.value or str(DEFAULT_PIXEL_SIZE))
                 if val >= 1:
-                    idx = str(self.app.current_key)
-                    if idx not in self.app.bitmaps:
-                        self.app.bitmaps[idx] = create_default_bitmap()
-                    self.app.bitmaps[idx]["pixelSize"] = val
+                    self.app.pixel_size = val
                     self.app.mark_dirty()
                     self.app.pop_screen()
-                    self.app.show_status("Pixel size saved.")
+                    self.app.show_status("Global pixel size saved.")
             except ValueError:
                 self.app.show_status("Please enter a positive integer.")
 

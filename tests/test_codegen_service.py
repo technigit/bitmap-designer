@@ -324,6 +324,20 @@ class TestCodegenService:
         assert len(lines) > 0
         assert "ctx.fillRect" in "\n".join(lines)
 
+    def test_bitmap_to_code_lines_with_pixel_size(self):
+        bm = {
+            "x": "x1",
+            "y": "y1",
+            "location": {"x": 5, "y": 10},
+            "pixelSize": 3,
+            "bitmap": {"pixels": ["##", "##"]},
+        }
+        lines = CodegenService._bitmap_to_code_lines("1", bm, {})
+        output = "\n".join(lines)
+        assert "var x1 = 15;" in output
+        assert "var y1 = 30;" in output
+        assert "x1 + 0, y1 + 0, 6, 6" in output
+
     def test_bitmap_to_code_lines_default_strategy(self):
         bm = {
             "x": "x1",

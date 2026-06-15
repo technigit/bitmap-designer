@@ -12,6 +12,7 @@ from textual.containers import Vertical
 from .popup_screen import PopupScreen
 
 from ..constants import DEFAULT_BITMAP_DIR, HINT_ESCAPE
+from ..services import DEFAULT_PIXEL_SIZE
 
 from .startup_screen import StartupScreen
 
@@ -24,6 +25,8 @@ def _build_save_data(app) -> dict:
         "version": "1.0",
         "bitmaps": app.bitmaps,
     }
+    if app.pixel_size != DEFAULT_PIXEL_SIZE:
+        data["pixelSize"] = app.pixel_size
     if app.palette_id:
         data["palette"] = app.palette_id
     if app.custom_palettes:

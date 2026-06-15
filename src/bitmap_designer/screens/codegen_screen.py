@@ -143,7 +143,7 @@ class CodegenScreen(PopupScreen):
 
     def _generate_code(self) -> None:
         active_filter = None if self.app.codegen_filtered_keys is None else list(self.app.codegen_filtered_keys)
-        code = CodegenService(self.app.bitmaps, palette=self.app.active_palette).generate_code(keys=active_filter)
+        code = CodegenService(self.app.bitmaps, palette=self.app.active_palette, pixel_size=self.app.pixel_size).generate_code(keys=active_filter)
         self.query_one("#code").update(code or "No bitmap data.")
         n_keys = len(active_filter) if active_filter is not None else len(self.app.bitmaps)
         total = len(self.app.bitmaps)
@@ -183,7 +183,7 @@ class CodegenScreen(PopupScreen):
             return
         if event.key in ("enter", "\n"):
             active_filter = None if self.app.codegen_filtered_keys is None else list(self.app.codegen_filtered_keys)
-            code = CodegenService(self.app.bitmaps, palette=self.app.active_palette).generate_code(keys=active_filter)
+            code = CodegenService(self.app.bitmaps, palette=self.app.active_palette, pixel_size=self.app.pixel_size).generate_code(keys=active_filter)
             pyperclip.copy(code)
             self.show_status("Code copied to clipboard.")
         elif event.key == "escape":

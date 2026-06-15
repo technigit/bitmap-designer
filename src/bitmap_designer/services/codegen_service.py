@@ -1,6 +1,8 @@
 """Preview HTML and JS code generation from bitmap data."""
 import webbrowser
 
+DEFAULT_PIXEL_SIZE = 2
+
 STRATEGIES = ("fast", "balanced", "thorough", "optimal")
 FALLBACK_DEFAULT = "balanced"
 
@@ -10,10 +12,11 @@ class CodegenService:
 
     PREVIEW_PATH = "/tmp/bitmap-preview.html"
 
-    def __init__(self, bitmaps: dict, show_status=None, palette: dict[str, dict] | None = None):
+    def __init__(self, bitmaps: dict, show_status=None, palette: dict[str, dict] | None = None, pixel_size: int = DEFAULT_PIXEL_SIZE):
         self.bitmaps = bitmaps
         self.show_status = show_status or (lambda msg: None)
         self.palette = palette or {}
+        self.pixel_size = pixel_size
 
     def preview(self) -> None:
         self.save_preview_html()
@@ -31,7 +34,7 @@ class CodegenService:
     def generate_preview_html(self) -> str:
         js_code = []
         for idx, bm in self.bitmaps.items():
-            js_code.extend(self._bitmap_to_js(idx, bm, self.palette))
+            js_code.extend(self._bitmap_to_js(idx, bm, self.palette, self.pixel_size))
         canvas_js = "\n    ".join(js_code)
         return f"""<!DOCTYPE html>
 <html>
@@ -55,18 +58,19 @@ class CodegenService:
 </html>"""
 
     @staticmethod
-    def _bitmap_to_code_lines(idx: str, bm: dict, palette: dict[str, dict]) -> list[str]:
+    def _bitmap_to_code_lines(idx: str, bm: dict, palette: dict[str, dict], pixel_size: int = DEFAULT_PIXEL_SIZE) -> list[str]:
         lines = []
         x_var = bm.get("x", f"x{idx}")
         y_var = bm.get("y", f"y{idx}")
         location = bm.get("location", {"x": 0, "y": 0})
+        pixel_size = bm.get("pixelSize", pixel_size)
         pixels = bm.get("bitmap", {}).get("pixels", [])
         if not pixels:
             return lines
 
         lines.append(f"// Bitmap {idx}")
-        lines.append(f"var {x_var} = {location['x']};")
-        lines.append(f"var {y_var} = {location['y']};")
+        lines.append(f"var {x_var} = {location['x'] * pixel_size};")
+        lines.append(f"var {y_var} = {location['y'] * pixel_size};")
 
         strategy = bm.get("codegenStrategy", FALLBACK_DEFAULT)
         rects_by_color = CodegenService._extract_rectangles(
@@ -76,7 +80,9 @@ class CodegenService:
             lines.append(f"ctx.fillStyle = '{palette.get(color.lower(), {}).get('hex', color)}';")
             for rx, ry, rw, rh in rects:
                 lines.append(
-                    f"ctx.fillRect({x_var} + {rx}, {y_var} + {ry}, {rw}, {rh});"
+                    f"ctx.fillRect({x_var} + {rx * pixel_size}, "
+                    f"{y_var} + {ry * pixel_size}, "
+                    f"{rw * pixel_size}, {rh * pixel_size});"
                 )
         return lines
 
@@ -84,20 +90,20 @@ class CodegenService:
         lines = []
         bm_iter = [(k, self.bitmaps[k]) for k in (keys if keys is not None else list(self.bitmaps.keys())) if k in self.bitmaps]
         for n, (idx, bm) in enumerate(bm_iter):
-            lines.extend(self._bitmap_to_code_lines(idx, bm, self.palette))
+            lines.extend(self._bitmap_to_code_lines(idx, bm, self.palette, self.pixel_size))
             if n < len(bm_iter) - 1:
                 lines.append("")
         return "\n".join(lines)
 
     @staticmethod
     def _bitmap_to_js(  # pylint: disable=too-many-locals
-        idx: str, bm: dict, palette: dict[str, dict]
+        idx: str, bm: dict, palette: dict[str, dict], pixel_size: int = DEFAULT_PIXEL_SIZE
     ) -> list[str]:
         lines = []
         x_var = bm.get("x", f"x{idx}")
         y_var = bm.get("y", f"y{idx}")
         location = bm.get("location", {"x": 0, "y": 0})
-        pixel_size = bm.get("pixelSize", 2)
+        pixel_size = bm.get("pixelSize", pixel_size)
         pixels = bm.get("bitmap", {}).get("pixels", [])
         if not pixels:
             return lines

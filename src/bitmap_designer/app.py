@@ -7,6 +7,7 @@ from textual.widgets import Footer, Static
 from textual.binding import Binding
 
 from .constants import DEFAULT_BITMAP_DIR, create_default_bitmap
+from .services import DEFAULT_PIXEL_SIZE
 from .services.file_service import FileService
 from .services.history_service import HistoryService
 from .services.palette_service import resolve_palette, resolve_palette_with_status
@@ -48,6 +49,7 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         self.palette_id: str | None = None
         self.custom_palettes: dict[str, dict] = {}
         self.active_palette: dict[str, dict] = self._init_palette()
+        self.pixel_size: int = DEFAULT_PIXEL_SIZE
         self.global_strategy: str = "balanced"
         self.codegen_filter_mode: str = "all"
         self.codegen_filter_page: int = 0
@@ -127,18 +129,21 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
             copy.deepcopy(self.bitmaps),
             self.palette_id,
             copy.deepcopy(self.custom_palettes),
+            self.pixel_size,
         )
 
     def _is_modified(self) -> bool:
         if self.history.any_nonempty():
             return True
         if self._clean_snapshot is not None:
-            snap_bitmaps, snap_pid, snap_customs = self._clean_snapshot
+            snap_bitmaps, snap_pid, snap_customs, snap_pixel_size = self._clean_snapshot
             if self.bitmaps != snap_bitmaps:
                 return True
             if self.palette_id != snap_pid:
                 return True
             if self.custom_palettes != snap_customs:
+                return True
+            if self.pixel_size != snap_pixel_size:
                 return True
         return False
 
@@ -220,6 +225,7 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
                 self.cursor_positions = {}
                 self.scroll_offsets = {}
                 self._init_palette_from_data(data)
+                self.pixel_size = data.get("pixelSize", DEFAULT_PIXEL_SIZE)
                 self.file.refresh_mtime()
         except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error reloading file: {e}")
@@ -271,6 +277,7 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         self.palette_id = None
         self.custom_palettes = {}
         self.active_palette = self._init_palette()
+        self.pixel_size = DEFAULT_PIXEL_SIZE
         self.push_screen(MainScreen())
 
     # Load bitmaps from a JSON file and open the main menu.
@@ -293,6 +300,7 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
                 self.color_pixels = "on"
                 self.glyphmode = False
                 self._init_palette_from_data(data)
+                self.pixel_size = data.get("pixelSize", DEFAULT_PIXEL_SIZE)
                 self.push_screen(MainScreen())
         except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error loading file: {e}")

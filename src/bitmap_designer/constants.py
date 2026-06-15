@@ -18,7 +18,6 @@ def create_default_bitmap() -> dict:
         "x": "x",
         "y": "y",
         "location": {"x": 0, "y": 0},
-        "pixelSize": 2,
         "bitmap": {"pixels": []},
     }
 

@@ -77,7 +77,8 @@ class MainScreen(Screen):
             self.app.push_screen(DesignScreen(bitmap))
         elif key_lower == "p":
             svc = CodegenService(
-                self.app.bitmaps, self.app.show_status, palette=self.app.active_palette
+                self.app.bitmaps, self.app.show_status, palette=self.app.active_palette,
+                pixel_size=self.app.pixel_size,
             )
             svc.preview()
         elif key_lower == "s":
