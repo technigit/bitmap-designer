@@ -316,8 +316,12 @@ class StrategySelectScreen(PopupScreen):
     #status { dock: bottom; }
     """
 
+    def __init__(self):
+        super().__init__()
+        self._pending: str | None = None
+
     def _strategy_text(self) -> str:
-        current = self.app.get_codegen_strategy()
+        current = self._pending if self._pending is not None else self.app.get_codegen_strategy()
         lines = [f'  Bitmap "{self.app.current_key}":']
         for s in STRATEGIES:
             marker = "◄" if s == current else " "
@@ -342,6 +346,7 @@ class StrategySelectScreen(PopupScreen):
         self._refresh()
 
     def on_screen_resume(self, _event) -> None:
+        self._pending = None
         self._refresh()
 
     def show_status(self, message: str) -> None:
@@ -351,15 +356,15 @@ class StrategySelectScreen(PopupScreen):
         self.query_one("#menu", Static).update(self._strategy_text())
 
     def _select(self, strategy: str) -> None:
-        self.app.set_codegen_strategy(strategy)
-        self.dismiss(strategy)
+        self._pending = strategy
+        self._refresh()
 
     def _show_details(self) -> None:
         self.app.push_screen(StrategyDetailsScreen())
 
     def _on_stats_chosen(self, strategy: str | None) -> None:
         if strategy is not None:
-            self.app.set_codegen_strategy(strategy)
+            self._pending = strategy
             self._refresh()
 
     def on_key(self, event) -> None:
@@ -377,8 +382,7 @@ class StrategySelectScreen(PopupScreen):
         elif k == "o":
             self._select("optimal")
         elif k in ("enter", "\n"):
-            current = self.app.get_codegen_strategy()
-            self.dismiss(current)
+            self.dismiss(self._pending)
         elif k == "escape":
             self.dismiss(None)
         elif k in ("question_mark", "slash"):

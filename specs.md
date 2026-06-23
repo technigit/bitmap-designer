@@ -59,7 +59,7 @@
             - [S]ave file // Save UI
             - [G]enerate code // Code generation UI
             - [M]anage file // Manage file UI
-            - [,] Configuration mode // Configuration UI
+            - [C]onfigure settings // Configuration UI
             - [Escape] back // Close UI
     - Design UI (Central UI space)
         - display bitmap grid sized by bounds (within the available terminal viewport)
@@ -201,10 +201,6 @@
                     - rename file
                     - Response: File renamed. [OK]
                     - return to Manage file UI
-            - [S]trategy — set per-key strategy override for current bitmap
-                - opens StrategySelectScreen scoped to the current key only
-                - saves per-key `codegenStrategy` in metadata
-                - marks file as dirty
             - [D]elete - delete file
                 - hint: [Y]es [N]o [Escape] cancel
                 - if file name already exists
@@ -226,9 +222,11 @@
             - when dirty, appends " (modified)"
             - refreshes on return from any sub-screen
         - shows current values in a right-aligned column, 2-character margin from longest label
-        - values displayed in two groups separated by a blank line:
-            - Design settings: Key, Bounds, Location
-            - Code settings: Context, Pixel Size, X, Y, Global Pixel Size
+        - values displayed in two sections separated by plain text headers
+          (`── Bitmap Key Settings ──` and `── General Settings ──`):
+            - Bitmap Key Settings: Key, Bounds, Location, Context, X, Y,
+              Pixel Size, Efficiency
+            - General Settings: Palette, Global Pixel Size
         - values refresh on return from any sub-screen
         - [K]ey - bitmap key
             - enter a key (short string, no spaces)
@@ -296,6 +294,11 @@
                 - Only explicitly set values saved to JSON (partial palette)
                 - [Enter] — save
                 - [Escape] — cancel
+        - [E]fficiency - per-key code generation strategy (default "balanced")
+            - shows current value with `(global)` or `(override)` suffix
+            - opens StrategySelectScreen; [Enter] saves per-key override
+            - marks file as dirty
+            - [Escape] — cancel/revert
         - Pixel [S]ize - per-bitmap pixel size (default 2)
             - shows current value, with `(global)` or `(override)` suffix
             - [Enter] — save the value as an explicit override for this bitmap
@@ -308,6 +311,7 @@
             - stored at the top level of the file as `"pixelSize"` (omitted when == 2)
             - [Enter] — save the new global default; all bitmaps without explicit `pixelSize` inherit this value
             - [Escape] — cancel/revert
+        - dimmed `[Escape] back` hint displayed below settings (also accepts [Enter])
     - Close UI (Escape from Main UI, or :close from command bar)
         - if no changes were made (file not dirty)
             - return to the Startup UI (no prompts)
@@ -422,9 +426,10 @@ Hardcoded preset: default
 ### Code Generation Strategy
 
 - **Global default**: stored as `app.global_strategy`, initially `"balanced"`.
-  Set via `[S]` in CodegenScreen. Does not mark file dirty.
+  Set via `[S]` in CodegenScreen. Marks file dirty.
+  Saved to JSON as `"globalStrategy"` (omitted when `"balanced"`).
 - **Per-key override**: stored in bitmap metadata as `codegenStrategy`.
-  Set via Configuration → Manage Key → [S]trategy. Marks file dirty.
+  Set via Configuration → [E]fficiency. Marks file dirty.
 - **Resolution order**: per-key `codegenStrategy` → `global_strategy` → `"balanced"` fallback.
 - When a per-key override matches the current global default, the metadata field
   is removed to avoid redundancy.
@@ -435,6 +440,7 @@ Hardcoded preset: default
 // Example values — illustrative, not prescriptive
     {
         "version": "1.0",
+        "globalStrategy": "speed",
         "palette": "default",
         "palettes": {
             "my-variant": {
@@ -518,6 +524,9 @@ Top-level fields:
   written to the file. Individual bitmaps can override this by specifying
   their own `"pixelSize"` in the bitmap object. Codegen pre-computes
   scaled values using the resolved pixelSize.
+- `"globalStrategy"` (string, optional, default `"balanced"`): Global code
+  generation strategy. When `"balanced"`, the field is omitted from the file.
+  Per-bitmap `"codegenStrategy"` overrides this.
 
 Bitmap fields (unchanged):
 

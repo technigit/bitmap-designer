@@ -30,6 +30,7 @@ class MainScreen(Screen):
     TITLE = "Main Menu"
     CSS = """
     #status { dock: bottom; margin-left: 3; margin-top: 1; }
+    #hints { margin-top: 1; opacity: 0.5; }
     """
 
     def _menu_text(self) -> str:
@@ -40,14 +41,14 @@ class MainScreen(Screen):
             "\n"
             "[S]ave file\n"
             "[M]anage file\n"
-            "[,] Configuration\n"
-            "[Escape] back"
+            "[C]onfigure settings"
         )
 
     def compose(self) -> ComposeResult:
         yield Static(self.app.title_with_file(self.TITLE), id="title")
         with Vertical():
             yield Static(self._menu_text(), id="menu", markup=False)
+            yield Static("[Escape] back", id="hints", markup=False)
         yield Static("", id="status")
 
     def show_status(self, message: str) -> None:
@@ -67,10 +68,10 @@ class MainScreen(Screen):
             self.app.refresh(repaint=True, layout=True)
             return
         key = event.key
-        if key == "comma":
+        key_lower = key.lower()
+        if key_lower == "c":
             self.app.push_screen(ConfigScreen())
             return
-        key_lower = key.lower()
         if key_lower == "d":
             bitmap = self.app.bitmaps.get(self.app.current_key, create_default_bitmap())
             self.app.push_screen(DesignScreen(bitmap))

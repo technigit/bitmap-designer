@@ -31,7 +31,7 @@ class ConfigScreen(PopupScreen):
     base_title = "Configuration"
     CSS = """
     #menu { margin-top: 1; }
-    #hints { opacity: 0.5; }
+    #hints { margin-top: 1; opacity: 0.5; }
 
     """
 
@@ -69,7 +69,7 @@ class ConfigScreen(PopupScreen):
             f"{bounds['width']} {bounds['height']}",
             f"{loc['x']} {loc['y']}",
         ]
-        labels_code = ["[C]ontext", "Pixel [S]ize", "Variable [X]", "Variable [Y]"]
+        labels_code = ["[C]ontext", "Pixel [S]ize", "Variable [X]", "Variable [Y]", "[E]fficiency"]
         ps = bm.get("pixelSize")
         if ps is not None:
             ps_display = f"{ps} (override)"
@@ -80,6 +80,8 @@ class ConfigScreen(PopupScreen):
             ps_display,
             bm.get("x", f"x{idx}"),
             bm.get("y", f"y{idx}"),
+            f"{bm.get('codegenStrategy', self.app.global_strategy)}"
+            f"{' (override)' if 'codegenStrategy' in bm else ' (global)'}",
         ]
 
         palette_name = self.app.palette_id or (
@@ -87,14 +89,26 @@ class ConfigScreen(PopupScreen):
             if self.app.custom_palettes
             else "default"
         )
-        rows = list(zip(labels_design, values_design))
-        rows.append(("", ""))
-        rows.extend(zip(labels_code, values_code))
-        lines = columnate(rows)
-        lines += f"\n\n[P]alette: {palette_name}"
-        lines += f"\n\n[G]lobal pixel size: {self.app.pixel_size}"
-        lines += "\n\n[M]anage key\n\n[Escape] back"
+        bitmap_rows = list(zip(labels_design, values_design))
+        bitmap_rows.append(("", ""))
+        bitmap_rows.extend(zip(labels_code, values_code))
+        bitmap_block = columnate(bitmap_rows)
+
+        sections = [
+            "── Bitmap Key Settings ──",
+            "",
+            bitmap_block,
+            "",
+            "[M]anage key",
+            "",
+            "── General Settings ──",
+            "",
+            f"[P]alette: {palette_name}",
+            f"[G]lobal pixel size: {self.app.pixel_size}",
+        ]
+        lines = "\n".join(sections)
         self.query_one("#menu", Static).update(lines)
+        self.query_one("#hints", Static).update("[Escape] back")
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)
@@ -121,6 +135,13 @@ class ConfigScreen(PopupScreen):
             self.app.push_screen(ConfigPixelScreen())
         elif key == "g":
             self.app.push_screen(ConfigGlobalPixelScreen())
+        elif key == "e":
+            self.app.push_screen(
+                StrategySelectScreen(),
+                callback=lambda s: (
+                    self.app.set_codegen_strategy(s), self._refresh_values()
+                ) if s else None,
+            )
         elif key == "m":
             self.app.push_screen(ConfigKeyManageScreen())
         elif key == "p":
@@ -187,7 +208,7 @@ class ConfigKeyManageScreen(PopupScreen):
     CSS = """
     #menu { margin-top: 1; }
     #info { margin-top: 1; }
-    #hints { opacity: 0.5; }
+    #hints { margin-top: 1; opacity: 0.5; }
 
     """
 
@@ -195,11 +216,12 @@ class ConfigKeyManageScreen(PopupScreen):
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
             yield Static(
-                "[R]ename key\n[S]trategy\n[D]elete key\n\n[Escape] back",
+                "[R]ename key\n[D]elete key",
                 id="menu",
                 markup=False,
             )
             yield Static("", id="info")
+            yield Static("[Escape] back", id="hints", markup=False)
             yield Static("", id="status")
 
     def on_mount(self) -> None:
@@ -217,15 +239,16 @@ class ConfigKeyManageScreen(PopupScreen):
         bounds = bm.get("bounds", {"width": 10, "height": 10})
         loc = bm.get("location", {"x": 0, "y": 0})
         lines = [
-            f"  Key:        {key}",
-            f"  Bounds:     {bounds['width']} {bounds['height']}",
-            f"  Context:    {bm.get('context', 'ctx')}",
-            f"  X:          {bm.get('x', 'x')}",
-            f"  Y:          {bm.get('y', 'y')}",
-            f"  Location:   {loc['x']} {loc['y']}",
-            f"  Pixel Size: {bm.get('pixelSize', self.app.pixel_size)}"
+            f"  Key:         {key}",
+            f"  Bounds:      {bounds['width']} {bounds['height']}",
+            f"  Context:     {bm.get('context', 'ctx')}",
+            f"  X:           {bm.get('x', 'x')}",
+            f"  Y:           {bm.get('y', 'y')}",
+            f"  Location:    {loc['x']} {loc['y']}",
+            f"  Pixel Size:  {bm.get('pixelSize', self.app.pixel_size)}"
             f"{'' if 'pixelSize' in bm else ' (global)'}",
-            f"  Strategy:   {self.app.get_codegen_strategy()}",
+            f"  Efficiency:  {bm.get('codegenStrategy', self.app.global_strategy)}"
+            f"{' (override)' if 'codegenStrategy' in bm else ' (global)'}",
         ]
         self.query_one("#info", Static).update("\n".join(lines))
 
@@ -236,11 +259,6 @@ class ConfigKeyManageScreen(PopupScreen):
             return
         if event.key.lower() == "r":
             self.app.push_screen(ConfigKeyRenameScreen())
-        elif event.key.lower() == "s":
-            self.app.push_screen(
-                StrategySelectScreen(),
-                callback=lambda strategy: self._refresh_info() if strategy else None,
-            )
         elif event.key.lower() == "d":
             self.app.push_screen(ConfigKeyDeleteScreen())
         elif event.key in ("escape", "enter", "\n"):

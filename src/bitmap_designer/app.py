@@ -144,13 +144,14 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
             self.palette_id,
             copy.deepcopy(self.custom_palettes),
             self.pixel_size,
+            self.global_strategy,
         )
 
     def _is_modified(self) -> bool:
         if self.history.any_nonempty():
             return True
         if self._clean_snapshot is not None:
-            snap_bitmaps, snap_pid, snap_customs, snap_pixel_size = self._clean_snapshot
+            snap_bitmaps, snap_pid, snap_customs, snap_pixel_size, snap_global_strategy = self._clean_snapshot
             if self.bitmaps != snap_bitmaps:
                 return True
             if self.palette_id != snap_pid:
@@ -158,6 +159,8 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
             if self.custom_palettes != snap_customs:
                 return True
             if self.pixel_size != snap_pixel_size:
+                return True
+            if self.global_strategy != snap_global_strategy:
                 return True
         return False
 
@@ -204,6 +207,7 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
             bm = self.bitmaps[k]
             if bm.get("codegenStrategy") == strategy:
                 bm.pop("codegenStrategy", None)
+        self.mark_dirty()
 
     def set_codegen_strategy(self, strategy: str, key: str | None = None) -> None:
         k = key if key is not None else self.current_key
@@ -246,12 +250,13 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
                 if self.bitmaps:
                     self.current_key = next(iter(self.bitmaps.keys()))
                 self.dirty = False
-                self._take_clean_snapshot()
                 self.history.clear_all()
                 self.cursor_positions = {}
                 self.scroll_offsets = {}
                 self._init_palette_from_data(data)
                 self.pixel_size = data.get("pixelSize", DEFAULT_PIXEL_SIZE)
+                self.global_strategy = data.get("globalStrategy", "balanced")
+                self._take_clean_snapshot()
                 self.file.refresh_mtime()
         except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error reloading file: {e}")
@@ -318,7 +323,6 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
                 if self.bitmaps:
                     self.current_key = next(iter(self.bitmaps.keys()))
                 self.dirty = False
-                self._take_clean_snapshot()
                 self.history.clear_all()
                 self.cursor_positions = {}
                 self.scroll_offsets = {}
@@ -327,6 +331,8 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
                 self.glyphmode = False
                 self._init_palette_from_data(data)
                 self.pixel_size = data.get("pixelSize", DEFAULT_PIXEL_SIZE)
+                self.global_strategy = data.get("globalStrategy", "balanced")
+                self._take_clean_snapshot()
                 self.push_screen(MainScreen())
         except (OSError, json.JSONDecodeError) as e:
             self.show_status(f"Error loading file: {e}")

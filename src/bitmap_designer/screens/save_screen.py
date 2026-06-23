@@ -28,6 +28,8 @@ def _build_save_data(app) -> dict:
     }
     if app.pixel_size != DEFAULT_PIXEL_SIZE:
         data["pixelSize"] = app.pixel_size
+    if app.global_strategy != "balanced":
+        data["globalStrategy"] = app.global_strategy
     if app.palette_id:
         data["palette"] = app.palette_id
     if app.custom_palettes:
@@ -121,7 +123,7 @@ class QuitSaveScreen(PopupScreen):
 
     CSS = """
     Input { margin: 1 0; }
-    #hints { opacity: 0.5; }
+    #hints { margin-top: 1; opacity: 0.5; }
     """
 
     def __init__(self):
@@ -201,7 +203,7 @@ class SaveScreenForClose(PopupScreen):
 
     CSS = """
     Input { margin: 1 0; }
-    #hints { opacity: 0.5; }
+    #hints { margin-top: 1; opacity: 0.5; }
     """
 
     def __init__(self):

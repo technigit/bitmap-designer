@@ -30,6 +30,7 @@ class ManageScreen(PopupScreen):
         with Vertical():
             yield Static(self.app.title_with_file(self.TITLE), id="title")
             yield Static("[R]ename file\n[D]elete file", id="menu", markup=False)
+            yield Static("[Escape] back", id="hints", markup=False)
             yield Static("", id="status")
 
     def show_status(self, message: str) -> None:
