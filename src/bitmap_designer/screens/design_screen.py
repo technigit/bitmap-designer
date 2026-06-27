@@ -11,7 +11,6 @@ from textual.containers import Vertical
 
 from .popup_screen import PopupScreen
 from ..services.codegen_service import CodegenService
-from ..constants import create_default_bitmap
 from ..text_utils import columnate
 
 from .command_bar import handle_cmd_key
@@ -166,10 +165,10 @@ class DesignScreen(Screen):
         if self.app.current_key != self._key_on_enter:
             self.switch_to_key(self.app.current_key)
         else:
-            bm = self.app.bitmaps.get(self.app.current_key, create_default_bitmap())
-            self.width = bm["bounds"]["width"]
-            self.height = bm["bounds"]["height"]
-            self.pixels = bm["bitmap"]["pixels"]
+            bm = self.app.bitmaps.get(self.app.current_key, {})
+            self.width = bm.get("bounds", {}).get("width", 10)
+            self.height = bm.get("bounds", {}).get("height", 10)
+            self.pixels = bm.get("bitmap", {}).get("pixels", [])
             self._ensure_cursor_visible()
             self.refresh_grid()
         self.update_hints()
@@ -609,12 +608,15 @@ class DesignScreen(Screen):
     def _sync_pixels(self) -> None:
         key = self.app.current_key
         if key in self.app.bitmaps:
-            self.app.bitmaps[key]["bitmap"]["pixels"] = list(self.pixels)
+            self.app.bitmaps[key].setdefault("bitmap", {})["pixels"] = list(self.pixels)
             self.app.mark_dirty()
 
     def _undo(self):
         if not self.undo_stack:
             self.show_status("Already at oldest change")
+            return
+        if len(self.undo_stack[-1]) != 3:
+            self.undo_stack.pop()
             return
         _, saved_cx, saved_cy = self.undo_stack[-1]
         self.redo_stack.append((list(self.pixels), saved_cx, saved_cy))
@@ -629,6 +631,9 @@ class DesignScreen(Screen):
     def _redo(self):
         if not self.redo_stack:
             self.show_status("Already at newest change")
+            return
+        if len(self.redo_stack[-1]) != 3:
+            self.redo_stack.pop()
             return
         _, saved_cx, saved_cy = self.redo_stack[-1]
         self.undo_stack.append((list(self.pixels), saved_cx, saved_cy))

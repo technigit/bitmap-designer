@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import re
 import pyperclip
+
+MAX_KEYS_PER_PAGE = 9
 
 from textual.app import ComposeResult
 from textual.screen import Screen
@@ -12,10 +13,6 @@ from textual.containers import Vertical, VerticalScroll
 
 from ..services.codegen_service import CodegenService, STRATEGIES, FALLBACK_DEFAULT
 from .popup_screen import PopupScreen
-
-
-def _natural_key(s: str):
-    return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", s)]
 
 
 if TYPE_CHECKING:
@@ -60,14 +57,11 @@ class CodegenScreen(PopupScreen):
         self._refresh_all()
 
     def _page_size(self) -> int:
-        margin = 3  # "  " indent
-        page_info = 15  # " [Page N/M]" est.
-        slot = 13  # "1:✓abcdef… " max entry width
-        available = self.size.width - margin - page_info
-        return max(1, min(9, available // slot))
+        all_keys = list(self.app.bitmaps.keys())
+        return min(MAX_KEYS_PER_PAGE, len(all_keys)) if all_keys else 1
 
     def _paginated_keys(self) -> tuple[list[str], int]:
-        all_keys = sorted(self.app.bitmaps.keys(), key=_natural_key)
+        all_keys = list(self.app.bitmaps.keys())
         page_size = self._page_size()
         n_pages = max(1, (len(all_keys) + page_size - 1) // page_size)
         page = min(self.app.codegen_filter_page, n_pages - 1)
@@ -76,19 +70,34 @@ class CodegenScreen(PopupScreen):
         return all_keys[start : start + page_size], n_pages
 
     def _keys_bar_text(self) -> str:
-        all_sorted = sorted(self.app.bitmaps.keys(), key=_natural_key)
-        if not all_sorted:
-            return "  No bitmaps."
         page_keys, n_pages = self._paginated_keys()
+        if not page_keys:
+            return "  No bitmaps."
         active_set = self.app.codegen_filtered_keys
-        parts = []
-        for i, key in enumerate(page_keys):
-            in_filter = active_set is None or key in active_set
-            marker = "\u2713" if in_filter else "\u2717"
-            label = key if len(key) <= 8 else key[:7] + "\u2026"
-            parts.append(f"{i + 1}:{marker}{label}")
+        popup_w = int(self.size.width * 0.8)
+        popup_w = max(40, min(popup_w, 80)) - 8
         page_info = f"  [Page {self.app.codegen_filter_page + 1}/{n_pages}]"
-        return "  " + "  ".join(parts) + page_info
+        rows = []
+        row = []
+        row_w = 2
+        for i, k in enumerate(page_keys):
+            label = k if len(k) <= 8 else k[:7] + "\u2026"
+            marker = "\u2713" if (active_set is None or k in active_set) else "\u2717"
+            slot = f"{i + 1}:{marker}{label}"
+            sep = 2 if row else 0
+            if row and row_w + sep + len(slot) > popup_w:
+                rows.append("  " + "  ".join(row))
+                row = []
+                row_w = 2
+            row.append(slot)
+            row_w += sep + len(slot)
+        if row:
+            rows.append("  " + "  ".join(row))
+        if rows and len(rows[-1]) + len(page_info) <= popup_w:
+            rows[-1] += page_info
+        else:
+            rows.append(page_info)
+        return "\n".join(rows)
 
     def _mode_bar_text(self) -> str:
         mode = self.app.codegen_filter_mode
@@ -148,10 +157,11 @@ class CodegenScreen(PopupScreen):
         self._generate_code()
 
     def _generate_code(self) -> None:
+        keys = self.app.codegen_filtered_keys
         active_filter = (
             None
-            if self.app.codegen_filtered_keys is None
-            else list(self.app.codegen_filtered_keys)
+            if keys is None
+            else [k for k in self.app.bitmaps if k in keys]
         )
         code = CodegenService(
             self.app.bitmaps,
@@ -242,7 +252,7 @@ class CodegenScreen(PopupScreen):
         self._refresh_all()
 
     def _n_pages(self) -> int:
-        all_keys = sorted(self.app.bitmaps.keys(), key=_natural_key)
+        all_keys = list(self.app.bitmaps.keys())
         ps = self._page_size()
         return max(1, (len(all_keys) + ps - 1) // ps)
 

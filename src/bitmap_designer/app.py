@@ -52,6 +52,7 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         self.active_palette: dict[str, dict] = self._init_palette()
         self.pixel_size: int = DEFAULT_PIXEL_SIZE
         self.global_strategy: str = "balanced"
+        self.auto_reorder: bool = True
         self.codegen_filter_mode: str = "all"
         self.codegen_filter_page: int = 0
         self.codegen_filter_keys: set[str] = set()
@@ -86,7 +87,23 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         by2 = by1 + b_bounds["height"]
         return ax1 < bx2 and ax2 > bx1 and ay1 < by2 and ay2 > by1
 
+    def _reorder_by_position(self) -> None:
+        if not self.auto_reorder:
+            return
+        sorted_keys = sorted(
+            self.bitmaps.keys(),
+            key=lambda k: (
+                self.bitmaps[k].get("location", {}).get("y", 0),
+                self.bitmaps[k].get("location", {}).get("x", 0),
+            )
+        )
+        self.bitmaps = {k: self.bitmaps[k] for k in sorted_keys}
+
+    def set_auto_reorder(self, on: bool) -> None:
+        self.auto_reorder = on
+
     def build_key_adjacency(self) -> None:
+        self._reorder_by_position()
         adj = {}
         locs = {k: self.get_location(self.bitmaps[k]) for k in self.bitmaps}
         for key, (bx, by) in locs.items():

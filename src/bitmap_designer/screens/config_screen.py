@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from textual.app import ComposeResult
 from textual import events
 from textual.widgets import ListItem, ListView, Static, Input
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 
 from .popup_screen import PopupScreen
 from .palette_edit_screen import (
@@ -59,13 +59,9 @@ class ConfigScreen(PopupScreen):
         bm = self.app.bitmaps.get(idx, {})
         bounds = bm.get("bounds", {"width": 10, "height": 10})
         loc = bm.get("location", {"x": 0, "y": 0})
-        keys_list = " ".join(
-            f"{k}*" if k == idx else k for k in sorted(self.app.bitmaps)
-        )
-
         labels_design = ["[K]ey", "[B]ounds", "[L]ocation"]
         values_design = [
-            keys_list if keys_list else str(self.app.current_key),
+            str(self.app.current_key),
             f"{bounds['width']} {bounds['height']}",
             f"{loc['x']} {loc['y']}",
         ]
@@ -157,6 +153,7 @@ class ConfigKeyScreen(PopupScreen):
     CSS = """
     Input { margin: 0 0; }
     #hints { margin-top: 1; opacity: 0.5; }
+    #key-list-scroll { height: 10; margin-top: 1; overflow-y: auto; }
 
     """
 
@@ -170,10 +167,24 @@ class ConfigKeyScreen(PopupScreen):
             self.input = Input(value=self.app.current_key, placeholder="Key", id="key")
             yield self.input
             yield Static("[Enter] set  [Escape] cancel", id="hints", markup=False)
+            with VerticalScroll(id="key-list-scroll"):
+                yield Static("", id="key-list")
             yield Static("", id="status")  # Status line for messages
+
+    def on_mount(self) -> None:
+        self._refresh_keys()
 
     def on_screen_resume(self, _event) -> None:
         self.input.value = self.app.current_key
+        self._refresh_keys()
+
+    def _refresh_keys(self) -> None:
+        self.app.build_key_adjacency()
+        current = self.app.current_key
+        keys = " ".join(
+            f"{k}*" if k == current else k for k in self.app.bitmaps
+        )
+        self.query_one("#key-list", Static).update(keys or "(no keys)")
 
     def show_status(self, message: str) -> None:
         self.query_one("#status", Static).update(message)

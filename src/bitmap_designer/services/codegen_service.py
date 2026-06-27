@@ -105,7 +105,7 @@ class CodegenService:
     def generate_code(self, keys: list[str] | None = None) -> str:
         lines = []
         keys_list = keys if keys is not None else list(self.bitmaps.keys())
-        bm_iter = [(k, self.bitmaps[k]) for k in keys_list if k in self.bitmaps]
+        bm_iter = [(k, self.bitmaps[k]) for k in keys_list if k in self.bitmaps and self.bitmaps[k].get("bitmap", {}).get("pixels")]
         for n, (idx, bm) in enumerate(bm_iter):
             lines.extend(
                 self._bitmap_to_code_lines(idx, bm, self.palette, self.pixel_size)
