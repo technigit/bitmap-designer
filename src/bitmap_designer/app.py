@@ -452,6 +452,36 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
                         return {"x": dcx, "y": dcy}
         return None
 
+    def find_nearest_key(self, key: str) -> str | None:
+        """Return the key whose rect center is closest to *key*."""
+        bm = self.bitmaps.get(key)
+        if bm is None:
+            return None
+        loc = self.get_location(bm)
+        bounds = bm.get("bounds", {"width": 10, "height": 10})
+        return self.find_nearest_key_at(loc, bounds, exclude=key)
+
+    def find_nearest_key_at(
+        self, loc: tuple[int, int], bounds: dict, exclude: str | None = None
+    ) -> str | None:
+        """Return the nearest key to the given rect, optionally excluding one key."""
+        cx = loc[0] + bounds["width"] // 2
+        cy = loc[1] + bounds["height"] // 2
+        best = None
+        best_dist = float("inf")
+        for k, other in self.bitmaps.items():
+            if k == exclude:
+                continue
+            oloc = self.get_location(other)
+            obounds = other.get("bounds", {"width": 10, "height": 10})
+            ocx = oloc[0] + obounds["width"] // 2
+            ocy = oloc[1] + obounds["height"] // 2
+            dist = (ocx - cx) ** 2 + (ocy - cy) ** 2
+            if dist < best_dist:
+                best_dist = dist
+                best = k
+        return best
+
     def resolve_collisions(self, changed_key: str) -> list[str]:
         """Move any bitmaps encroached by changed_key's new bounds/location.
         Returns list of keys that were moved."""

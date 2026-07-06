@@ -327,8 +327,8 @@ class ConfigKeyRenameScreen(PopupScreen):
             return
         self.app.bitmaps[new_key] = self.app.bitmaps.pop(old_key)
         self.app.history.migrate(old_key, new_key)
-        self.app.set_current_key(new_key)
         self.app.build_key_adjacency()
+        self.app.set_current_key(new_key)
         self.app.mark_dirty()
         self.app.show_status(f"Key '{old_key}' renamed to '{new_key}'.")
         self.app.pop_screen()
@@ -373,14 +373,17 @@ class ConfigKeyDeleteScreen(PopupScreen):
         if len(self.app.bitmaps) <= 1:
             self.show_status("Cannot delete the last key.")
             return
+        bm = self.app.bitmaps[key]
+        loc = self.app.get_location(bm)
+        bounds = bm.get("bounds", {"width": 10, "height": 10})
         del self.app.bitmaps[key]
         self.app.history.delete(key)
         self.app.build_key_adjacency()
         if self.app.bitmaps:
-            self.app.set_current_key(next(iter(self.app.bitmaps)))
+            nearest = self.app.find_nearest_key_at(loc, bounds)
+            self.app.set_current_key(nearest)
         self.app.mark_dirty()
         self.app.pop_screen()  # back to ConfigKeyManageScreen
-        self.app.pop_screen()  # back to ConfigScreen
         self.app.show_status(f"Key '{key}' deleted.")
 
 

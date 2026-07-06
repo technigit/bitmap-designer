@@ -10,7 +10,7 @@ from textual.containers import Vertical
 from textual.widgets import Static
 
 from .close_screen import CloseScreen
-from .config_screen import ConfigScreen
+from .config_screen import ConfigScreen, ConfigKeyDeleteScreen, ConfigKeyRenameScreen
 from .info_screen import InfoScreen, gather_info
 from .popup_screen import PopupScreen
 from .quit_screen import QuitScreen
@@ -46,7 +46,9 @@ CMD_HELP_TEXT = """\
 :set cursortimeout N  Auto-hide grid cursor after N seconds (0 = never)
 :info          Show project metadata
 :config        Open the configuration menu
-:config key NAME  Switch to key and open config\
+:config key NAME  Switch to key and open config
+:rename [NAME] Rename current bitmap key
+:delete        Delete current bitmap key (with confirmation)\
 """
 
 
@@ -397,8 +399,47 @@ def _cmd_config(screen, args, _force, app):
         return
     if hasattr(screen, "selected_key") and screen.selected_key != app.current_key:
         app.set_current_key(screen.selected_key)
+        app.show_status(f"Switched to key {screen.selected_key}")
     _clear_status(screen, ":" + screen.cmd_buffer)
     app.push_screen(ConfigScreen())
+
+
+def _cmd_rename(screen, args, _force, app):
+    if hasattr(screen, "selected_key") and screen.selected_key != app.current_key:
+        app.set_current_key(screen.selected_key)
+    if not args:
+        _clear_status(screen, ":" + screen.cmd_buffer)
+        app.push_screen(ConfigKeyRenameScreen())
+        return
+    new_key = " ".join(args).strip()
+    old_key = app.current_key
+    if not new_key or " " in new_key:
+        _clear_status(screen, "Key name cannot contain spaces")
+        return
+    if new_key == old_key:
+        _clear_status(screen, "Same name, no change")
+        return
+    if new_key in app.bitmaps:
+        _clear_status(screen, f"Key '{new_key}' already exists")
+        return
+    app.bitmaps[new_key] = app.bitmaps.pop(old_key)
+    app.history.migrate(old_key, new_key)
+    app.build_key_adjacency()
+    app.set_current_key(new_key)
+    if hasattr(screen, "switch_to_key"):
+        screen.switch_to_key(new_key)
+    elif hasattr(screen, "selected_key"):
+        screen.selected_key = new_key
+        screen.refresh_map()
+    app.mark_dirty()
+    _clear_status(screen, f"Key '{old_key}' renamed to '{new_key}'")
+
+
+def _cmd_delete(screen, _args, _force, app):
+    if hasattr(screen, "selected_key") and screen.selected_key != app.current_key:
+        app.set_current_key(screen.selected_key)
+    _clear_status(screen, ":" + screen.cmd_buffer)
+    app.push_screen(ConfigKeyDeleteScreen())
 
 
 _COMMAND_HANDLERS = {
@@ -414,6 +455,8 @@ _COMMAND_HANDLERS = {
     "info": _cmd_info,
     "set": _cmd_set,
     "config": _cmd_config,
+    "rename": _cmd_rename,
+    "delete": _cmd_delete,
 }
 
 

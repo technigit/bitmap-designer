@@ -83,6 +83,13 @@
                 - vertical tie-break (w/s): favor leftmost (smallest x)
                 - if no key in that direction, show a status message
             - [/] find key - switch to or create a bitmap key (opens ConfigKeyScreen) // Bitmap key UI
+            - [N]ew — create a new bitmap key
+                - Opens DirectionSelectScreen (8-direction popup); user picks a direction
+                - NewKeyScreen opens with name input pre-filled with suggested "keyN"
+                - [Enter] creates the key flush-against the source in that direction
+                  (h_gap=1, v_gap=1); scans outward if occupied; shifts all bitmaps if OOB
+            - [B] duplicate — copy the current bitmap key
+                - Same DirectionSelectScreen → NewKeyScreen flow, copies pixel data from source
             - [C]olor=N - select current color (N shows current color value) // Color UI
             - [space] - paint one bitmap pixel at the cursor position with the current color
             - [F]ill - flood fill (paint bucket style) with current color
@@ -133,16 +140,46 @@
                 - type key name, live substring matching shows results
                 - [Enter] confirms or creates, [Escape] cancels
                 - existing keys are zoomed to; newly created keys are placed at an empty location and selected without zooming
+            - [N]ew — create a new bitmap key adjacent to the selected key
+                - Same DirectionSelectScreen → NewKeyScreen flow as Design UI
+            - [B] duplicate — copy the selected bitmap key
+                - Same DirectionSelectScreen → NewKeyScreen flow, copies pixel data from source
             - [Escape] - return to Design UI
         - Bitmap labels are truncated at the fill area boundary (canvas margins and virtual bounds)
         - Hints bar shows current key, zoom percentage, and available commands
         - Pixel display within bitmap rectangles respects the color pixels mode (swatches vs numbers)
-    - Bitmap key UI (modal window) // select a unique dataspace for a bitmap with its own data
+    - Bitmap key / find key UI (modal window) — triggered by `/` from Design or Map mode
         - Prompt: Enter a key (short string, no spaces).
-            - [Enter] - save configuration
-            - [Escape] - cancel/revert
-        - Error handling message for invalid input:
-            - Response: Please enter a valid key (no spaces). [OK]
+        - [Enter] validates and switches to the key (creates it if new, placed at an empty location)
+        - [Escape] cancels
+        - Error handling: Response: "Please enter a valid key (no spaces)."
+    - DirectionSelectScreen (modal popup) — triggered by `n` (new) or `b` (duplicate) from Design or Map mode
+        - 8-direction grid: [Q] ↖  [W] ↑  [E] ↗  [A] ←  [D] →  [Z] ↙  [S] ↓  [X] ↘
+        - After picking a direction, pushes NewKeyScreen
+    - NewKeyScreen (modal popup) — name input for the new key
+        - Input pre-filled with the next available `"keyN"` name (skips existing keys)
+        - [Enter] creates the key and places it via find_nearby_location():
+            - Candidate placed flush-against the source key in the chosen direction (h_gap=1, v_gap=1)
+            - If occupied, scans outward at increasing distance (up to 20 steps)
+            - If out of bounds (negative x/y), all bitmaps are shifted to make room
+            - When `directional_search=True` (default): only the chosen direction is scanned
+            - When `directional_search=False`: all 8 directions tried at each distance (up to 10 steps)
+        - After placement: build_key_adjacency(), mark_dirty(), set_current_key(new_key), pop back
+        - [Escape] cancels
+        - Duplicate flow (`b` key): same DirectionSelectScreen → NewKeyScreen, copies pixel data from source key before placement
+    - Bitmap key management (ConfigKeyManageScreen) — reached from ConfigScreen via `m`
+        - Displays current key info (name, bounds, location, pixel size, efficiency)
+        - [R]ename — pushes ConfigKeyRenameScreen (Input pre-filled with current key name)
+            - [Enter] validates (not empty, no spaces, not existing), moves data under new key,
+              migrates undo/redo history, rebuilds adjacency, marks dirty, pops back
+            - [Escape] cancels
+        - [D]elete — pushes ConfigKeyDeleteScreen (confirmation: "Delete key 'X'? [Y]es [N]o")
+            - [Y] deletes: removes data, removes undo/redo history, rebuilds adjacency,
+              selects spatial nearest-neighbor as new current key (find_nearest_key_at),
+              marks dirty, pops back to ConfigKeyManageScreen
+            - Guards against deleting the last remaining key
+            - [N] / [Enter] / [Escape] cancels
+        - [Escape] / [Enter] returns to ConfigScreen
     - Color UI (modal window)
         - select color from list (see Colors section)
             - [0-9A-F] - color by # // 0 = transparent
@@ -636,6 +673,8 @@ Bitmap fields (unchanged):
   - `info` — show project metadata popup
   - `config` — open the configuration menu (in Map mode, targets the selected/highlighted key)
   - `config key NAME` — switch to key and open configuration
+  - `rename [NAME]` — rename current bitmap key (opens prompt if no name given; in Map mode targets the selected key)
+  - `delete` — delete current bitmap key (shows confirmation; in Map mode targets the selected key)
 - Vim-style messages: `"filename" written`, `No file name`, `Warning: File modified since reading (add ! to overwrite)`, `File exists (add ! to overwrite)`, `Unknown command: <cmd>`
 - Cancel with Escape
 - Tab completion: planned (see ROADMAP)
