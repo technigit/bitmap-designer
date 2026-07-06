@@ -15,6 +15,7 @@ from textual.containers import Vertical
 from .command_bar import handle_cmd_key
 from .popup_screen import PopupScreen
 from ..constants import create_default_bitmap
+from .direction_screen import DirectionSelectScreen, NewKeyScreen
 
 if TYPE_CHECKING:
     pass
@@ -137,6 +138,8 @@ class MapScreen(Screen):
         "0": ("_reset_zoom_view", ()),
         "r": ("_reset_pan_view", ()),
         "p": ("_toggle_pan_mode", ()),
+        "n": ("_new_key", ()),
+        "b": ("_dup_key", ()),
         "slash": ("_enter_find_mode", ()),
         "solidus": ("_enter_find_mode", ()),
     }
@@ -543,7 +546,8 @@ class MapScreen(Screen):
             hints.append("[wasd] select key  ", style="dim")
         else:
             hints.append("[wasd] select key  ")
-        hints.append("[Enter] switch key  ")
+        hints.append("[Enter] select key  ")
+        hints.append("[N]ew  [B] dup  ")
         hints.append("[/] find key  \n")
         zoom_in_style = None if self.zoom_scale < 20.0 else "dim"
         hints.append("[+=] zoom in  ", style=zoom_in_style)
@@ -599,6 +603,24 @@ class MapScreen(Screen):
 
     def _enter_find_mode(self) -> None:
         self.app.push_screen(FindKeyScreen(), self._on_find_key)
+
+    def _new_key(self) -> None:
+        self.app.push_screen(DirectionSelectScreen(), self._on_new_key_direction)
+
+    def _dup_key(self) -> None:
+        self.app.push_screen(DirectionSelectScreen(), self._on_dup_key_direction)
+
+    def _on_new_key_direction(self, direction: str | None) -> None:
+        if direction:
+            self.app.push_screen(
+                NewKeyScreen(direction, False, self.app.next_key_name(), self.selected_key)
+            )
+
+    def _on_dup_key_direction(self, direction: str | None) -> None:
+        if direction:
+            self.app.push_screen(
+                NewKeyScreen(direction, True, self.app.next_key_name(), self.selected_key)
+            )
 
     def _on_find_key(self, result: tuple[str, bool] | None) -> None:
         if result is not None:

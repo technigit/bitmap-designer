@@ -53,6 +53,7 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         self.pixel_size: int = DEFAULT_PIXEL_SIZE
         self.global_strategy: str = "balanced"
         self.auto_reorder: bool = True
+        self.directional_search: bool = True
         self.codegen_filter_mode: str = "all"
         self.codegen_filter_page: int = 0
         self.codegen_filter_keys: set[str] = set()
@@ -373,6 +374,83 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
                 x = 0
                 y += step
         return {"x": x, "y": y}
+
+    def next_key_name(self) -> str:
+        """Return the first unused 'keyN' name."""
+        n = len(self.bitmaps) + 1
+        while f"key{n}" in self.bitmaps:
+            n += 1
+        return f"key{n}"
+
+    def _rect_overlaps(self, x: int, y: int, w: int, h: int) -> bool:
+        """Check if a rectangle overlaps any existing bitmap."""
+        for bm in self.bitmaps.values():
+            loc = self.get_location(bm)
+            bounds = bm.get("bounds", {"width": 10, "height": 10})
+            if self.rects_overlap((x, y), {"width": w, "height": h}, loc, bounds):
+                return True
+        return False
+
+    def _shift_all_bitmaps(self, dx: int, dy: int) -> None:
+        """Shift every bitmap's location by (dx, dy)."""
+        if dx == 0 and dy == 0:
+            return
+        for bm in self.bitmaps.values():
+            loc = bm.setdefault("location", {})
+            loc["x"] = loc.get("x", 0) + dx
+            loc["y"] = loc.get("y", 0) + dy
+
+    def find_nearby_location(
+        self, source_key: str, direction: str, width: int = 10, height: int = 10
+    ) -> dict | None:
+        """Find a free in-bounds location near source_key.
+        When directional_search is True (default) tries only the chosen
+        direction at increasing distances.  When False, tries all 8
+        directions at each radial distance (nearest-distance strategy).
+        Shifts all bitmaps if the candidate would be out of bounds.
+        Returns {"x": ..., "y": ...} or None."""
+
+        def _candidate(d: str, dist: int):
+            kdata = self.bitmaps.get(source_key, {})
+            ksx, ksy = self.get_location(kdata)
+            kw = kdata.get("bounds", {}).get("width", 10)
+            kh = kdata.get("bounds", {}).get("height", 10)
+            h_gap = 1
+            v_gap = 1
+            dx, dy = ksx, ksy
+            if "right" in d:
+                dx = ksx + kw + h_gap + dist * (kw + h_gap)
+            elif "left" in d:
+                dx = ksx - width - h_gap - dist * (width + h_gap)
+            if "down" in d:
+                dy = ksy + kh + v_gap + dist * (kh + v_gap)
+            elif "up" in d:
+                dy = ksy - height - v_gap - dist * (height + v_gap)
+            if dx < 0 or dy < 0:
+                shift_x = -min(dx, 0)
+                shift_y = -min(dy, 0)
+                self._shift_all_bitmaps(shift_x, shift_y)
+                dx += shift_x
+                dy += shift_y
+            return dx, dy
+
+        if self.directional_search:
+            for dist in range(0, 20):
+                dcx, dcy = _candidate(direction, dist)
+                if not self._rect_overlaps(dcx, dcy, width, height):
+                    return {"x": dcx, "y": dcy}
+        else:
+            dirs = [
+                "left", "right", "up", "down",
+                "up-left", "up-right", "down-left", "down-right",
+            ]
+            ordered = [direction] + [d for d in dirs if d != direction]
+            for dist in range(0, 10):
+                for d in ordered:
+                    dcx, dcy = _candidate(d, dist)
+                    if not self._rect_overlaps(dcx, dcy, width, height):
+                        return {"x": dcx, "y": dcy}
+        return None
 
     def resolve_collisions(self, changed_key: str) -> list[str]:
         """Move any bitmaps encroached by changed_key's new bounds/location.

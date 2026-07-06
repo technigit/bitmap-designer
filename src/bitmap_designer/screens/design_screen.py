@@ -15,6 +15,7 @@ from ..text_utils import columnate
 
 from .command_bar import handle_cmd_key
 from .config_screen import ConfigKeyScreen
+from .direction_screen import DirectionSelectScreen, NewKeyScreen
 from .map_screen import MapScreen
 
 if TYPE_CHECKING:
@@ -431,8 +432,30 @@ class DesignScreen(Screen):
             svc.preview()
         elif k == "m":
             self.app.push_screen(MapScreen())
+        elif k == "n":
+            self.app.push_screen(
+                DirectionSelectScreen(),
+                self._on_new_key_direction,
+            )
+        elif k == "b":
+            self.app.push_screen(
+                DirectionSelectScreen(),
+                self._on_dup_key_direction,
+            )
 
         self.refresh_grid()
+
+    def _on_new_key_direction(self, direction: str | None) -> None:
+        if direction:
+            self.app.push_screen(
+                NewKeyScreen(direction, False, self.app.next_key_name(), self.app.current_key)
+            )
+
+    def _on_dup_key_direction(self, direction: str | None) -> None:
+        if direction:
+            self.app.push_screen(
+                NewKeyScreen(direction, True, self.app.next_key_name(), self.app.current_key)
+            )
 
     def _switch_key_dir(self, direction: str) -> None:
         dest = self.app.navigate_key(direction)
@@ -680,6 +703,7 @@ class DesignScreen(Screen):
             else:
                 hints.append("[wasd] switch key  ")
             hints.append("[/] find key\n")
+            hints.append("[N]ew  [B] dup  ")
             hints.append("[M]ap  ")
             hints.append("[P]review  ")
             hints.append(f"[Tab] {'show' if self.cursor_hidden else 'hide'} cursor  ")
