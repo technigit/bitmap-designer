@@ -102,8 +102,7 @@ class ConfigScreen(PopupScreen):
             f"[P]alette: {palette_name}",
             f"[G]lobal pixel size: {self.app.pixel_size}",
         ]
-        lines = "\n".join(sections)
-        self.query_one("#menu", Static).update(lines)
+        self.query_one("#menu", Static).update("\n".join(sections))
         self.query_one("#hints", Static).update("[Escape] back")
 
     def show_status(self, message: str) -> None:
@@ -115,35 +114,31 @@ class ConfigScreen(PopupScreen):
             self.app.refresh(repaint=True, layout=True)
             return
         key = event.key.lower()
-        if key == "k":
-            self.app.push_screen(ConfigKeyScreen())
-        elif key == "b":
-            self.app.push_screen(ConfigBoundsScreen())
-        elif key == "c":
-            self.app.push_screen(ConfigContextScreen())
-        elif key == "x":
-            self.app.push_screen(ConfigXScreen())
-        elif key == "y":
-            self.app.push_screen(ConfigYScreen())
-        elif key == "l":
-            self.app.push_screen(ConfigLocationScreen())
-        elif key == "s":
-            self.app.push_screen(ConfigPixelScreen())
-        elif key == "g":
-            self.app.push_screen(ConfigGlobalPixelScreen())
-        elif key == "e":
+        if key == "e":
             self.app.push_screen(
                 StrategySelectScreen(),
                 callback=lambda s: (
                     self.app.set_codegen_strategy(s), self._refresh_values()
                 ) if s else None,
             )
-        elif key == "m":
-            self.app.push_screen(ConfigKeyManageScreen())
-        elif key == "p":
-            self.app.push_screen(ConfigPaletteScreen())
-        elif key in ("escape", "enter", "\n"):
+            return
+        if key in ("escape", "enter", "\n"):
             self.app.pop_screen()
+            return
+        screen = {
+            "k": ConfigKeyScreen,
+            "b": ConfigBoundsScreen,
+            "c": ConfigContextScreen,
+            "x": ConfigXScreen,
+            "y": ConfigYScreen,
+            "l": ConfigLocationScreen,
+            "s": ConfigPixelScreen,
+            "g": ConfigGlobalPixelScreen,
+            "m": ConfigKeyManageScreen,
+            "p": ConfigPaletteScreen,
+        }.get(key)
+        if screen:
+            self.app.push_screen(screen())
 
 
 class ConfigKeyScreen(PopupScreen):

@@ -168,19 +168,18 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
     def _is_modified(self) -> bool:
         if self.history.any_nonempty():
             return True
-        if self._clean_snapshot is not None:
-            snap_bitmaps, snap_pid, snap_customs, snap_pixel_size, snap_global_strategy = self._clean_snapshot
-            if self.bitmaps != snap_bitmaps:
-                return True
-            if self.palette_id != snap_pid:
-                return True
-            if self.custom_palettes != snap_customs:
-                return True
-            if self.pixel_size != snap_pixel_size:
-                return True
-            if self.global_strategy != snap_global_strategy:
-                return True
-        return False
+        if self._clean_snapshot is None:
+            return False
+        snap_bitmaps, snap_pid, snap_customs, snap_pixel_size, snap_global_strategy = (
+            self._clean_snapshot
+        )
+        return any((
+            self.bitmaps != snap_bitmaps,
+            self.palette_id != snap_pid,
+            self.custom_palettes != snap_customs,
+            self.pixel_size != snap_pixel_size,
+            self.global_strategy != snap_global_strategy,
+        ))
 
     def mark_dirty(self, value: bool = True) -> None:
         if value is True:

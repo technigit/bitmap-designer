@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 from typing import TYPE_CHECKING
+
 import pyperclip
-
-MAX_KEYS_PER_PAGE = 9
-
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.widgets import Static, Button
@@ -13,6 +11,8 @@ from textual.containers import Vertical, VerticalScroll
 
 from ..services.codegen_service import CodegenService, STRATEGIES, FALLBACK_DEFAULT
 from .popup_screen import PopupScreen
+
+MAX_KEYS_PER_PAGE = 9
 
 
 if TYPE_CHECKING:
