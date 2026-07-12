@@ -38,7 +38,6 @@ CMD_HELP_TEXT = """\
 :noscroll Disable scroll mode (Design mode only)
 :pan     Enable pan mode (Map mode only)
 :nopan   Disable pan mode (Map mode only)
-:set step N       Set cursor/scroll step (1-9)
 :set key NAME     Switch to or create a bitmap key
 :set color C      Set current drawing color (0-9, A-F)
 :set colorpixels [on|off|mixed]  Set pixel display mode
@@ -275,24 +274,6 @@ def _cmd_info(screen, _args, _force, app):
     app.push_screen(InfoScreen(gather_info(app, screen), app, screen))
 
 
-def _set_step(screen, sub_args, app):
-    if not sub_args:
-        _clear_status(screen, "Usage: set step N")
-        return
-    try:
-        n = int(sub_args[0])
-        if 1 <= n <= 9:
-            app.step = n
-            if hasattr(screen, "step"):
-                screen.step = n
-            screen.update_hints()
-            _clear_status(screen, f"Step set to {n}")
-        else:
-            _clear_status(screen, "Step must be 1-9")
-    except ValueError:
-        _clear_status(screen, "Step must be a number (1-9)")
-
-
 def _set_color(screen, sub_args, app):
     if not sub_args:
         _clear_status(screen, "Usage: set color C")
@@ -364,12 +345,11 @@ def _set_cursortimeout(screen, sub_args, app):
 
 def _cmd_set(screen, args, _force, app):
     if not args:
-        _clear_status(screen, "Usage: set step N | set key NAME | set color C")
+        _clear_status(screen, "Usage: set key NAME | set color C | ...")
         return
     sub = args[0]
     sub_args = args[1:]
     dispatch = {
-        "step": _set_step,
         "key": _switch_or_create_key,
         "color": _set_color,
         "colorpixels": _set_colorpixels,

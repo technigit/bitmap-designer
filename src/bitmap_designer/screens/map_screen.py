@@ -12,7 +12,9 @@ from textual.screen import Screen
 from textual.widgets import Input, Static
 from textual.containers import Vertical
 
+from .bitmap_ops_screen import BitmapOpsScreen
 from .command_bar import handle_cmd_key
+from .config_screen import ConfigKeyDeleteScreen, ConfigKeyRenameScreen
 from .popup_screen import PopupScreen
 from ..constants import create_default_bitmap
 from .direction_screen import DirectionSelectScreen, NewKeyScreen
@@ -138,8 +140,6 @@ class MapScreen(Screen):
         "0": ("_reset_zoom_view", ()),
         "r": ("_reset_pan_view", ()),
         "p": ("_toggle_pan_mode", ()),
-        "n": ("_new_key", ()),
-        "b": ("_dup_key", ()),
         "slash": ("_enter_find_mode", ()),
         "solidus": ("_enter_find_mode", ()),
     }
@@ -152,7 +152,6 @@ class MapScreen(Screen):
         self.pan_flip = self.app.map_pan_flip
         self.selected_key = self.app.current_key
         self._last_fit: str | None = None
-        self.step = self.app.step
         self.cmd_mode = False
         self.cmd_buffer = ""
 
@@ -171,7 +170,6 @@ class MapScreen(Screen):
         self._store_map_state()
 
     def on_screen_resume(self, _event) -> None:
-        self.step = self.app.step
         self.selected_key = self.app.current_key
         self.query_one("#title", Static).update(
             self.app.title_with_file(self.base_title)
@@ -547,7 +545,7 @@ class MapScreen(Screen):
         else:
             hints.append("[wasd] select key  ")
         hints.append("[Enter] select key  ")
-        hints.append("[N]ew  [B] dup  ")
+        hints.append("[⇧O]ps  ")
         hints.append("[/] find key  \n")
         zoom_in_style = None if self.zoom_scale < 20.0 else "dim"
         hints.append("[+=] zoom in  ", style=zoom_in_style)
@@ -561,7 +559,7 @@ class MapScreen(Screen):
         hints.append("[F]it key selection\n")
         pan_label = "pan" if self.pan_flip else "scroll"
         hints.append(f"[hjkl/\u25b4\u25be\u25c2\u25b8] {pan_label}  ")
-        hints.append(f"[1-9] step={self.app.step}\n")
+        hints.append("[⇧HJKL] fast  ")
         reset_pan_style = None if self.pan_x != 2 or self.pan_y != 3 else "dim"
         hints.append(
             f"[R]eset {'pan' if self.pan_flip else 'scroll'}", style=reset_pan_style
@@ -603,6 +601,16 @@ class MapScreen(Screen):
 
     def _enter_find_mode(self) -> None:
         self.app.push_screen(FindKeyScreen(), self._on_find_key)
+
+    def _on_bitmap_ops_result(self, result: str | None) -> None:
+        if result == "n":
+            self._new_key()
+        elif result == "c":
+            self._dup_key()
+        elif result == "r":
+            self.app.push_screen(ConfigKeyRenameScreen())
+        elif result == "d":
+            self.app.push_screen(ConfigKeyDeleteScreen())
 
     def _new_key(self) -> None:
         self.app.push_screen(DirectionSelectScreen(), self._on_new_key_direction)
@@ -697,20 +705,16 @@ class MapScreen(Screen):
 
         key_low = key.lower()
 
-        if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
-            self.app.step = int(key)
-            self.show_status(f"Step set to {self.app.step}")
-            self.update_hints()
+        if key == "O":
+            self.app.push_screen(BitmapOpsScreen(), self._on_bitmap_ops_result)
             return
 
         if key_low in PAN_KEYS:
-            step = self.app.step
             parts = key.split("+")
             mods = set(parts[:-1])
             if parts[-1].isupper():
                 mods.add("shift")
-            if "shift" in mods:
-                step *= 5
+            step = 5 if "shift" in mods else 1
             dx, dy = PAN_KEYS[key_low]
             self._pan(dx * step, dy * step)
             return

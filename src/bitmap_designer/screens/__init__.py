@@ -2,6 +2,7 @@
 
 __all__ = [
     "AreYouSureScreen",
+    "BitmapOpsScreen",
     "CloseScreen",
     "CodegenScreen",
     "ColorScreen",
@@ -17,6 +18,7 @@ __all__ = [
     "DesignScreen",
     "FindKeyScreen",
     "HelpPopupScreen",
+    "HelpScreen",
     "InfoScreen",
     "MainScreen",
     "ManageScreen",
@@ -36,6 +38,7 @@ __all__ = [
 ]
 
 from .startup_screen import StartupScreen, OpenScreen
+from .bitmap_ops_screen import BitmapOpsScreen
 from .design_screen import DesignScreen, ColorScreen
 from .save_screen import SaveScreen, QuitSaveScreen, SaveScreenForClose
 from .manage_screen import ManageScreen, RenameScreen, DeleteScreen
@@ -60,4 +63,5 @@ from .codegen_screen import (
 )
 from .map_screen import MapScreen, FindKeyScreen
 from .command_bar import HelpPopupScreen
+from .help_screen import HelpScreen
 from .info_screen import InfoScreen

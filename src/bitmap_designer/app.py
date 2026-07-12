@@ -43,7 +43,6 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         self.map_zoom: float | None = None
         self.map_pan: tuple[int, int] = (0, 0)
         self.map_pan_flip: bool = False
-        self.step: int = 1
         self.cursor_timeout: int = 3  # seconds; 0 = disabled
         self.color_pixels: str = "on"
         self.glyphmode: bool = False
@@ -54,6 +53,7 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         self.global_strategy: str = "balanced"
         self.auto_reorder: bool = True
         self.directional_search: bool = True
+        self.key_level_mode: bool = True
         self.codegen_filter_mode: str = "all"
         self.codegen_filter_page: int = 0
         self.codegen_filter_keys: set[str] = set()
@@ -319,7 +319,6 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         self.history.clear_all()
         self.cursor_positions = {}
         self.scroll_offsets = {}
-        self.step = 1
         self.color_pixels = "on"
         self.glyphmode = False
         self.palette_id = None
@@ -343,7 +342,6 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
                 self.history.clear_all()
                 self.cursor_positions = {}
                 self.scroll_offsets = {}
-                self.step = 1
                 self.color_pixels = "on"
                 self.glyphmode = False
                 self._init_palette_from_data(data)
