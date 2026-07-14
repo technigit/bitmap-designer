@@ -785,7 +785,7 @@ class DesignScreen(Screen):
             self.refresh_grid()
             return
 
-        if key == "?":
+        if key == "?" or getattr(event, "character", None) == "?":
             self.app.push_screen(HelpScreen())
             return
 
