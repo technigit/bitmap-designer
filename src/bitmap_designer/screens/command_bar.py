@@ -11,6 +11,7 @@ from textual.widgets import Static
 
 from .close_screen import CloseScreen
 from .config_screen import ConfigScreen, ConfigKeyDeleteScreen, ConfigKeyRenameScreen
+from .help_screen import _build_pages
 from .info_screen import InfoScreen, gather_info
 from .popup_screen import PopupScreen
 from .quit_screen import QuitScreen
@@ -20,35 +21,41 @@ from ..constants import DEFAULT_BITMAP_DIR, create_default_bitmap
 if TYPE_CHECKING:
     pass
 
-CMD_HELP_TEXT = """\
-[bold]Command Bar[/bold]
+_CMD_HELP_DATA = [
+    ("[b]Command Bar[/]", [
+        ("[bold]:q[/]", "Quit (with confirmation if modified)"),
+        ("[bold]:q![/]", "Force quit (discard changes)"),
+        ("[bold]:w[/]", "Save current file"),
+        ("[bold]:w <name>[/]", "Save as a new file"),
+        ("[bold]:w![/]", "Force save (overwrite external changes)"),
+        ("[bold]:w! <name>[/]", "Force save and overwrite existing"),
+        ("[bold]:wq[/]", "Save and quit"),
+        ("[bold]:e[/]", "Exit to previous screen"),
+        ("[bold]:close[/]", "Close project (with confirmation if modified)"),
+        ("[bold]:close![/]", "Force close (discard changes)"),
+        ("[bold]:scroll[/]", "Enable scroll mode (Design mode only)"),
+        ("[bold]:noscroll[/]", "Disable scroll mode (Design mode only)"),
+        ("[bold]:pan[/]", "Enable pan mode (Map mode only)"),
+        ("[bold]:nopan[/]", "Disable pan mode (Map mode only)"),
+        ("[bold]:set key <name>[/]", "Switch to or create a bitmap key"),
+        ("[bold]:set color <color>[/]", "Set current drawing color (0-9, A-F)"),
+        ("[bold]:set colorpixels on[/]", "Display actual colors (default)"),
+        ("[bold]:set colorpixels off[/]", "Display hex characters"),
+        ("[bold]:set colorpixels mixed[/]", "Show glyphs with color"),
+        ("[bold]:set glyphmode on[/]", "Show glyphs instead of hex digits"),
+        ("[bold]:set glyphmode off[/]", "Show hex digits (default)"),
+        ("[bold]:set cursortimeout <n>[/]", "Auto-hide grid cursor after n seconds"),
+        ("[bold]:info[/]", "Show project metadata"),
+        ("[bold]:config[/]", "Open the configuration menu"),
+        ("[bold]:config key <name>[/]", "Switch to key and open config"),
+        ("[bold]:rename[/]", "Open rename prompt for current key"),
+        ("[bold]:rename <name>[/]", "Rename current key to <name>"),
+        ("[bold]:delete[/]", "Delete current bitmap key (with confirmation)"),
+        ("[bold]:help[/]", "Show this help"),
+    ]),
+]
 
-:q       Quit (with confirmation if modified)
-:q!      Force quit (discard changes)
-:w       Save current file
-:w <name> Save as a new file
-:w!      Force save (overwrite external changes)
-:w! <name> Force save and overwrite existing
-:wq      Save and quit
-:e       Exit to previous screen
-:close   Close project (with confirmation if modified)
-:close!  Force close (discard changes)
-:help    Show this help
-:scroll  Enable scroll mode (Design mode only)
-:noscroll Disable scroll mode (Design mode only)
-:pan     Enable pan mode (Map mode only)
-:nopan   Disable pan mode (Map mode only)
-:set key NAME     Switch to or create a bitmap key
-:set color C      Set current drawing color (0-9, A-F)
-:set colorpixels [on|off|mixed]  Set pixel display mode
-:set glyphmode [on|off]        Toggle palette glyph display
-:set cursortimeout N  Auto-hide grid cursor after N seconds (0 = never)
-:info          Show project metadata
-:config        Open the configuration menu
-:config key NAME  Switch to key and open config
-:rename [NAME] Rename current bitmap key
-:delete        Delete current bitmap key (with confirmation)\
-"""
+CMD_HELP_TEXT = _build_pages(_CMD_HELP_DATA)[0]
 
 
 class HelpPopupScreen(PopupScreen):

@@ -185,7 +185,11 @@ class DesignScreen(Screen):
                 return col
         return 0
 
-    def _cell_markup(self, x: int, y: int, *, rect_preview: bool = False, visual_selection: bool = False) -> str:
+    def _cell_markup(
+        self, x: int, y: int, *,
+        rect_preview: bool = False,
+        visual_selection: bool = False,
+    ) -> str:
         if rect_preview:
             char = self.app.current_color
         else:
@@ -1437,8 +1441,10 @@ class DesignScreen(Screen):
         t = action["type"]
         if t == "paint":
             saved_color = self.app.current_color
+            # pylint: disable=attribute-defined-outside-init  # false positive: self.app attr, not self attr
             self.app.current_color = action.get("color", saved_color)
             self._paint_pixel_no_save()
+            # pylint: disable=attribute-defined-outside-init  # false positive: self.app attr, not self attr
             self.app.current_color = saved_color
         elif t == "fill":
             target = self._get_pixel(self.cursor[0], self.cursor[1])

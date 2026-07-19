@@ -89,12 +89,14 @@ class HelpScreen(PopupScreen):
     """Popup listing all keybindings organized by paginated categories."""
 
     base_title = "Keybindings"
+    _shared_page: int = 0
     CSS = """
     #hints { margin-top: 1; }
     """
 
     def __init__(self) -> None:
         super().__init__()
+        self._page = HelpScreen._shared_page
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -103,7 +105,6 @@ class HelpScreen(PopupScreen):
             yield Static("", id="hints")
 
     def on_mount(self) -> None:
-        self._page = getattr(self.app, "_help_page", 0)
         self._update_display()
 
     def _update_display(self) -> None:
@@ -121,7 +122,7 @@ class HelpScreen(PopupScreen):
             f"{prev_open}\\[b] prev{prev_close} \u2014 Page {self._page + 1}/{total} \u2014 "
             f"{next_open}\\[space] next{next_close} \\[Escape] close"
         )
-        self.app._help_page = self._page
+        HelpScreen._shared_page = self._page
 
     def on_key(self, event) -> None:
         key = event.key
