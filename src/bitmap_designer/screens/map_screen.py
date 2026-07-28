@@ -560,6 +560,7 @@ class MapScreen(Screen):
 
     def update_hints(self) -> None:
         hints = Text()
+        unicode_arrows = "\u25b4\u25be\u25c2\u25b8"
         select_key_dim = None if (len(self.app.bitmaps) > 1) else "dim"
         zoom_on_off = "on" if self._zoom_mode else "off"
         action_on_off = "yank/put/delete" if self._action_mode else "off"
@@ -570,13 +571,16 @@ class MapScreen(Screen):
         pan_label = "pan" if self.pan_flip else "scroll"
         reset_dim = None if (self.pan_x != 2 or self.pan_y != 3) else "dim"
 
-        hints.append(f"[{'wasd/hjkl/arrows' if not self._zoom_mode else 'wasd'}] select key  ", style=select_key_dim)
+        if not self._zoom_mode:
+            hints.append(f"[wasd/hjkl/{unicode_arrows}] select key  ", style=select_key_dim)
+        else:
+            hints.append("[wasd] select key  ", style=select_key_dim)
         hints.append("[/] find key  ")
         hints.append("[Enter] open key  ")
         hints.append(f"Key={self.selected_key}\n")
 
         hints.append("[⇧F]it all  ", style=zero_style)
-        hints.append("[f]it key  ")
+        hints.append("[f]it selected key  ")
         hints.append("[+=] zoom  ", style=zoom_in_style)
         hints.append("[-_] zoom  ", style=zoom_out_style)
         hints.append("[0] reset zoom  ", style=reset_zoom_style)
@@ -584,7 +588,7 @@ class MapScreen(Screen):
 
         hints.append(f"[⇧HJKL] fast {pan_label}  ")
         if self._zoom_mode:
-            hints.append(f"[hjkl/arrows] slow {pan_label}  ")
+            hints.append(f"[hjkl/{unicode_arrows}] slow {pan_label}  ")
         hints.append(f"[r]eset {pan_label}\n", style=reset_dim)
 
         hints.append("[⇧O]ps  ")

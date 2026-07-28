@@ -171,7 +171,7 @@ class HelpScreen(PopupScreen):
         ch = getattr(event, "character", None)
         total = len(_ALL_PAGES[self._mode])
 
-        if key in ("escape", "q"):
+        if key == "escape":
             self.dismiss(None)
             return
 
