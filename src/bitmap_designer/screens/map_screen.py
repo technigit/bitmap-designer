@@ -13,6 +13,7 @@ from textual.widgets import Input, Static
 from textual.containers import Vertical
 
 from .bitmap_ops_screen import BitmapOpsScreen
+from .help_screen import HelpScreen
 from .command_bar import handle_cmd_key
 from .config_screen import ConfigKeyDeleteScreen, ConfigKeyRenameScreen
 from .popup_screen import PopupScreen
@@ -130,7 +131,21 @@ class MapScreen(Screen):
         "a": ("_navigate", ("left", "No bitmap key to the left")),
         "s": ("_navigate", ("down", "No bitmap key below")),
         "w": ("_navigate", ("up", "No bitmap key above")),
+        "h": ("_navigate", ("left", "No bitmap key to the left")),
+        "j": ("_navigate", ("down", "No bitmap key below")),
+        "k": ("_navigate", ("up", "No bitmap key above")),
+        "l": ("_navigate", ("right", "No bitmap key to the right")),
         "enter": ("_select_current_key", ()),
+        "^": ("_select_leftmost_in_row", ()),
+        "circumflex_accent": ("_select_leftmost_in_row", ()),
+        "$": ("_select_rightmost_in_row", ()),
+        "dollar_sign": ("_select_rightmost_in_row", ()),
+        "g": ("_handle_g_key", ()),
+        "G": ("_select_last_row", ()),
+        "left": ("_navigate", ("left", "No bitmap key to the left")),
+        "right": ("_navigate", ("right", "No bitmap key to the right")),
+        "up": ("_navigate", ("up", "No bitmap key above")),
+        "down": ("_navigate", ("down", "No bitmap key below")),
         "F": ("_zero_fit_content", ()),
         "f": ("_zoom_to_key_selected", ()),
         "plus": ("_zoom_change", (1.25,)),
@@ -139,9 +154,10 @@ class MapScreen(Screen):
         "underscore": ("_zoom_change", (0.8,)),
         "0": ("_reset_zoom_view", ()),
         "r": ("_reset_pan_view", ()),
-        "p": ("_toggle_pan_mode", ()),
+        "tilde": ("_toggle_pan_mode", ()),
         "slash": ("_enter_find_mode", ()),
         "solidus": ("_enter_find_mode", ()),
+
     }
 
     def __init__(self):
@@ -152,6 +168,10 @@ class MapScreen(Screen):
         self.pan_flip = self.app.map_pan_flip
         self.selected_key = self.app.current_key
         self._last_fit: str | None = None
+        self._zoom_mode = False
+        self._action_mode = False
+        self._g_pending = False
+        self._count_pending = 0
         self.cmd_mode = False
         self.cmd_buffer = ""
 
@@ -540,34 +560,38 @@ class MapScreen(Screen):
 
     def update_hints(self) -> None:
         hints = Text()
-        if len(self.app.bitmaps) <= 1:
-            hints.append("[wasd] select key  ", style="dim")
-        else:
-            hints.append("[wasd] select key  ")
-        hints.append("[Enter] select key  ")
-        hints.append("[⇧O]ps  ")
-        hints.append("[/] find key  \n")
-        zoom_in_style = None if self.zoom_scale < 20.0 else "dim"
-        hints.append("[+=] zoom in  ", style=zoom_in_style)
-        zoom_out_style = None if self.zoom_scale > 0.1 else "dim"
-        hints.append("[-_] zoom out  ", style=zoom_out_style)
-        reset_zoom_style = None if self.zoom_scale != 1.0 else "dim"
-        hints.append("[0] reset zoom  ", style=reset_zoom_style)
-        hints.append("\n")
+        select_key_dim = None if (len(self.app.bitmaps) > 1) else "dim"
+        zoom_on_off = "on" if self._zoom_mode else "off"
+        action_on_off = "yank/put/delete" if self._action_mode else "off"
         zero_style = None if self._last_fit != "zero" else "dim"
-        hints.append("[⇧F]it all  ", style=zero_style)
-        hints.append("[F]it key selection\n")
+        zoom_in_style = None if self.zoom_scale < 20.0 else "dim"
+        zoom_out_style = None if self.zoom_scale > 0.1 else "dim"
+        reset_zoom_style = None if self.zoom_scale != 1.0 else "dim"
         pan_label = "pan" if self.pan_flip else "scroll"
-        hints.append(f"[hjkl/\u25b4\u25be\u25c2\u25b8] {pan_label}  ")
-        hints.append("[⇧HJKL] fast  ")
-        reset_pan_style = None if self.pan_x != 2 or self.pan_y != 3 else "dim"
-        hints.append(
-            f"[R]eset {'pan' if self.pan_flip else 'scroll'}", style=reset_pan_style
-        )
-        hints.append("  ")
-        hints.append(f"[P]an {'on' if self.pan_flip else 'off'}\n")
-        hints.append(f"Key={self.selected_key}  ")
-        hints.append(f"Zoom={int(self.zoom_scale * 100)}%  ")
+        reset_dim = None if (self.pan_x != 2 or self.pan_y != 3) else "dim"
+
+        hints.append(f"[{'wasd/hjkl/arrows' if not self._zoom_mode else 'wasd'}] select key  ", style=select_key_dim)
+        hints.append("[/] find key  ")
+        hints.append("[Enter] open key  ")
+        hints.append(f"Key={self.selected_key}\n")
+
+        hints.append("[⇧F]it all  ", style=zero_style)
+        hints.append("[f]it key  ")
+        hints.append("[+=] zoom  ", style=zoom_in_style)
+        hints.append("[-_] zoom  ", style=zoom_out_style)
+        hints.append("[0] reset zoom  ", style=reset_zoom_style)
+        hints.append(f"Zoom={int(self.zoom_scale * 100)}%\n")
+
+        hints.append(f"[⇧HJKL] fast {pan_label}  ")
+        if self._zoom_mode:
+            hints.append(f"[hjkl/arrows] slow {pan_label}  ")
+        hints.append(f"[r]eset {pan_label}\n", style=reset_dim)
+
+        hints.append("[⇧O]ps  ")
+        hints.append(f"[`] zoom ({zoom_on_off})  ")
+        hints.append(f"[~] pan/scroll ({'pan' if self.pan_flip else 'scroll'})  ")
+        hints.append(f"[!] action ({action_on_off})  ")
+        hints.append("[?] help  ")
         hints.append("[Escape] back")
         self.query_one("#hints", Static).update(hints)
 
@@ -647,6 +671,103 @@ class MapScreen(Screen):
         else:
             self.show_status(fail_msg)
 
+    def _select_first_key(self) -> None:
+        keys = list(self.app.bitmaps.keys())
+        if not keys:
+            return
+        locs = {
+            k: self.app.bitmaps[k].get("location", {"x": 0, "y": 0})
+            for k in keys
+        }
+        first = min(keys, key=lambda k: (locs[k].get("y", 0), locs[k].get("x", 0)))
+        self.selected_key = first
+        self.refresh_map()
+
+    def _select_last_row(self) -> None:
+        keys = list(self.app.bitmaps.keys())
+        if not keys:
+            return
+        locs = {k: self.app.bitmaps[k].get("location", {"x": 0, "y": 0}) for k in keys}
+        rows = sorted(set(loc.get("y", 0) for loc in locs.values()))
+        if not rows:
+            return
+        target_y = rows[-1]
+        candidates = [k for k in keys if locs[k].get("y", 0) == target_y]
+        best = min(candidates, key=lambda k: locs[k].get("x", 0))
+        self.selected_key = best
+        self.refresh_map()
+
+    def _select_leftmost_in_row(self) -> None:
+        my_loc = self.app.bitmaps.get(self.selected_key, {}).get("location", {"y": 0})
+        row_y = my_loc.get("y", 0)
+        locs = {k: v.get("location", {}) for k, v in self.app.bitmaps.items()}
+        best = None
+        for key, kloc in locs.items():
+            if kloc.get("y", 0) == row_y:
+                if best is None or kloc.get("x", 0) < locs[best].get("x", 0):
+                    best = key
+        if best:
+            self.selected_key = best
+            self.refresh_map()
+
+    def _select_rightmost_in_row(self) -> None:
+        loc = self.app.bitmaps.get(self.selected_key, {}).get("location", {"y": 0})
+        row_y = loc.get("y", 0)
+        locs = {k: v.get("location", {}) for k, v in self.app.bitmaps.items()}
+        best = None
+        for key, kloc in locs.items():
+            if kloc.get("y", 0) == row_y:
+                if best is None or kloc.get("x", 0) > locs[best].get("x", 0):
+                    best = key
+        if best:
+            self.selected_key = best
+            self.refresh_map()
+
+    def _handle_g_key(self) -> None:
+        self._g_pending = True
+        self.show_status("g")
+
+    def _select_viewport_leftmost(self) -> None:
+        cw, ch = self.compute_canvas_size()
+        ctx = DeviceContext(cw, ch, self.zoom_scale, self.aspect_y, self.pan_x, self.pan_y)
+        positions = self._compute_positions(ctx)
+        visible = []
+        for key, pos in positions.items():
+            px = pos["pixel_left"]
+            pt = pos["pixel_top"]
+            if pt < ch and pt + pos["pixel_h"] >= 0:
+                visible.append((key, px))
+        if visible:
+            self.selected_key = min(visible, key=lambda x: x[1])[0]
+            self.refresh_map()
+
+    def _select_viewport_rightmost(self) -> None:
+        cw, ch = self.compute_canvas_size()
+        ctx = DeviceContext(cw, ch, self.zoom_scale, self.aspect_y, self.pan_x, self.pan_y)
+        positions = self._compute_positions(ctx)
+        visible = []
+        for key, pos in positions.items():
+            pt = pos["pixel_top"]
+            if pt < ch and pt + pos["pixel_h"] >= 0:
+                visible.append((key, pos["pixel_left"] + pos["pixel_w"]))
+        if visible:
+            self.selected_key = max(visible, key=lambda x: x[1])[0]
+            self.refresh_map()
+
+    def _select_nth_row(self, n: int) -> None:
+        keys = list(self.app.bitmaps.keys())
+        if not keys:
+            return
+        locs = {k: self.app.bitmaps[k].get("location", {"x": 0, "y": 0}) for k in keys}
+        rows = sorted(set(loc.get("y", 0) for loc in locs.values()))
+        n = max(n, 1)
+        n = min(n, len(rows))
+        target_y = rows[n - 1]
+        candidates = [k for k in keys if locs[k].get("y", 0) == target_y]
+        best = min(candidates, key=lambda k: locs[k].get("x", 0))
+        self.selected_key = best
+        self.refresh_map()
+
     def _select_current_key(self) -> None:
         self.app.set_current_key(self.selected_key)
         self.app.pop_screen()
@@ -682,6 +803,62 @@ class MapScreen(Screen):
     def _toggle_pan_mode(self) -> None:
         self.pan_flip = not self.pan_flip
         self.update_hints()
+        self.show_status("Pan mode on" if self.pan_flip else "Pan mode off")
+
+    def _handle_action_key(self, key: str) -> bool:
+        if not self._action_mode:
+            return False
+        self._count_pending = 0
+        self._g_pending = False
+        if key in ("y", "Y"):
+            self.show_status("Yank not implemented yet")
+            return True
+        if key in ("p", "P"):
+            self.show_status("Put not implemented yet")
+            return True
+        if key in ("d", "x"):
+            self.show_status("Delete not implemented yet")
+            return True
+        return False
+
+    def _handle_g_pending(self, key: str, key_low: str) -> bool:
+        if not self._g_pending:
+            return False
+        self._g_pending = False
+        if key == "g":
+            self._select_first_key()
+            return True
+        if key_low in ("^", "6", "circumflex_accent"):
+            self._select_viewport_leftmost()
+            return True
+        if key_low in ("$", "4", "dollar_sign"):
+            self._select_viewport_rightmost()
+            return True
+        self.show_status("")
+        return True
+
+    def _handle_count_prefix(self, key: str) -> bool:
+        if self._count_pending <= 0:
+            return False
+        count = self._count_pending
+        self._count_pending = 0
+        if key == "G":
+            self._select_nth_row(count)
+            return True
+        return False
+
+    def _handle_pan(self, key: str, key_low: str) -> bool:
+        if key_low.startswith("shift+"):
+            key_low = key_low[len("shift+"):]
+        if key_low not in PAN_KEYS:
+            return False
+        has_shift = key.startswith("shift+") or key.isupper()
+        if not self._zoom_mode and not has_shift:
+            return False
+        step = 5 if has_shift else 1
+        dx, dy = PAN_KEYS[key_low]
+        self._pan(dx * step, dy * step)
+        return True
 
     def _handle_map_key(self, key: str, key_low: str) -> None:
         action = self._ACTIONS.get(key) or self._ACTIONS.get(key_low)
@@ -709,14 +886,36 @@ class MapScreen(Screen):
             self.app.push_screen(BitmapOpsScreen(), self._on_bitmap_ops_result)
             return
 
-        if key_low in PAN_KEYS:
-            parts = key.split("+")
-            mods = set(parts[:-1])
-            if parts[-1].isupper():
-                mods.add("shift")
-            step = 5 if "shift" in mods else 1
-            dx, dy = PAN_KEYS[key_low]
-            self._pan(dx * step, dy * step)
+        if key in ("`", "grave_accent"):
+            self._zoom_mode = not self._zoom_mode
+            self.refresh_map()
+            self.update_hints()
+            self.show_status("Zoom mode on" if self._zoom_mode else "Zoom mode off")
+            return
+
+        if key == "!" or getattr(event, "character", None) == "!":
+            self._action_mode = not self._action_mode
+            self.refresh_map()
+            self.update_hints()
+            self.show_status("Action mode on" if self._action_mode else "Action mode off")
+            return
+
+        if key == "?" or getattr(event, "character", None) == "?":
+            self.app.push_screen(HelpScreen(mode="map"))
+            return
+
+        if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
+            self._count_pending = self._count_pending * 10 + int(key)
+            self.show_status(str(self._count_pending))
+            return
+
+        if self._handle_action_key(key):
+            return
+        if self._handle_g_pending(key, key_low):
+            return
+        if self._handle_count_prefix(key):
+            return
+        if self._handle_pan(key, key_low):
             return
 
         self._handle_map_key(key, key_low)

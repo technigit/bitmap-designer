@@ -25,10 +25,10 @@ class BitmapOpsScreen(PopupScreen):
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
             yield Static(
-                "  [N] New key\n"
-                "  [C] Copy (duplicate) current key\n"
-                "  [R] Rename current key\n"
-                "  [D] Delete current key\n",
+                "  [N]ew key\n"
+                "  [C]opy (duplicate) current key\n"
+                "  [R]ename current key\n"
+                "  [D]elete current key\n",
                 markup=False,
             )
             yield Static("[Escape] cancel", id="hints", markup=False)

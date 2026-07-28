@@ -790,7 +790,7 @@ class DesignScreen(Screen):
             return
 
         if key == "?" or getattr(event, "character", None) == "?":
-            self.app.push_screen(HelpScreen())
+            self.app.push_screen(HelpScreen(mode="design"))
             return
 
         self._on_key_action(key, event)
