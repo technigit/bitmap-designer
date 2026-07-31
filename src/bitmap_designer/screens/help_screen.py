@@ -105,8 +105,9 @@ _MAP_HELP_DATA = [
     ]),
     ("[b]Action[/]", [
         ("[bold]![/]", "Toggle action mode"),
-        ("[bold]y[/] / [bold]Y[/]", "Yank / put yanked key"),
-        ("[bold]p[/] / [bold]P[/]", "Put after / put before cursor"),
+        ("[bold]y[/]", "Yank key"),
+        ("[bold]Y[/]", "Yank row (not yet)"),
+        ("[bold]p[/] / [bold]P[/]", "Put after/before cursor"),
         ("[bold]d[/] / [bold]x[/]", "Delete selected key"),
     ]),
     ("[b]Find & Ops[/]", [
@@ -135,10 +136,15 @@ class HelpScreen(PopupScreen):
     #hints { margin-top: 1; }
     """
 
-    def __init__(self, mode: str = "design") -> None:
+    def __init__(self, mode: str = "design", page: int | None = None) -> None:
         super().__init__()
         self._mode = mode
-        self._page = HelpScreen._shared_page
+        if page is not None:
+            self._page = page
+            self._freeze_shared = True
+        else:
+            self._page = HelpScreen._shared_page
+            self._freeze_shared = False
 
     def compose(self) -> ComposeResult:
         with Vertical():
@@ -164,7 +170,8 @@ class HelpScreen(PopupScreen):
             f"{prev_open}\\[b] prev{prev_close} \u2014 Page {self._page + 1}/{total} \u2014 "
             f"{next_open}\\[space] next{next_close} \\[Escape] close"
         )
-        HelpScreen._shared_page = self._page
+        if not self._freeze_shared:
+            HelpScreen._shared_page = self._page
 
     def on_key(self, event) -> None:
         key = event.key
@@ -178,12 +185,14 @@ class HelpScreen(PopupScreen):
         if key in ("space", "j", "down", "ctrl+d"):
             if self._page < total - 1:
                 self._page += 1
+                self._freeze_shared = False
                 self._update_display()
             return
 
-        if key in ("b", "k", "up", "ctrl+u") or ch == "b":
+        if key in ("b", "k", "up", "ctrl+u"):
             if self._page > 0:
                 self._page -= 1
+                self._freeze_shared = False
                 self._update_display()
             return
 

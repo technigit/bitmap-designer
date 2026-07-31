@@ -281,15 +281,16 @@ class ConfigKeyRenameScreen(PopupScreen):
 
     """
 
-    def __init__(self):
+    def __init__(self, key: str | None = None):
         super().__init__()
+        self._key = key
         self.input = None
 
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
             self.input = Input(
-                value=self.app.current_key, placeholder="New key", id="key"
+                value=self._key or self.app.current_key, placeholder="New key", id="key"
             )
             yield self.input
             yield Static("[Enter] rename  [Escape] cancel", id="hints", markup=False)
@@ -310,7 +311,7 @@ class ConfigKeyRenameScreen(PopupScreen):
 
     def rename_key(self):
         new_key = (self.input.value or "").strip()
-        old_key = self.app.current_key
+        old_key = self._key or self.app.current_key
         if not new_key or " " in new_key:
             self.show_status("Please enter a valid key (no spaces).")
             return
@@ -338,11 +339,15 @@ class ConfigKeyDeleteScreen(PopupScreen):
 
     """
 
+    def __init__(self, key: str | None = None):
+        super().__init__()
+        self._key = key
+
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
             yield Static(
-                f"Delete key '{self.app.current_key}' and all its data?", id="prompt"
+                f"Delete key '{self._key or self.app.current_key}' and all its data?", id="prompt"
             )
             yield Static("[Y]es  [N]o  " + HINT_ESCAPE, id="hints", markup=False)
             yield Static("", id="status")
@@ -361,7 +366,7 @@ class ConfigKeyDeleteScreen(PopupScreen):
             self.app.pop_screen()
 
     def delete_key(self):
-        key = self.app.current_key
+        key = self._key or self.app.current_key
         if key not in self.app.bitmaps:
             self.show_status("Key not found.")
             return

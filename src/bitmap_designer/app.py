@@ -412,8 +412,8 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
             ksx, ksy = self.get_location(kdata)
             kw = kdata.get("bounds", {}).get("width", 10)
             kh = kdata.get("bounds", {}).get("height", 10)
-            h_gap = 1
-            v_gap = 1
+            h_gap = 2
+            v_gap = 2
             dx, dy = ksx, ksy
             if "right" in d:
                 dx = ksx + kw + h_gap + dist * (kw + h_gap)

@@ -1,6 +1,7 @@
 """Spatial overview screen showing all bitmap keys on a virtual canvas."""
 
 from __future__ import annotations
+import copy
 import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -174,6 +175,10 @@ class MapScreen(Screen):
         self._count_pending = 0
         self.cmd_mode = False
         self.cmd_buffer = ""
+        self._yank_buffer_name: str | None = None
+        self._yank_buffer_data: dict | None = None
+        self._saved_location: tuple[int, int] | None = None
+        self._saved_bounds: dict | None = None
 
     def compose(self) -> ComposeResult:
         yield Static(self.app.title_with_file(self.base_title), id="title")
@@ -190,7 +195,16 @@ class MapScreen(Screen):
         self._store_map_state()
 
     def on_screen_resume(self, _event) -> None:
-        self.selected_key = self.app.current_key
+        if self.selected_key not in self.app.bitmaps:
+            if self._saved_location and self._saved_bounds and self.app.bitmaps:
+                nearest = self.app.find_nearest_key_at(self._saved_location, self._saved_bounds)
+                self.selected_key = nearest or next(iter(self.app.bitmaps))
+            elif self.app.bitmaps:
+                self.selected_key = next(iter(self.app.bitmaps))
+            else:
+                self.selected_key = None
+            self._saved_location = None
+            self._saved_bounds = None
         self.query_one("#title", Static).update(
             self.app.title_with_file(self.base_title)
         )
@@ -563,7 +577,7 @@ class MapScreen(Screen):
         unicode_arrows = "\u25b4\u25be\u25c2\u25b8"
         select_key_dim = None if (len(self.app.bitmaps) > 1) else "dim"
         zoom_on_off = "on" if self._zoom_mode else "off"
-        action_on_off = "yank/put/delete" if self._action_mode else "off"
+        action_on_off = "on" if self._action_mode else "off"
         zero_style = None if self._last_fit != "zero" else "dim"
         zoom_in_style = None if self.zoom_scale < 20.0 else "dim"
         zoom_out_style = None if self.zoom_scale > 0.1 else "dim"
@@ -593,7 +607,10 @@ class MapScreen(Screen):
 
         hints.append("[⇧O]ps  ")
         hints.append(f"[`] zoom ({zoom_on_off})  ")
-        hints.append(f"[~] pan/scroll ({'pan' if self.pan_flip else 'scroll'})  ")
+        if self.pan_flip:
+            hints.append("[~] *pan*/scroll  ")
+        else:
+            hints.append("[~] pan/*scroll*  ")
         hints.append(f"[!] action ({action_on_off})  ")
         hints.append("[?] help  ")
         hints.append("[Escape] back")
@@ -636,9 +653,20 @@ class MapScreen(Screen):
         elif result == "c":
             self._dup_key()
         elif result == "r":
-            self.app.push_screen(ConfigKeyRenameScreen())
+            self._save_key_state()
+            self.app.push_screen(ConfigKeyRenameScreen(key=self.selected_key))
         elif result == "d":
-            self.app.push_screen(ConfigKeyDeleteScreen())
+            self._save_key_state()
+            self.app.push_screen(ConfigKeyDeleteScreen(key=self.selected_key))
+
+    def _save_key_state(self) -> None:
+        if self.selected_key in self.app.bitmaps:
+            bm = self.app.bitmaps[self.selected_key]
+            self._saved_location = self.app.get_location(bm)
+            self._saved_bounds = bm.get("bounds", {"width": 10, "height": 10})
+        else:
+            self._saved_location = None
+            self._saved_bounds = None
 
     def _new_key(self) -> None:
         self.app.push_screen(DirectionSelectScreen(), self._on_new_key_direction)
@@ -809,19 +837,80 @@ class MapScreen(Screen):
         self.update_hints()
         self.show_status("Pan mode on" if self.pan_flip else "Pan mode off")
 
+    def _yank_selected_key(self) -> None:
+        if self.selected_key not in self.app.bitmaps:
+            self.show_status("No key to yank")
+            return
+        self._yank_buffer_name = self.selected_key
+        self._yank_buffer_data = copy.deepcopy(self.app.bitmaps[self.selected_key])
+        self.show_status(f"Yanked '{self.selected_key}'")
+
+    def _put_yanked_key(self, after: bool = True) -> None:
+        if self._yank_buffer_data is None:
+            self.show_status("No yanked key to put")
+            return
+        direction = "right" if after else "left"
+        w = self._yank_buffer_data.get("bounds", {}).get("width", 10)
+        h = self._yank_buffer_data.get("bounds", {}).get("height", 10)
+        loc = self.app.find_nearby_location(self.selected_key, direction, w, h)
+        if loc is None:
+            self.show_status("No space in that direction")
+            return
+        n = 1
+        base = self._yank_buffer_name or "key"
+        while f"{base}_{n}" in self.app.bitmaps:
+            n += 1
+        new_name = f"{base}_{n}"
+        bm = copy.deepcopy(self._yank_buffer_data)
+        bm["location"] = loc
+        self.app.bitmaps[new_name] = bm
+        self.app.build_key_adjacency()
+        self.app.mark_dirty()
+        self.selected_key = new_name
+        self.refresh_map()
+        self.update_hints()
+        self.show_status(f"Put '{new_name}'")
+
+    def _delete_selected_key(self) -> None:
+        if self.selected_key not in self.app.bitmaps:
+            return
+        key = self.selected_key
+        next_key = self.app.navigate_key("right", key)
+        if next_key is None or next_key == key:
+            next_key = self.app.navigate_key("left", key)
+        if next_key is None or next_key == key:
+            next_key = self.app.navigate_key("down", key)
+        if next_key is None or next_key == key:
+            next_key = self.app.navigate_key("up", key)
+        if next_key == key:
+            next_key = None
+        del self.app.bitmaps[key]
+        self.selected_key = next_key
+        self.app.build_key_adjacency()
+        self.app.mark_dirty()
+        self.refresh_map()
+        self.update_hints()
+        self.show_status(f"Deleted '{key}'")
+
     def _handle_action_key(self, key: str) -> bool:
         if not self._action_mode:
             return False
         self._count_pending = 0
         self._g_pending = False
-        if key in ("y", "Y"):
-            self.show_status("Yank not implemented yet")
+        if key == "y":
+            self._yank_selected_key()
             return True
-        if key in ("p", "P"):
-            self.show_status("Put not implemented yet")
+        if key == "Y":
+            self.show_status("Yank row not implemented yet")
+            return True
+        if key == "p":
+            self._put_yanked_key(after=True)
+            return True
+        if key == "P":
+            self._put_yanked_key(after=False)
             return True
         if key in ("d", "x"):
-            self.show_status("Delete not implemented yet")
+            self._delete_selected_key()
             return True
         return False
 
@@ -901,11 +990,15 @@ class MapScreen(Screen):
             self._action_mode = not self._action_mode
             self.refresh_map()
             self.update_hints()
-            self.show_status("Action mode on" if self._action_mode else "Action mode off")
+            if self._action_mode:
+                self.show_status("Action mode on! - ? for help")
+            else:
+                self.show_status("Action mode off")
             return
 
         if key == "?" or getattr(event, "character", None) == "?":
-            self.app.push_screen(HelpScreen(mode="map"))
+            help_page = 3 if self._action_mode else None
+            self.app.push_screen(HelpScreen(mode="map", page=help_page))
             return
 
         if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
