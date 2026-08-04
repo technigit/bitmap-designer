@@ -1,7 +1,5 @@
 """Bitmap design and color selection screens."""
 
-# pylint: disable=too-many-lines
-
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
@@ -1441,11 +1439,9 @@ class DesignScreen(Screen):
         t = action["type"]
         if t == "paint":
             saved_color = self.app.current_color
-            # pylint: disable=attribute-defined-outside-init  # false positive: self.app attr, not self attr
-            self.app.current_color = action.get("color", saved_color)
+            self.app.set_current_color(action.get("color", saved_color))
             self._paint_pixel_no_save()
-            # pylint: disable=attribute-defined-outside-init  # false positive: self.app attr, not self attr
-            self.app.current_color = saved_color
+            self.app.set_current_color(saved_color)
         elif t == "fill":
             target = self._get_pixel(self.cursor[0], self.cursor[1])
             fill_color = action.get("color", self.app.current_color)

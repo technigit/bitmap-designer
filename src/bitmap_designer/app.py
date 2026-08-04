@@ -43,6 +43,8 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         self.map_zoom: float | None = None
         self.map_pan: tuple[int, int] = (0, 0)
         self.map_pan_flip: bool = False
+        self.action_mode: bool = False
+        self.yank_buffer: dict | None = None
         self.cursor_timeout: int = 3  # seconds; 0 = disabled
         self.color_pixels: str = "on"
         self.glyphmode: bool = False
@@ -268,6 +270,7 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
                     self.current_key = next(iter(self.bitmaps.keys()))
                 self.dirty = False
                 self.history.clear_all()
+                self.yank_buffer = None
                 self.cursor_positions = {}
                 self.scroll_offsets = {}
                 self._init_palette_from_data(data)
@@ -317,6 +320,7 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         self._take_clean_snapshot()
         self.current_color = "1"
         self.history.clear_all()
+        self.yank_buffer = None
         self.cursor_positions = {}
         self.scroll_offsets = {}
         self.color_pixels = "on"
@@ -340,6 +344,7 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
                     self.current_key = next(iter(self.bitmaps.keys()))
                 self.dirty = False
                 self.history.clear_all()
+                self.yank_buffer = None
                 self.cursor_positions = {}
                 self.scroll_offsets = {}
                 self.color_pixels = "on"
@@ -397,21 +402,49 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
             loc["x"] = loc.get("x", 0) + dx
             loc["y"] = loc.get("y", 0) + dy
 
+    def shift_all_bitmaps(self, dx: int, dy: int) -> None:
+        """Public wrapper around _shift_all_bitmaps."""
+        self._shift_all_bitmaps(dx, dy)
+
+    def rect_overlaps_any(self, x: int, y: int, w: int, h: int) -> bool:
+        """Public wrapper around _rect_overlaps."""
+        return self._rect_overlaps(x, y, w, h)
+
     def find_nearby_location(
         self, source_key: str, direction: str, width: int = 10, height: int = 10
     ) -> dict | None:
-        """Find a free in-bounds location near source_key.
+        """Find a free in-bounds location near source_key."""
+        kdata = self.bitmaps.get(source_key, {})
+        loc = self.get_location(kdata)
+        kw = kdata.get("bounds", {}).get("width", 10)
+        kh = kdata.get("bounds", {}).get("height", 10)
+        return self.find_location_near_rect(
+            loc,
+            (kw, kh),
+            direction=direction,
+            target_size=(width, height),
+        )
+
+    def find_location_near_rect(
+        self,
+        source_loc: tuple[int, int],
+        source_size: tuple[int, int],
+        *,
+        direction: str,
+        target_size: tuple[int, int] = (10, 10),
+    ) -> dict | None:
+        """Find a free in-bounds location near an arbitrary source rect.
         When directional_search is True (default) tries only the chosen
         direction at increasing distances.  When False, tries all 8
         directions at each radial distance (nearest-distance strategy).
         Shifts all bitmaps if the candidate would be out of bounds.
         Returns {"x": ..., "y": ...} or None."""
+        source_w, source_h = source_size
+        width, height = target_size
 
         def _candidate(d: str, dist: int):
-            kdata = self.bitmaps.get(source_key, {})
-            ksx, ksy = self.get_location(kdata)
-            kw = kdata.get("bounds", {}).get("width", 10)
-            kh = kdata.get("bounds", {}).get("height", 10)
+            ksx, ksy = source_loc
+            kw, kh = source_w, source_h
             h_gap = 2
             v_gap = 2
             dx, dy = ksx, ksy

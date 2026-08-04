@@ -118,7 +118,28 @@ class CodegenService:
         return "\n".join(lines)
 
     @staticmethod
-    def _bitmap_to_js(  # pylint: disable=too-many-locals
+    def _emit_rectangles(
+        lines: list[str],
+        rectangles: dict,
+        palette: dict[str, dict],
+        *,
+        x_var: str,
+        y_var: str,
+        pixel_size: int,
+    ) -> None:
+        for color, rects in rectangles.items():
+            entry = palette.get(color.lower(), {})
+            color_value = entry.get("hex", color)
+            lines.append(f"ctx.fillStyle = '{color_value}';")
+            for rx, ry, rw, rh in rects:
+                lines.append(
+                    f"ctx.fillRect({x_var} + {rx} * {pixel_size}, "
+                    f"{y_var} + {ry} * {pixel_size}, "
+                    f"{rw} * {pixel_size}, {rh} * {pixel_size});"
+                )
+
+    @staticmethod
+    def _bitmap_to_js(
         idx: str,
         bm: dict,
         palette: dict[str, dict],
@@ -141,16 +162,9 @@ class CodegenService:
 
         strategy = bm.get("codegenStrategy", FALLBACK_DEFAULT)
         rectangles = CodegenService._extract_rectangles(pixels, width, height, strategy)
-        for color, rects in rectangles.items():
-            entry = palette.get(color.lower(), {})
-            color_value = entry.get("hex", color)
-            lines.append(f"ctx.fillStyle = '{color_value}';")
-            for rx, ry, rw, rh in rects:
-                lines.append(
-                    f"ctx.fillRect({x_var} + {rx} * {pixel_size}, "
-                    f"{y_var} + {ry} * {pixel_size}, "
-                    f"{rw} * {pixel_size}, {rh} * {pixel_size});"
-                )
+        CodegenService._emit_rectangles(
+            lines, rectangles, palette, x_var=x_var, y_var=y_var, pixel_size=pixel_size
+        )
         return lines
 
     @staticmethod

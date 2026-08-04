@@ -81,22 +81,34 @@ _DESIGN_HELP_DATA = [
     ]),
 ]
 
+_MAP_ZOOM_OFF = ("[b]Zoom[/]", [
+    ("[bold]`[/]", "Toggle zoom mode"),
+    ("[bold]+=[/] / [bold]-_[/]", "Zoom in / out"),
+    ("[bold]f[/] / [bold]F[/]", "Fit key / Fit all to view"),
+])
+_MAP_ZOOM_ON = ("[b]Zoom[/]", [
+    ("[bold]`[/]", "Toggle zoom mode"),
+    ("[bold]+=[/] / [bold]-_[/]", "Zoom in / out"),
+    ("[bold]f[/] / [bold]F[/]", "Fit key / Fit all to view"),
+    ("[bold]0[/]", "Reset zoom"),
+])
+
+MAP_PAGE_ZOOM = 1
+MAP_PAGE_ACTION = 3
+MAP_PAGE_GHOST = 4
+
 _MAP_HELP_DATA = [
     ("[b]Navigation[/]", [
-        ("[bold]wasd[/] / [bold]hjkl[/] / arrows", "Select adjacent bitmap"),
-        ("[bold]^[/] / [bold]$[/]", "Leftmost / rightmost in row"),
+        ("[bold]wasd[/] / [bold]hjkl[/] / arrows / [bold]space[/]", "Select adjacent bitmap"),
+        ("[bold]^[/] / [bold]0[/] / [bold]$[/]", "Leftmost / rightmost in row"),
         ("[bold]gg[/] / [bold]G[/]", "First / last row"),
         ("[bold]nG[/]", "Row n, first bitmap"),
         ("[bold]g^[/] / [bold]g$[/]", "Viewport left / right visible key"),
-        ("[bold]1-9[/]", "Count prefix"),
+        ("[bold]zz[/]", "Center current key row"),
+        ("[bold]1-9[/]", "Count prefix (5h / 3l / 2j / 3gg = 3G)"),
         ("[bold]Enter[/]", "Select key & exit"),
     ]),
-    ("[b]Zoom[/]", [
-        ("[bold]`[/]", "Toggle zoom mode"),
-        ("[bold]+=[/] / [bold]-_[/]", "Zoom in / out"),
-        ("[bold]f[/] / [bold]F[/]", "Fit key / Fit all to view"),
-        ("[bold]0[/]", "Reset zoom"),
-    ]),
+    _MAP_ZOOM_OFF,
     ("[b]Pan/Scroll[/]", [
         ("[bold]~[/]", "Toggle pan/scroll mode"),
         ("[bold]hjkl[/] / arrows", "Slow pan/scroll (in Zoom mode)"),
@@ -105,10 +117,21 @@ _MAP_HELP_DATA = [
     ]),
     ("[b]Action[/]", [
         ("[bold]![/]", "Toggle action mode"),
-        ("[bold]y[/]", "Yank key"),
-        ("[bold]Y[/]", "Yank row (not yet)"),
-        ("[bold]p[/] / [bold]P[/]", "Put after/before cursor"),
-        ("[bold]d[/] / [bold]x[/]", "Delete selected key"),
+        ("[bold]y[/] / [bold]yy[/] / [bold]Y[/]", "Yank key / row / motion range"),
+        ("[bold]d[/] / [bold]dd[/] / [bold]x[/]", "Delete key / row / range (yanks)"),
+        ("[bold]3dd[/] / [bold]y3j[/]", "Count before / after operator"),
+        ("[bold]p[/] / [bold]P[/]", "Put right / left"),
+        ("[bold]v[/]", "Visual multi-select (Enter ends row)"),
+        ("[bold]u[/] / [bold]\u2303Z[/]", "Undo map change"),
+        ("[bold]\u2303R[/]", "Redo"),
+    ]),
+    ("[b]Ghost[/]", [
+        ("[bold]@[/]", "Toggle ghost mode"),
+        ("[bold]hjkl[/] / wasd / arrows / space", "Snap grid (\u21e7 = fine 1)"),
+        ("[bold]0[/] / [bold]^[/] / [bold]$[/]", "Canvas edge left / right"),
+        ("[bold]\\[ / ][/]", "Align to visible keys"),
+        ("[bold]Enter[/]", "Place (stays on)"),
+        ("[bold]Esc[/]", "Cancel"),
     ]),
     ("[b]Find & Ops[/]", [
         ("[bold]/[/]", "Find key by name"),
@@ -120,11 +143,17 @@ _MAP_HELP_DATA = [
     ]),
 ]
 
+_MAP_HELP_DATA_ZOOM = [
+    (_MAP_ZOOM_ON if title == _MAP_ZOOM_OFF[0] else (title, section))
+    for title, section in _MAP_HELP_DATA
+]
+
 _ALL_HELP_DATA = {
     "design": _DESIGN_HELP_DATA,
     "map": _MAP_HELP_DATA,
 }
 _ALL_PAGES = {k: _build_pages(v) for k, v in _ALL_HELP_DATA.items()}
+_ALL_PAGES["map:zoom"] = _build_pages(_MAP_HELP_DATA_ZOOM)
 
 
 class HelpScreen(PopupScreen):
@@ -136,9 +165,12 @@ class HelpScreen(PopupScreen):
     #hints { margin-top: 1; }
     """
 
-    def __init__(self, mode: str = "design", page: int | None = None) -> None:
+    def __init__(
+        self, mode: str = "design", page: int | None = None, zoom_mode: bool = False
+    ) -> None:
         super().__init__()
         self._mode = mode
+        self._zoom_mode = zoom_mode
         if page is not None:
             self._page = page
             self._freeze_shared = True
@@ -146,18 +178,23 @@ class HelpScreen(PopupScreen):
             self._page = HelpScreen._shared_page
             self._freeze_shared = False
 
+    def _pages(self) -> list[str]:
+        if self._mode == "map" and self._zoom_mode:
+            return _ALL_PAGES["map:zoom"]
+        return _ALL_PAGES[self._mode]
+
     def compose(self) -> ComposeResult:
         with Vertical():
             yield Static(self.app.title_with_file(self.base_title), id="title")
-            yield Static(_ALL_PAGES[self._mode][0], id="content")
+            yield Static(self._pages()[0], id="content")
             yield Static("", id="hints")
 
     def on_mount(self) -> None:
         self._update_display()
 
     def _update_display(self) -> None:
-        total = len(_ALL_PAGES[self._mode])
-        self.query_one("#content", Static).update(_ALL_PAGES[self._mode][self._page])
+        total = len(self._pages())
+        self.query_one("#content", Static).update(self._pages()[self._page])
         prev_is_dim = self._page == 0
         next_is_dim = self._page == total - 1
 
@@ -175,8 +212,7 @@ class HelpScreen(PopupScreen):
 
     def on_key(self, event) -> None:
         key = event.key
-        ch = getattr(event, "character", None)
-        total = len(_ALL_PAGES[self._mode])
+        total = len(self._pages())
 
         if key == "escape":
             self.dismiss(None)

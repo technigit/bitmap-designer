@@ -25,8 +25,10 @@ disable = ["missing-function-docstring"]
 max-args = 6
 max-attributes = 30
 max-parents = 10
-max-returns = 15
-max-locals = 16
+max-returns = 16
+max-locals = 18
+max-branches = 20
+max-module-lines = 2100
 
 [tool.pylint.MASTER]
 ignore = "tests"
