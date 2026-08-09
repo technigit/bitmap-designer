@@ -339,6 +339,82 @@ class DesignScreen(Screen):
 
         return True
 
+    def _finish_motion(self) -> None:
+        self._ensure_cursor_visible()
+        self._reset_cursor_timer()
+        self.refresh_grid()
+
+    def _motion_zero(self) -> None:
+        self.cursor[0] = 0
+        self._finish_motion()
+
+    def _motion_hat(self) -> None:
+        self.cursor[0] = self._first_non_blank_col(self.cursor[1])
+        self._finish_motion()
+
+    def _motion_dollar(self) -> None:
+        self.cursor[0] = self._last_non_blank_col(self.cursor[1])
+        self._finish_motion()
+
+    def _motion_last_row(self) -> None:
+        y = self.height - 1
+        self.cursor = [self._first_non_blank_col(y), y]
+        self._finish_motion()
+
+    def _motion_gg(self) -> None:
+        self.cursor = [self._first_non_blank_col(0), 0]
+        self._finish_motion()
+
+    def _motion_g_hat(self) -> None:
+        limit = min(self._offset[0] + self.viewport[0], self.width)
+        for col in range(self._offset[0], limit):
+            if self._get_pixel(col, self.cursor[1]) != " ":
+                self.cursor[0] = col
+                break
+        else:
+            self.cursor[0] = self._offset[0]
+        self._finish_motion()
+
+    def _motion_g_dollar(self) -> None:
+        limit = min(self._offset[0] + self.viewport[0], self.width) - 1
+        for col in range(limit, self._offset[0] - 1, -1):
+            if self._get_pixel(col, self.cursor[1]) != " ":
+                self.cursor[0] = col
+                break
+        else:
+            self.cursor[0] = limit
+        self._finish_motion()
+
+    def _goto_line(self, n: int) -> None:
+        y = min(max(0, n - 1), self.height - 1)
+        self.cursor = [self._first_non_blank_col(y), y]
+        self._finish_motion()
+
+    def _jump(self, dx: int, dy: int) -> None:
+        self.cursor[0] = max(0, min(self.width - 1, self.cursor[0] + dx))
+        self.cursor[1] = max(0, min(self.height - 1, self.cursor[1] + dy))
+        self._finish_motion()
+
+    def _motion_enter(self) -> None:
+        self.cursor[0] = 0
+        self.cursor[1] = min(self.cursor[1] + 1, self.height - 1)
+        self._finish_motion()
+
+    def _center_cursor(self) -> bool:
+        if self.content_fits:
+            return False
+        old = (self._offset[0], self._offset[1])
+        self._ensure_cursor_visible()
+        self._offset[1] = max(
+            0,
+            min(
+                max(0, self.height - self.viewport[1]),
+                self.cursor[1] - self.viewport[1] // 2,
+            ),
+        )
+        self.update_hints()
+        return (self._offset[0], self._offset[1]) != old
+
     def _scroll_move(self, base_lower: str, msgs: dict) -> None:
         deltas = {
             "left": (-1, 0),
@@ -442,6 +518,10 @@ class DesignScreen(Screen):
             if key == "escape":
                 self.show_status("")
                 return
+            if key == "z":
+                if self._center_cursor():
+                    self.refresh_grid()
+                return
             if key in ("l", "h", "L", "H"):
                 dx = 1 if key.islower() else max(1, self.viewport[0] // 2)
                 factor = -1 if key.lower() == "h" else 1
@@ -457,34 +537,21 @@ class DesignScreen(Screen):
         if self._g_pending:
             self._g_pending = False
             if key == "g":
-                self._goto_first()
-                self.refresh_grid()
+                if self._visual_mode:
+                    self._motion_gg()
+                else:
+                    self._goto_first()
                 return
             if key == "escape":
                 self.show_status("")
                 return
             ch = getattr(event, "character", None)
             if ch == "^":
-                limit = min(self._offset[0] + self.viewport[0], self.width)
-                for col in range(self._offset[0], limit):
-                    if self._get_pixel(col, self.cursor[1]) != " ":
-                        self.cursor[0] = col
-                        break
-                else:
-                    self.cursor[0] = self._offset[0]
+                self._motion_g_hat()
             elif ch == "$":
-                limit = min(self._offset[0] + self.viewport[0], self.width) - 1
-                for col in range(limit, self._offset[0] - 1, -1):
-                    if self._get_pixel(col, self.cursor[1]) != " ":
-                        self.cursor[0] = col
-                        break
-                else:
-                    self.cursor[0] = limit
+                self._motion_g_dollar()
             else:
                 return
-            self.cursor_hidden = False
-            self.update_hints()
-            self.refresh_grid()
             return
 
         if self._y_pending:
@@ -531,7 +598,7 @@ class DesignScreen(Screen):
 
         if key in (DESIGN_SCROLL_KEY, "backslash"):
             if self.content_fits:
-                self.show_status("All content visible — scrolling disabled")
+                self.show_status("Content fits; scrolling disabled")
                 return
             self.scroll_mode = not self.scroll_mode
             self.show_status(
@@ -552,25 +619,20 @@ class DesignScreen(Screen):
             return
 
         if self._visual_mode:
-            self._on_key_visual(key)
+            self._on_key_visual(key, event)
             return
 
-        if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9"):
+        if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9") or (
+            key == "0" and self._count_pending > 0
+        ):
             self._count_pending = self._count_pending * 10 + int(key)
-            self.show_status(str(self._count_pending))
             return
 
         if self._count_pending > 0:
             count = self._count_pending
             self._count_pending = 0
             if key == "G":
-                y = min(max(0, count - 1), self.height - 1)
-                self.cursor = [self._first_non_blank_col(y), y]
-                if not self._key_level_mode:
-                    self.show_status(f"Line {y + 1} of {self.height}")
-                self._ensure_cursor_visible()
-                self._reset_cursor_timer()
-                self.refresh_grid()
+                self._goto_line(count)
                 return
             if key == "x":
                 self._delete_chars(count)
@@ -586,7 +648,7 @@ class DesignScreen(Screen):
                     self.app.bitmaps, palette=self.app.active_palette
                 ).save_preview_html()
                 self._store_last_action(
-                    {"type": "paint", "color": self.app.current_color}
+                    {"type": "paint", "color": self.app.current_color, "count": count}
                 )
                 self.show_status(f"Painted {count} pixels")
                 self.refresh_grid()
@@ -603,11 +665,7 @@ class DesignScreen(Screen):
                     "down": (0, count),
                 }
                 dx, dy = dirs[key]
-                self.cursor[0] = max(0, min(self.width - 1, self.cursor[0] + dx))
-                self.cursor[1] = max(0, min(self.height - 1, self.cursor[1] + dy))
-                self._ensure_cursor_visible()
-                self._reset_cursor_timer()
-                self.refresh_grid()
+                self._jump(dx, dy)
                 return
             if key == "D":
                 self._delete_lines(count)
@@ -615,7 +673,7 @@ class DesignScreen(Screen):
                 return
             if key == "p":
                 if not self._clipboard:
-                    self.show_status("Nothing to paste")
+                    self.show_status("Nothing in register")
                     return
                 self._save_state()
                 for _ in range(count):
@@ -626,11 +684,11 @@ class DesignScreen(Screen):
                 CodegenService(
                     self.app.bitmaps, palette=self.app.active_palette
                 ).save_preview_html()
-                self._store_last_action({"type": "paste"})
+                self._store_last_action({"type": "paste", "count": count})
                 self.show_status(f"Pasted {count} times")
                 self.refresh_grid()
                 return
-            if key == ".":
+            if key in (".", "full_stop") or getattr(event, "character", None) == ".":
                 if not self._last_action:
                     self.show_status("No previous action to repeat")
                     return
@@ -649,7 +707,6 @@ class DesignScreen(Screen):
             if key == "d":
                 self._count_for_d = count
                 self._d_pending = True
-                self.show_status("d")
                 return
             if key == "escape":
                 self.show_status("")
@@ -657,22 +714,18 @@ class DesignScreen(Screen):
 
         if key == "d" and not self._key_level_mode:
             self._d_pending = True
-            self.show_status("d")
             return
 
         if key == "z":
             self._z_pending = True
-            self.show_status("z")
             return
 
         if key == "g":
             self._g_pending = True
-            self.show_status("g")
             return
 
         if key == "y" and not self._visual_mode:
             self._y_pending = True
-            self.show_status("y")
             return
 
         if key == "O":
@@ -700,53 +753,34 @@ class DesignScreen(Screen):
         ch = getattr(event, "character", None)
         if ch == "^":
             if self._key_level_mode:
-                self._goto_first_key()
+                self._goto_row_edge("left")
             else:
-                self.cursor[0] = self._first_non_blank_col(self.cursor[1])
-            self._ensure_cursor_visible()
-            self.refresh_grid()
-            self._reset_cursor_timer()
+                self._motion_hat()
             return
 
         if ch == "$":
             if self._key_level_mode:
-                self._goto_last_key()
+                self._goto_row_edge("right")
             else:
-                self.cursor[0] = self._last_non_blank_col(self.cursor[1])
-            self._ensure_cursor_visible()
-            self.refresh_grid()
-            self._reset_cursor_timer()
+                self._motion_dollar()
             return
 
         if key == "0":
             if self._key_level_mode:
-                self._goto_first_key()
+                self._goto_row_edge("left")
             else:
-                self.cursor[0] = 0
-                self.show_status(f"Column 1 of {self.width}")
-            self._ensure_cursor_visible()
-            self.refresh_grid()
-            self._reset_cursor_timer()
+                self._motion_zero()
             return
 
         if key == "G":
             if self._key_level_mode:
                 self._goto_last_key()
             else:
-                y = self.height - 1
-                self.cursor = [self._first_non_blank_col(y), y]
-                self.show_status(f"Line {y + 1} of {self.height}")
-            self._ensure_cursor_visible()
-            self.refresh_grid()
-            self._reset_cursor_timer()
+                self._motion_last_row()
             return
 
         if key in ("enter", "\n"):
-            self.cursor[0] = 0
-            self.cursor[1] = min(self.cursor[1] + 1, self.height - 1)
-            self._ensure_cursor_visible()
-            self.refresh_grid()
-            self._reset_cursor_timer()
+            self._motion_enter()
             return
 
         if key == "e":
@@ -782,7 +816,7 @@ class DesignScreen(Screen):
             self.refresh_grid()
             return
 
-        if key == ".":
+        if key in (".", "full_stop") or getattr(event, "character", None) == ".":
             self._repeat_last_action()
             self.refresh_grid()
             return
@@ -793,12 +827,41 @@ class DesignScreen(Screen):
 
         self._on_key_action(key, event)
 
-    def _on_key_visual(self, key: str) -> None:
+    def _on_key_visual(  # pylint: disable=too-many-return-statements,too-many-branches,too-many-statements
+        self, key: str, event
+    ) -> None:
+        if key in ("1", "2", "3", "4", "5", "6", "7", "8", "9") or (
+            key == "0" and self._count_pending > 0
+        ):
+            self._count_pending = self._count_pending * 10 + int(key)
+            return
+
         k_low = key.lower()
+
+        if self._count_pending > 0:
+            count = self._count_pending
+            self._count_pending = 0
+            if key == "G":
+                self._goto_line(count)
+                return
+            if k_low in ("left", "right", "up", "down", "h", "j", "k", "l"):
+                dirs = {
+                    "h": (-count, 0),
+                    "j": (0, count),
+                    "k": (0, -count),
+                    "l": (count, 0),
+                    "left": (-count, 0),
+                    "right": (count, 0),
+                    "up": (0, -count),
+                    "down": (0, count),
+                }
+                dx, dy = dirs[k_low]
+                self._jump(dx, dy)
+                return
+
         if k_low in ("left", "right", "up", "down", "h", "j", "k", "l"):
             parts = key.split("+")
-            base = parts[-1]
-            base_low = base.lower()
+            base_low = parts[-1].lower()
             if base_low in ("left", "h"):
                 self.cursor[0] = max(0, self.cursor[0] - 1)
             elif base_low in ("right", "l"):
@@ -811,15 +874,70 @@ class DesignScreen(Screen):
             self.refresh_grid()
             self._reset_cursor_timer()
             return
+
+        if key == "g":
+            self._g_pending = True
+            return
+
+        if key == "z":
+            self._z_pending = True
+            return
+
+        ch = getattr(event, "character", None)
+
+        if key == "G":
+            self._motion_last_row()
+            return
+        if key == "0":
+            self._motion_zero()
+            return
+        if ch == "^":
+            self._motion_hat()
+            return
+        if ch == "$":
+            self._motion_dollar()
+            return
+        if key in ("enter", "\n"):
+            self._motion_enter()
+            return
+
+        if k_low == "b":
+            self._prev_color_word()
+            self.refresh_grid()
+            return
+        if key == "W":
+            self._next_vertical_color_run()
+            self.refresh_grid()
+            return
+        if key == "B":
+            self._prev_vertical_color_run()
+            self.refresh_grid()
+            return
+
+        if k_low in ("x", "d"):
+            self._delete_visual_selection()
+            return
+
+        if k_low == "v":
+            self._visual_mode = False
+            self._visual_start[0] = self._visual_start[1] = 0
+            self._count_pending = 0
+            self.show_status("Visual mode off")
+            self.update_hints()
+            self.refresh_grid()
+            return
+
         if k_low == "y":
             self._yank_visual_selection()
             self._visual_mode = False
+            self._count_pending = 0
             self.show_status("Selection yanked")
             self.update_hints()
             self.refresh_grid()
             return
         if k_low == "escape":
             self._visual_mode = False
+            self._count_pending = 0
             self.show_status("Visual mode cancelled")
             self.update_hints()
             self.refresh_grid()
@@ -957,7 +1075,7 @@ class DesignScreen(Screen):
         self.update_hints()
         title = self.query_one("#title", Static)
         title.update(self.app.title_with_file(self.base_title))
-        self.show_status(f"Switched to key {new_key}.")
+        self.show_status(f"Switched to key {new_key}")
 
     def _on_key_action(self, k: str, event) -> None:
         if k == "u":
@@ -1027,6 +1145,9 @@ class DesignScreen(Screen):
     def paint_pixel(self):
         new_color = " " if self.app.current_color == "0" else self.app.current_color
         if self._get_pixel(self.cursor[0], self.cursor[1]) == new_color:
+            self._store_last_action(
+                {"type": "paint", "color": self.app.current_color}
+            )
             return
         self._save_state()
         self._paint_pixel_no_save()
@@ -1040,11 +1161,12 @@ class DesignScreen(Screen):
         )
 
     def flood_fill(self):
-        self._save_state()
         target = self._get_pixel(self.cursor[0], self.cursor[1])
         fill_color = self.app.current_color
         if target == fill_color:
+            self._store_last_action({"type": "fill", "color": fill_color})
             return
+        self._save_state()
         self._flood_fill(self.cursor[0], self.cursor[1], target, fill_color)
         self.app.mark_dirty()
         self._sync_pixels()
@@ -1162,14 +1284,14 @@ class DesignScreen(Screen):
             hints.append("[hjkl/\u25b4\u25be\u25c2\u25b8] select opposite corner  ")
             hints.append("[Enter] confirm  [Escape] cancel")
         else:
-            hints.append(f"[C]olor={self.app.current_color}  ")
+            hints.append(f"[c]olor={self.app.current_color}  ")
             hints.append("[space] paint  ")
-            hints.append("[F]ill  ")
-            hints.append("[R]ect  ")
+            hints.append("[f]ill  ")
+            hints.append("[r]ect  ")
             if not self.undo_stack:
-                hints.append("[U]ndo", style="dim")
+                hints.append("[u]ndo", style="dim")
             else:
-                hints.append("[U]ndo")
+                hints.append("[u]ndo")
             hints.append("  ")
             if not self.redo_stack:
                 hints.append("[⌃R]edo", style="dim")
@@ -1202,10 +1324,10 @@ class DesignScreen(Screen):
                 hints.append("[B\u2191] ", style=cap_b_style)
                 hints.append("color run  ")
             hints.append("[/] find key  ")
-            mode_str = "key" if self._key_level_mode else "bitmap"
+            mode_str = "key switching" if self._key_level_mode else "bitmap editing"
             hints.append(f"[`] {mode_str}\n")
             hints.append("[⇧O]ps  ")
-            hints.append("[M]ap  ")
+            hints.append("[m]ap  ")
             hints.append("[⇧P]review  ")
             hints.append(f"[Tab] {'show' if self.cursor_hidden else 'hide'} cursor  ")
             hints.append("[Escape] back")
@@ -1214,7 +1336,7 @@ class DesignScreen(Screen):
     def _eyedropper(self) -> None:
         color = self._get_pixel(self.cursor[0], self.cursor[1])
         if color == " ":
-            self.show_status("Empty pixel — color not changed")
+            self.show_status("Empty pixel; color not changed")
             return
         self.app.set_current_color(color)
         self.show_status(f"Color set to {color}")
@@ -1252,9 +1374,7 @@ class DesignScreen(Screen):
                 self.cursor[1] = y
                 self._ensure_cursor_visible()
                 self._reset_cursor_timer()
-                self.show_status(
-                    f"Run {y + 1} of {self.height} in column {self.cursor[0]}"
-                )
+                self.refresh_grid()
                 return
             y += 1
         self.show_status("No more color runs in this column")
@@ -1267,9 +1387,7 @@ class DesignScreen(Screen):
                 self.cursor[1] = y
                 self._ensure_cursor_visible()
                 self._reset_cursor_timer()
-                self.show_status(
-                    f"Run {y + 1} of {self.height} in column {self.cursor[0]}"
-                )
+                self.refresh_grid()
                 return
             y -= 1
         self.show_status("No more color runs in this column")
@@ -1306,7 +1424,7 @@ class DesignScreen(Screen):
         self._visual_mode = True
         self._visual_start[0] = self.cursor[0]
         self._visual_start[1] = self.cursor[1]
-        self.show_status("Visual mode — move cursor to expand selection")
+        self.show_status("Visual mode")
         self.update_hints()
         self.refresh_grid()
 
@@ -1326,6 +1444,32 @@ class DesignScreen(Screen):
             f"Yanked {x2 - x1 + 1}x{y2 - y1 + 1} block"
         )
 
+    def _delete_visual_selection(self) -> None:
+        x1 = min(self._visual_start[0], self.cursor[0])
+        x2 = max(self._visual_start[0], self.cursor[0])
+        y1 = min(self._visual_start[1], self.cursor[1])
+        y2 = max(self._visual_start[1], self.cursor[1])
+        w = x2 - x1 + 1
+        h = y2 - y1 + 1
+        self._save_state()
+        for y in range(y1, y2 + 1):
+            for x in range(x1, x2 + 1):
+                self._set_pixel(x, y, " ")
+        self._sync_pixels()
+        self.app.mark_dirty()
+        CodegenService(
+            self.app.bitmaps, palette=self.app.active_palette
+        ).save_preview_html()
+        self._store_last_action(
+            {"type": "rect", "color": "0", "width": w, "height": h}
+        )
+        self._visual_mode = False
+        self._visual_start[0] = self._visual_start[1] = 0
+        self._count_pending = 0
+        self.show_status(f"Deleted {w}x{h} block")
+        self.update_hints()
+        self.refresh_grid()
+
     def _yank_line(self) -> None:
         y = self.cursor[1]
         row = []
@@ -1336,7 +1480,7 @@ class DesignScreen(Screen):
 
     def _paste(self) -> None:
         if not self._clipboard:
-            self.show_status("Nothing to paste")
+            self.show_status("Nothing in register")
             return
         self._save_state()
         self._paste_clipboard_at_cursor()
@@ -1400,7 +1544,7 @@ class DesignScreen(Screen):
         CodegenService(
             self.app.bitmaps, palette=self.app.active_palette
         ).save_preview_html()
-        self._store_last_action({"type": "paint", "color": "0"})
+        self._store_last_action({"type": "delete", "count": count})
         self.show_status(f"Deleted {deleted} pixel{'s' if deleted != 1 else ''}")
 
     def _paint_pixel_no_save(self) -> None:
@@ -1436,30 +1580,37 @@ class DesignScreen(Screen):
                 self.cursor[1] = min(self.cursor[1] + 1, self.height - 1)
 
     def _execute_action(self, action: dict) -> None:
-        t = action["type"]
-        if t == "paint":
-            saved_color = self.app.current_color
-            self.app.set_current_color(action.get("color", saved_color))
-            self._paint_pixel_no_save()
-            self.app.set_current_color(saved_color)
-        elif t == "fill":
-            target = self._get_pixel(self.cursor[0], self.cursor[1])
-            fill_color = action.get("color", self.app.current_color)
-            if target != fill_color:
-                self._flood_fill(self.cursor[0], self.cursor[1], target, fill_color)
-        elif t == "rect":
-            w = action.get("width", 1)
-            h = action.get("height", 1)
-            color = action.get("color", self.app.current_color)
-            for dy in range(h):
-                for dx in range(w):
-                    x = self.cursor[0] + dx
-                    y = self.cursor[1] + dy
-                    if 0 <= x < self.width and 0 <= y < self.height:
-                        self._set_pixel(x, y, color)
-        elif t == "paste":
-            self._paste_clipboard_at_cursor()
-            self._advance_paste_cursor()
+        for _ in range(action.get("count", 1)):
+            t = action["type"]
+            if t == "paint":
+                saved_color = self.app.current_color
+                self.app.set_current_color(action.get("color", saved_color))
+                self._paint_pixel_no_save()
+                self.app.set_current_color(saved_color)
+            elif t == "fill":
+                target = self._get_pixel(self.cursor[0], self.cursor[1])
+                fill_color = action.get("color", self.app.current_color)
+                if target != fill_color:
+                    self._flood_fill(self.cursor[0], self.cursor[1], target, fill_color)
+            elif t == "rect":
+                w = action.get("width", 1)
+                h = action.get("height", 1)
+                color = action.get("color", self.app.current_color)
+                for dy in range(h):
+                    for dx in range(w):
+                        x = self.cursor[0] + dx
+                        y = self.cursor[1] + dy
+                        if 0 <= x < self.width and 0 <= y < self.height:
+                            self._set_pixel(x, y, color)
+            elif t == "paste":
+                self._paste_clipboard_at_cursor()
+                self._advance_paste_cursor()
+            elif t == "delete":
+                for i in range(action.get("count", 1)):
+                    x = self.cursor[0] + i
+                    if x >= self.width:
+                        break
+                    self._set_pixel(x, self.cursor[1], " ")
 
     def _delete_lines(self, n: int) -> None:
         self._save_state()
@@ -1500,6 +1651,20 @@ class DesignScreen(Screen):
             return
         last = list(self.app.bitmaps.keys())[-1]
         self.switch_to_key(last)
+
+    def _goto_row_edge(self, which: str) -> None:
+        row = self.app.row_keys(self.app.current_key)
+        if not row:
+            return
+        key = min(
+            row, key=lambda k: self.app.get_location(self.app.bitmaps[k])[0]
+        )
+        if which == "right":
+            key = max(
+                row, key=lambda k: self.app.get_location(self.app.bitmaps[k])[0]
+            )
+        if key != self.app.current_key:
+            self.switch_to_key(key)
 
 
 class ColorScreen(PopupScreen):

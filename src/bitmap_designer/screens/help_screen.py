@@ -39,6 +39,7 @@ _DESIGN_HELP_DATA = [
         ("[bold]nG[/]", "Row n, first non-blank"),
         ("[bold]H[/] / [bold]M[/] / [bold]L[/]", "Viewport top / middle / bottom row"),
         ("[bold]g^[/] / [bold]g$[/]", "Viewport left / right non-blank"),
+        ("[bold]zz[/]", "Center cursor vertically in viewport"),
         ("1-9", "Prefix count (e.g. 5j → 5 down)"),
     ]),
     ("[b]Editing[/]", [
@@ -53,7 +54,9 @@ _DESIGN_HELP_DATA = [
         ("[bold]m[/]", "Map / remap"),
     ]),
     ("[b]Visual / Yank / Put[/]", [
-        ("[bold]v[/]", "Start visual selection"),
+        ("[bold]v[/]", "Start visual selection (v exits)"),
+        ("[bold]hjkl[/] / [bold]^[/] / [bold]$[/] / [bold]0[/]", "Extend selection"),
+        ("[bold]gg[/] / [bold]G[/] / [bold]nG[/] / [bold]Enter[/]", "Extend selection"),
         ("[bold]y[/]", "Yank selection"),
         ("[bold]yy[/]", "Yank current row"),
         ("[bold]p[/]", "Paste clipboard at cursor"),

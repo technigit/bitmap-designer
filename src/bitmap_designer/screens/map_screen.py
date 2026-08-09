@@ -887,32 +887,26 @@ class MapScreen(Screen):
         self.refresh_map()
 
     def _select_leftmost_in_row(self) -> None:
-        my_loc = self.app.bitmaps.get(self.selected_key, {}).get("location", {"y": 0})
-        row_y = my_loc.get("y", 0)
-        locs = {k: v.get("location", {}) for k, v in self.app.bitmaps.items()}
-        best = None
-        for key, kloc in locs.items():
-            if kloc.get("y", 0) == row_y:
-                if best is None or kloc.get("x", 0) < locs[best].get("x", 0):
-                    best = key
-        if best:
-            self.selected_key = best
-            self._ensure_cursor_visible()
-            self.refresh_map()
+        row = self._row_keys()
+        if not row:
+            return
+        best = min(
+            row, key=lambda k: self.app.get_location(self.app.bitmaps[k])[0]
+        )
+        self.selected_key = best
+        self._ensure_cursor_visible()
+        self.refresh_map()
 
     def _select_rightmost_in_row(self) -> None:
-        loc = self.app.bitmaps.get(self.selected_key, {}).get("location", {"y": 0})
-        row_y = loc.get("y", 0)
-        locs = {k: v.get("location", {}) for k, v in self.app.bitmaps.items()}
-        best = None
-        for key, kloc in locs.items():
-            if kloc.get("y", 0) == row_y:
-                if best is None or kloc.get("x", 0) > locs[best].get("x", 0):
-                    best = key
-        if best:
-            self.selected_key = best
-            self._ensure_cursor_visible()
-            self.refresh_map()
+        row = self._row_keys()
+        if not row:
+            return
+        best = max(
+            row, key=lambda k: self.app.get_location(self.app.bitmaps[k])[0]
+        )
+        self.selected_key = best
+        self._ensure_cursor_visible()
+        self.refresh_map()
 
     def _handle_g_key(self) -> None:
         self._g_pending = True
@@ -1092,44 +1086,11 @@ class MapScreen(Screen):
         bounds = bm.get("bounds", {"width": 10, "height": 10})
         return x, y, bounds.get("width", 10), bounds.get("height", 10)
 
-    @staticmethod
-    def _ranges_overlap(a0: int, a1: int, b0: int, b1: int) -> bool:
-        return a0 < b1 and a1 > b0
-
     def _row_groups(self) -> list[list[str]]:
-        keys = sorted(
-            (
-                k
-                for k in self.app.bitmaps
-                if self._key_rect(k) is not None
-            ),
-            key=lambda k: (
-                self.app.get_location(self.app.bitmaps[k])[1],
-                self.app.get_location(self.app.bitmaps[k])[0],
-            ),
-        )
-        groups: list[list[str]] = []
-        for key in keys:
-            rect = self._key_rect(key)
-            if groups and any(
-                self._ranges_overlap(
-                    rect[1], rect[1] + rect[3], m_rect[1], m_rect[1] + m_rect[3]
-                )
-                for m in groups[-1]
-                if (m_rect := self._key_rect(m)) is not None
-            ):
-                groups[-1].append(key)
-            else:
-                groups.append([key])
-        for group in groups:
-            group.sort(key=lambda k: self.app.get_location(self.app.bitmaps[k])[0])
-        return groups
+        return self.app.row_groups()
 
     def _row_keys(self) -> list[str]:
-        for group in self._row_groups():
-            if self.selected_key in group:
-                return group
-        return []
+        return self.app.row_keys(self.selected_key)
 
     def _col_keys(self) -> list[str]:
         my_rect = self._key_rect(self.selected_key)
@@ -1140,7 +1101,7 @@ class MapScreen(Screen):
             rect = self._key_rect(key)
             if rect is None:
                 continue
-            if self._ranges_overlap(
+            if self.app.ranges_overlap(
                 rect[0], rect[0] + rect[2], my_rect[0], my_rect[0] + my_rect[2]
             ):
                 result.append(key)

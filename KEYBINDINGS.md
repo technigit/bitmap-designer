@@ -53,6 +53,7 @@ Overrides `hjkl`/arrows to pan instead of navigate. Everything else passes throu
 | `0` | Reset zoom |
 | `+=` / `-=` | Zoom in / out |
 | `r` | Reset pan |
+| `R` | Reset to show cursor |
 | `~` | Toggle pan mode |
 | `` ` `` | Disable Zoom |
 

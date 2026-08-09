@@ -90,6 +90,44 @@ class BitmapDesignerApp(App):  # pylint: disable=too-many-instance-attributes,to
         by2 = by1 + b_bounds["height"]
         return ax1 < bx2 and ax2 > bx1 and ay1 < by2 and ay2 > by1
 
+    @staticmethod
+    def ranges_overlap(a0: int, a1: int, b0: int, b1: int) -> bool:
+        return a0 < b1 and a1 > b0
+
+    def row_groups(self) -> list[list[str]]:
+        keys = sorted(
+            self.bitmaps.keys(),
+            key=lambda k: (
+                self.get_location(self.bitmaps[k])[1],
+                self.get_location(self.bitmaps[k])[0],
+            ),
+        )
+        groups: list[list[str]] = []
+        for key in keys:
+            y0, y1 = self._row_span(key)
+            if groups and any(
+                self.ranges_overlap(y0, y1, *self._row_span(m)) for m in groups[-1]
+            ):
+                groups[-1].append(key)
+            else:
+                groups.append([key])
+        for group in groups:
+            group.sort(key=lambda k: self.get_location(self.bitmaps[k])[0])
+        return groups
+
+    def _row_span(self, key: str) -> tuple[int, int]:
+        y = self.get_location(self.bitmaps[key])[1]
+        height = self.bitmaps[key].get("bounds", {"width": 10, "height": 10}).get(
+            "height", 10
+        )
+        return y, y + height
+
+    def row_keys(self, key: str) -> list[str]:
+        for group in self.row_groups():
+            if key in group:
+                return group
+        return []
+
     def _reorder_by_position(self) -> None:
         if not self.auto_reorder:
             return
